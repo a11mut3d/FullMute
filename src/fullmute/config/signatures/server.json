@@ -1,0 +1,42 @@
+{
+  "Nginx": {
+    "headers": ["Server: nginx", "X-Powered-By: nginx"],
+    "urls": ["/nginx-status", "/server-status"],
+    "must_not_have": ["Apache", "IIS", "LiteSpeed"]
+  },
+  "Apache": {
+    "headers": ["Server: Apache", "Server: Apache/.*", "X-Powered-By: Apache"],
+    "urls": ["/server-status", "/apache-status", "/mod_status"],
+    "must_not_have": ["nginx", "IIS"]
+  },
+  "IIS": {
+    "headers": ["Server: Microsoft-IIS", "Server: Microsoft-HTTPAPI", "X-Powered-By: ASP.NET"],
+    "urls": ["/iisstart.htm", "/iisadmin", "/aspnet_client/"],
+    "must_not_have": ["nginx", "Apache"]
+  },
+  "LiteSpeed": {
+    "headers": ["Server: LiteSpeed", "X-LiteSpeed-", "X-Litespeed-"],
+    "urls": ["/lsapi", "/ls_status"],
+    "must_not_have": ["nginx", "Apache", "IIS"]
+  },
+  "Cloudflare": {
+    "headers": ["Server: cloudflare", "CF-RAY", "CF-Cache-Status", "CF-Connecting-IP"],
+    "urls": [],
+    "must_not_have": []
+  },
+  "Tomcat": {
+    "headers": ["Server: Apache-Coyote", "X-Powered-By: JSP", "Server: Tomcat"],
+    "urls": ["/manager/html", "/tomcat-docs/", "/examples/"],
+    "must_not_have": []
+  },
+  "Node.js": {
+    "headers": ["X-Powered-By: Express", "X-Powered-By: nodejs"],
+    "urls": [],
+    "must_not_have": ["Apache", "IIS", "nginx"]
+  },
+  "Gunicorn": {
+    "headers": ["Server: gunicorn", "X-Gunicorn"],
+    "urls": [],
+    "must_not_have": []
+  }
+}

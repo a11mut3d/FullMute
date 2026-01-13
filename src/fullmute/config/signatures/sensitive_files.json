@@ -1,0 +1,103 @@
+{
+  "git_config": {
+    "paths": ["/.git/HEAD", "/.git/config", "/.git/index", "/.git/description"],
+    "verification": {
+      "method": "content",
+      "patterns": ["ref: refs/", "\\[core\\]", "repositoryformatversion"]
+    },
+    "confidence": 95
+  },
+  "git_exposed": {
+    "paths": ["/.git/", "/git/", "/.gitignore"],
+    "verification": {
+      "method": "directory_listing",
+      "patterns": ["HEAD", "config", "index", "objects"]
+    },
+    "confidence": 80
+  },
+  "env_files": {
+    "paths": ["/.env", "/.env.example", "/.env.local", "/.env.production", "/.env.dev", "/.env.test"],
+    "verification": {
+      "method": "content",
+      "patterns": ["API_KEY", "SECRET_KEY", "PASSWORD=", "DATABASE_URL=", "SECRET=", "TOKEN=", "KEY="]
+    },
+    "confidence": 90
+  },
+  "config_php": {
+    "paths": ["/config.php", "/configuration.php", "/config.inc.php", "/settings.php", "/wp-config.php"],
+    "verification": {
+      "method": "content",
+      "patterns": ["define\\(", "\\$database", "\\$password", "\\$host", "DB_"]
+    },
+    "confidence": 85
+  },
+  "backup_files": {
+    "paths": [
+      "/backup.zip", "/backup.tar.gz", "/backup.sql", "/dump.sql",
+      "/database.sql", "/db.sql", "/backup.bak", "/backup.old",
+      "/www.zip", "/site.tar.gz", "/dump.rar"
+    ],
+    "verification": {
+      "method": "extension",
+      "patterns": [".zip", ".tar", ".gz", ".sql", ".bak", ".old", ".rar"]
+    },
+    "confidence": 70
+  },
+  "log_files": {
+    "paths": [
+      "/debug.log", "/error.log", "/storage/logs/laravel.log",
+      "/var/log/", "/logs/", "/app/logs/", "/tmp/logs/",
+      "/error_log", "/php_errors.log"
+    ],
+    "verification": {
+      "method": "content",
+      "patterns": ["\\[.*\\]", "ERROR", "WARNING", "INFO", "DEBUG", "Exception", "Stack trace"]
+    },
+    "confidence": 75
+  },
+  "admin_panels": {
+    "paths": [
+      "/admin/", "/administrator/", "/wp-admin/", "/manager/",
+      "/cpanel/", "/controlpanel/", "/webadmin/", "/admincp/",
+      "/admin.php", "/administrator.php", "/login.php", "/signin.php"
+    ],
+    "verification": {
+      "method": "login_form",
+      "patterns": ["password", "username", "login", "sign in", "auth", "form"]
+    },
+    "confidence": 60
+  },
+  "config_files": {
+    "paths": [
+      "/.htaccess", "/web.config", "/robots.txt", "/sitemap.xml",
+      "/crossdomain.xml", "/clientaccesspolicy.xml", "/security.txt"
+    ],
+    "verification": {
+      "method": "config_content",
+      "patterns": ["Directory", "Rewrite", "Allow", "Deny", "xml", "txt"]
+    },
+    "confidence": 50
+  },
+  "ide_files": {
+    "paths": [
+      "/.idea/", "/.vscode/", "/.project", "/.classpath",
+      "/.settings/", "/nbproject/", "/phpstorm.xml"
+    ],
+    "verification": {
+      "method": "directory_listing",
+      "patterns": [".idea", ".vscode", "workspace.xml", "project.xml"]
+    },
+    "confidence": 65
+  },
+  "database_dumps": {
+    "paths": [
+      "/sql/", "/database/", "/db/", "/data/",
+      "/export/", "/import/", "/mysql/", "/postgres/"
+    ],
+    "verification": {
+      "method": "sql_content",
+      "patterns": ["CREATE TABLE", "INSERT INTO", "DROP TABLE", "ALTER TABLE"]
+    },
+    "confidence": 70
+  }
+}

@@ -1,0 +1,151 @@
+{
+  "WordPress": {
+    "headers": ["X-Powered-By:.*WordPress", "X-WP-Nonce", "X-WP-Total", "X-WP-TotalPages"],
+    "html": [
+      "<meta name=\"generator\" content=\"WordPress",
+      "wp-content/themes/",
+      "wp-content/plugins/",
+      "wp-includes/js/",
+      "wp-json",
+      "/wp-admin/",
+      "/wp-login.php",
+      "id=\"wp-admin-bar\""
+    ],
+    "urls": ["/wp-admin/", "/wp-login.php", "/wp-content/", "/wp-includes/"],
+    "cookies": ["wordpress_logged_in_", "wp-settings-", "wordpress_test_cookie"],
+    "must_have": ["wp-content"]
+  },
+  "Joomla": {
+    "headers": ["X-Powered-By:.*Joomla", "X-Content-Encoded-By: Joomla"],
+    "html": [
+      "<meta name=\"generator\" content=\"Joomla",
+      "/media/jui/js/",
+      "/media/system/js/",
+      "/templates/",
+      "com_content",
+      "index.php?option=com_"
+    ],
+    "urls": ["/administrator/", "/index.php?option="],
+    "cookies": ["joomla_[a-z0-9_]+", "sessioncookie"],
+    "must_not_have": ["wp-content", "wordpress"]
+  },
+  "Drupal": {
+    "headers": ["X-Generator: Drupal", "X-Drupal-Cache", "X-Drupal-Dynamic-Cache"],
+    "html": [
+      "<meta name=\"Generator\" content=\"Drupal",
+      "drupal.js",
+      "/sites/default/",
+      "/sites/all/",
+      "/modules/",
+      "/themes/",
+      "/profiles/",
+      "id=\"block-system-main\"",
+      "class=\"region region-"
+    ],
+    "urls": ["/user/login", "/node/", "/admin/", "/sites/"],
+    "cookies": ["SESS[a-z0-9]+", "has_js", "Drupal.visitor"],
+    "must_not_have": ["wp-content", "joomla"]
+  },
+  "Magento": {
+    "headers": ["X-Powered-By:.*Magento", "X-Magento-", "X-Content-Encoded-By: Magento"],
+    "html": [
+      "<meta name=\"keywords\" content=\"Magento",
+      "/skin/frontend/",
+      "/js/mage/",
+      "/media/css/",
+      "Mage.Cookies",
+      "var Mage=",
+      "<!-- /var/www/magento"
+    ],
+    "urls": ["/admin/", "/checkout/", "/customer/", "/catalog/"],
+    "cookies": ["frontend", "adminhtml", "PHPSESSID", "store", "private_content_version"],
+    "must_have": ["mage", "Magento"]
+  },
+  "Shopify": {
+    "headers": ["X-ShopId", "X-Shopify-Shop", "X-Shopify-Stage", "X-Shopify-"],
+    "html": [
+      "shopify\\.com",
+      "Shopify\\.Analytics",
+      "cdn\\.shopify\\.com",
+      "window\\.Shopify",
+      "\"shop\":\"[a-z0-9-]+\\.myshopify\\.com\"",
+      "class=\"shopify"
+    ],
+    "urls": ["/cart", "/collections/", "/products/", "/pages/", "/blogs/"],
+    "cookies": ["_shopify_[a-z_]+", "cart_", "_shopify_fs", "_shopify_s"],
+    "must_have": ["shopify"]
+  },
+  "PrestaShop": {
+    "headers": ["X-Powered-By: PrestaShop", "X-Ps"],
+    "html": [
+      "PrestaShop",
+      "content=\"PrestaShop",
+      "/themes/",
+      "/modules/",
+      "/img/",
+      "id=\"header_logo\"",
+      "class=\"breadcrumb"
+    ],
+    "urls": ["/authentication", "/order", "/my-account", "/module/"],
+    "cookies": ["PrestaShop-[a-z0-9]+", "id_currency"],
+    "must_have": ["PrestaShop"]
+  },
+  "OpenCart": {
+    "headers": [],
+    "html": [
+      "OpenCart",
+      "catalog/view/theme",
+      "catalog/view/javascript",
+      "index.php\\?route=",
+      "common/home",
+      "product/category"
+    ],
+    "urls": ["/index.php?route=", "/admin/index.php"],
+    "cookies": ["OCSESSID", "language", "currency"],
+    "must_have": ["index.php?route="]
+  },
+  "WooCommerce": {
+    "headers": ["X-Powered-By: WordPress"],
+    "html": [
+      "woocommerce",
+      "WooCommerce",
+      "wc-",
+      "class=\"woocommerce",
+      "/wp-content/plugins/woocommerce/",
+      "ajax\\?wc-ajax="
+    ],
+    "urls": ["/shop/", "/cart/", "/checkout/", "/my-account/"],
+    "cookies": ["woocommerce_[a-z_]+", "wp_woocommerce_"],
+    "must_have": ["wp-content", "woocommerce"]
+  },
+  "vBulletin": {
+    "headers": ["X-Powered-By: vBulletin"],
+    "html": [
+      "vBulletin",
+      "content=\"vBulletin",
+      "/clientscript/",
+      "/images/",
+      "forumdisplay\\.php",
+      "showthread\\.php",
+      "member\\.php"
+    ],
+    "urls": ["/forumdisplay.php", "/showthread.php", "/member.php", "/admincp/"],
+    "cookies": ["bb_[a-z]+", "sessionhash", "bbsessionhash"],
+    "must_have": ["vBulletin"]
+  },
+  "phpBB": {
+    "headers": ["X-Powered-By: phpBB"],
+    "html": [
+      "phpBB",
+      "content=\"phpBB",
+      "/styles/",
+      "viewtopic\\.php",
+      "viewforum\\.php",
+      "memberlist\\.php",
+      "posting\\.php"
+    ],
+    "urls": ["/viewtopic.php", "/viewforum.php", "/memberlist.php", "/ucp.php"],
+    "cookies": ["phpbb[a-z0-9_]+", "sid"],
+    "must_have": ["phpBB"]
+  }
+}

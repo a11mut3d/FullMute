@@ -1,0 +1,108 @@
+{
+  "Laravel": {
+    "headers": ["X-Powered-By: Laravel", "X-Framework: Laravel"],
+    "html": [
+      "csrf-token",
+      "_token",
+      "laravel",
+      "app\\/Http",
+      "Illuminate\\\\",
+      "Session::",
+      "Route::",
+      "<!-- Laravel -->"
+    ],
+    "must_not_have": ["django", "rails"]
+  },
+  "Django": {
+    "headers": ["X-Powered-By: Django", "X-Frame-Options: SAMEORIGIN"],
+    "html": [
+      "csrfmiddlewaretoken",
+      "__admin__",
+      "Django",
+      "django",
+      "/static/admin/",
+      "/admin/jsi18n/",
+      "<!-- django -->"
+    ],
+    "must_not_have": ["laravel", "rails"]
+  },
+  "Ruby on Rails": {
+    "headers": ["X-Runtime", "X-Rails", "X-Request-Id", "X-Powered-By: Ruby"],
+    "html": [
+      "csrf-token",
+      "rails",
+      "data-remote=\"true\"",
+      "data-method=",
+      "action=\"/rails/",
+      "<!-- Rails -->"
+    ],
+    "must_not_have": ["django", "laravel"]
+  },
+  "Express.js": {
+    "headers": ["X-Powered-By: Express", "X-Powered-By: Express/"],
+    "html": [
+      "express",
+      "Express",
+      "__express__",
+      "app\\.use\\(",
+      "res\\.render",
+      "<!-- express -->"
+    ],
+    "must_not_have": []
+  },
+  "Spring Boot": {
+    "headers": ["X-Application-Context", "X-SpringBoot-"],
+    "html": [
+      "spring",
+      "Spring",
+      "thymeleaf",
+      "@Controller",
+      "@Service",
+      "<!-- Spring Boot -->"
+    ],
+    "must_not_have": []
+  },
+  "Symfony": {
+    "headers": ["X-Powered-By: Symfony", "X-Symfony-"],
+    "html": [
+      "symfony",
+      "Symfony",
+      "sf-",
+      "/bundles/",
+      "/web/bundles/",
+      "<!-- Symfony -->"
+    ],
+    "must_not_have": []
+  },
+  "Yii": {
+    "headers": ["X-Powered-By: Yii Framework", "X-Yii-"],
+    "html": [
+      "yii",
+      "Yii",
+      "yii\\.js",
+      "yiiActiveForm",
+      "<!-- Yii Framework -->"
+    ],
+    "must_not_have": []
+  },
+  "CodeIgniter": {
+    "headers": ["X-Powered-By: CodeIgniter", "CI-"],
+    "html": [
+      "codeigniter",
+      "CodeIgniter",
+      "ci_",
+      "<!-- CodeIgniter -->"
+    ],
+    "must_not_have": []
+  },
+  "Flask": {
+    "headers": ["X-Powered-By: Flask", "Server: Werkzeug"],
+    "html": [
+      "flask",
+      "Flask",
+      "<!-- flask -->",
+      "url_for\\("
+    ],
+    "must_not_have": []
+  }
+}
