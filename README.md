@@ -1,5 +1,7 @@
 # FullMute
 A mass website scanner that detects technologies, surveillance cameras, and sensitive files.
+
+This project has room to grow. You can even see some of the initial concepts in the code.
 ## Peculiarities
 - CMS detection (WordPress, Joomla, Drupal, Magento, Shopify, etc.)
 - Definition of web servers (Nginx, Apache, IIS, LiteSpeed)
