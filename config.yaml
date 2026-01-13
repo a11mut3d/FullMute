@@ -1,0 +1,22 @@
+database:
+  path: "fullmute.db"
+
+scanner:
+  max_retries: 3
+  timeout: 15
+  max_concurrent: 10
+  proxy_enabled: false
+  proxy_file: "proxies.txt"
+  min_delay: 1.0
+  max_delay: 3.0
+  rotate_user_agents: true
+  verify_ssl: false
+
+signatures:
+  path: "./config/signatures"
+
+logging:
+  level: "INFO"
+  file: "./logs/fullmute.log"
+  max_mb: 50
+  backups: 5

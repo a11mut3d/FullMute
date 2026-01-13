@@ -1,0 +1,8 @@
+aiohttp
+PyYAML
+aiosqlite
+rich
+fake-useragent
+psutil
+sqlalchemy
+requests
