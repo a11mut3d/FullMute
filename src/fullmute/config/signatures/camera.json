@@ -1,0 +1,114 @@
+{
+  "Axis": {
+    "headers": ["Server: App-webs/", "Server: AXIS", "WWW-Authenticate: Basic realm=\"AXIS\""],
+    "html": [
+      "AXIS",
+      "axis",
+      "/view/view.shtml",
+      "/view/viewer.shtml",
+      "/mjpg/video.mjpg",
+      "/axis-cgi/",
+      "/img/axis_logo.gif",
+      "title>AXIS",
+      "AXIS Camera"
+    ],
+    "scripts": ["axis-cgi", "axis-web", "viewer.js"],
+    "titles": ["AXIS.*Camera", "Network Camera", "Video Server"],
+    "favicon": ["axis.ico", "favicon.ico"],
+    "must_not_have": ["hikvision", "dahua"]
+  },
+  "Hikvision": {
+    "headers": ["Server: Hikvision", "Server: App-webs/", "WWW-Authenticate: Basic realm=\"Hikvision\""],
+    "html": [
+      "Hikvision",
+      "hikvision",
+      "Web Video",
+      "webVideoCtrl.js",
+      "OCXInstaller.exe",
+      "language/en_US.js",
+      "logo-Hikvision",
+      "title>Hikvision"
+    ],
+    "scripts": ["webVideoCtrl", "hikvision", "playctrl.js"],
+    "titles": ["Hikvision", "Web Video", "iVMS"],
+    "favicon": ["hikvision.ico"],
+    "must_not_have": ["axis", "dahua"]
+  },
+  "Dahua": {
+    "headers": ["Server: Dahua", "Server: DHL-WEB", "WWW-Authenticate: Basic realm=\"Dahua\""],
+    "html": [
+      "Dahua",
+      "dahua",
+      "WEBACTIVEX",
+      "webCom\\.js",
+      "dahua\\.js",
+      "logo-dahua",
+      "title>Dahua"
+    ],
+    "scripts": ["dahua", "webcomponents", "webCom"],
+    "titles": ["Dahua", "Network Video Recorder", "DVR"],
+    "favicon": ["dahua.ico"],
+    "must_not_have": ["axis", "hikvision"]
+  },
+  "Ubiquiti": {
+    "headers": ["Server: AirVision", "Server: Ubiquiti", "X-Ubiquiti-"],
+    "html": [
+      "Ubiquiti",
+      "ubiquiti",
+      "UniFi",
+      "ui\\.com",
+      "unifi-video",
+      "title>UniFi",
+      "logo-ubiquiti"
+    ],
+    "scripts": ["unifi", "ubnt", "ui-video"],
+    "titles": ["UniFi", "Ubiquiti", "Network Video"],
+    "favicon": ["ubiquiti.ico", "favicon-ubnt.ico"],
+    "must_not_have": []
+  },
+  "Vivotek": {
+    "headers": ["Server: Vivotek", "WWW-Authenticate: Basic realm=\"Vivotek\""],
+    "html": [
+      "Vivotek",
+      "vivotek",
+      "liveView\\.shtml",
+      "cameraView\\.shtml",
+      "title>Vivotek",
+      "logo-vivotek"
+    ],
+    "scripts": ["vivotek", "cameraview"],
+    "titles": ["Vivotek", "Network Camera"],
+    "favicon": ["vivotek.ico"],
+    "must_not_have": []
+  },
+  "Bosch": {
+    "headers": ["Server: Bosch", "WWW-Authenticate: Basic realm=\"Bosch\""],
+    "html": [
+      "Bosch",
+      "bosch",
+      "VideoJet",
+      "title>Bosch",
+      "logo-bosch",
+      "bosch-security"
+    ],
+    "scripts": ["bosch", "videojet"],
+    "titles": ["Bosch", "Video Security"],
+    "favicon": ["bosch.ico"],
+    "must_not_have": []
+  },
+  "Samsung": {
+    "headers": ["Server: Samsung", "Samsung-DVR"],
+    "html": [
+      "Samsung",
+      "samsung",
+      "SNS-",
+      "title>Samsung",
+      "samsung-techwin",
+      "webviewer"
+    ],
+    "scripts": ["samsung", "webviewer"],
+    "titles": ["Samsung", "Network Camera"],
+    "favicon": ["samsung.ico"],
+    "must_not_have": []
+  }
+}
