@@ -8,6 +8,7 @@ from fullmute.db.queries import DBQueries
 from fullmute.utils.http_client import HttpClient
 from fullmute.utils.logger import setup_logger
 from fullmute.utils.stealth import Stealth
+from fullmute.utils.cve_checker import CVEChecker
 
 logger = setup_logger()
 
@@ -37,13 +38,17 @@ class FullMuteScanner:
             rotate_user_agents=self.config.get('rotate_user_agents', True)
         )
 
+        
+        self.cve_checker = CVEChecker()
+
         self.stats = {
             'total': 0,
             'successful': 0,
             'failed': 0,
             'with_technologies': 0,
             'with_files': 0,
-            'with_cameras': 0
+            'with_cameras': 0,
+            'with_cves': 0
         }
 
     async def scan_domain(self, domain: str):
@@ -54,6 +59,7 @@ class FullMuteScanner:
             "technologies": {},
             "cameras": [],
             "sensitive_files": [],
+            "cves": {},
             "error": None,
             "status_code": 0
         }
@@ -91,6 +97,54 @@ class FullMuteScanner:
             if cameras:
                 self.stats['with_cameras'] += 1
 
+            routers = technologies.get('router', [])
+            if routers:
+                self.stats['with_technologies'] += 1
+
+            js_libs = technologies.get('javascript', [])
+            if js_libs:
+                self.stats['with_technologies'] += 1
+
+            
+            tech_with_versions = []
+            for tech_type, tech_list in technologies.items():
+                for tech in tech_list:
+                    
+                    if ' (' in tech and tech.endswith(')'):
+                        parts = tech.rsplit(' (', 1)
+                        if len(parts) == 2:
+                            name = parts[0]
+                            version = parts[1][:-1]  
+                            tech_with_versions.append((name, version))
+
+            
+            if 'plugins' in technologies:
+                for plugin in technologies['plugins']:
+                    if ' (' in plugin and plugin.endswith(')'):
+                        parts = plugin.rsplit(' (', 1)
+                        if len(parts) == 2:
+                            name = parts[0]
+                            version = parts[1][:-1]  
+                            tech_with_versions.append((name, version))
+
+            if 'themes' in technologies:
+                for theme in technologies['themes']:
+                    if ' (' in theme and theme.endswith(')'):
+                        parts = theme.rsplit(' (', 1)
+                        if len(parts) == 2:
+                            name = parts[0]
+                            version = parts[1][:-1]  
+                            tech_with_versions.append((name, version))
+
+            
+            if tech_with_versions:
+                cve_results = await self.cve_checker.check_cves_batch(tech_with_versions)
+                results["cves"] = cve_results
+
+                if cve_results:
+                    self.stats['with_cves'] += 1
+                    logger.info(f"Found CVEs for {domain}: {len(cve_results)} technology(s) affected")
+
             async with aiohttp.ClientSession() as session:
                 sensitive_files = await self.verifier.verify(session, url)
                 results["sensitive_files"] = sensitive_files
@@ -100,7 +154,7 @@ class FullMuteScanner:
 
             self._save_to_db(domain, results)
 
-            logger.info(f"Scanned {domain} - Tech: {len(technologies.get('cms', []))} CMS, Files: {len(sensitive_files)}")
+            logger.info(f"Scanned {domain} - Tech: {len(technologies.get('cms', []))} CMS, CVEs: {len(results['cves'])}, Files: {len(sensitive_files)}")
 
         except Exception as e:
             logger.error(f"Error scanning {domain}: {e}")
@@ -123,15 +177,139 @@ class FullMuteScanner:
             domain_id = self.db.get_domain_id(domain)
 
             if domain_id:
+                
+                technology_ids = {}
                 for tech_type, tech_list in results.get('technologies', {}).items():
                     for tech in tech_list:
+                        
+                        name = tech
+                        version = ""
+
+                        if ' (' in tech and tech.endswith(')'):
+                            parts = tech.rsplit(' (', 1)
+                            if len(parts) == 2:
+                                name = parts[0]
+                                version = parts[1][:-1]  
+
                         tech_data = {
                             'domain_id': domain_id,
                             'category': tech_type,
-                            'name': tech,
+                            'name': name,
+                            'version': version,
                             'confidence': 100
                         }
-                        self.db.add_technology(tech_data)
+                        tech_id = self.db.add_technology(tech_data)
+                        if tech_id:
+                            technology_ids[f"{name}_{version}"] = tech_id
+
+                
+                plugins = results.get('technologies', {}).get('plugins', [])
+                themes = results.get('technologies', {}).get('themes', [])
+
+                plugin_ids = {}
+
+                
+                for plugin in plugins:
+                    if ' (' in plugin and plugin.endswith(')'):
+                        parts = plugin.rsplit(' (', 1)
+                        if len(parts) == 2:
+                            name = parts[0]
+                            version = parts[1][:-1]  
+
+                            
+                            cms_type = 'unknown'
+                            if any(word in name.lower() for word in ['wp-', 'wordpress']):
+                                cms_type = 'wordpress'
+                            elif any(word in name.lower() for word in ['joomla', 'com_']):
+                                cms_type = 'joomla'
+                            elif any(word in name.lower() for word in ['drupal']):
+                                cms_type = 'drupal'
+                            else:
+                                
+                                cms_type = 'wordpress'
+
+                            plugin_data = {
+                                'domain_id': domain_id,
+                                'cms_type': cms_type,
+                                'plugin_name': name,
+                                'version': version,
+                                'status': 'active'
+                            }
+                            plugin_id = self.db.add_plugin(plugin_data)
+                            if plugin_id:
+                                plugin_ids[f"{name}_{version}"] = plugin_id
+
+                
+                for theme in themes:
+                    if ' (' in theme and theme.endswith(')'):
+                        parts = theme.rsplit(' (', 1)
+                        if len(parts) == 2:
+                            name = parts[0]
+                            version = parts[1][:-1]  
+
+                            
+                            cms_type = 'wordpress_theme'
+                            if 'joomla' in name.lower():
+                                cms_type = 'joomla_template'
+                            elif 'drupal' in name.lower():
+                                cms_type = 'drupal_theme'
+
+                            plugin_data = {
+                                'domain_id': domain_id,
+                                'cms_type': cms_type,
+                                'plugin_name': name,
+                                'version': version,
+                                'status': 'active'
+                            }
+                            plugin_id = self.db.add_plugin(plugin_data)
+                            if plugin_id:
+                                plugin_ids[f"{name}_{version}"] = plugin_id
+
+                
+                cve_results = results.get('cves', {})
+                for tech_identifier, cves in cve_results.items():
+                    
+                    if ' (' in tech_identifier and tech_identifier.endswith(')'):
+                        parts = tech_identifier.rsplit(' (', 1)
+                        if len(parts) == 2:
+                            name = parts[0]
+                            version = parts[1][:-1]  
+
+                            
+                            tech_id_key = f"{name}_{version}"
+                            tech_id = technology_ids.get(tech_id_key)
+                            plugin_id = plugin_ids.get(tech_id_key)
+
+                            if tech_id:
+                                for cve in cves:
+                                    cve_data = {
+                                        'technology_id': tech_id,
+                                        'cve_id': cve.get('id'),
+                                        'description': cve.get('description'),
+                                        'severity': cve.get('cvss', {}).get('severity'),
+                                        'cvss_score': cve.get('cvss', {}).get('score'),
+                                        'cvss_version': cve.get('cvss', {}).get('version'),
+                                        'published_date': cve.get('published_date'),
+                                        'last_modified': cve.get('last_modified'),
+                                        'vector_string': cve.get('cvss', {}).get('vector'),
+                                        'references': cve.get('references', [])
+                                    }
+                                    self.db.add_cve(cve_data)
+                            elif plugin_id:
+                                for cve in cves:
+                                    plugin_cve_data = {
+                                        'plugin_id': plugin_id,
+                                        'cve_id': cve.get('id'),
+                                        'description': cve.get('description'),
+                                        'severity': cve.get('cvss', {}).get('severity'),
+                                        'cvss_score': cve.get('cvss', {}).get('score'),
+                                        'cvss_version': cve.get('cvss', {}).get('version'),
+                                        'published_date': cve.get('published_date'),
+                                        'last_modified': cve.get('last_modified'),
+                                        'vector_string': cve.get('cvss', {}).get('vector'),
+                                        'references': cve.get('references', [])
+                                    }
+                                    self.db.add_plugin_cve(plugin_cve_data)
 
                 for file_info in results.get('sensitive_files', []):
                     file_data = {
