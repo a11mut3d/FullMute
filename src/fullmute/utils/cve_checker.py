@@ -182,9 +182,6 @@ class CVEChecker:
         }
 
     async def check_cves_for_technology(self, name: str, version: str) -> List[Dict]:
-        """
-        Check for CVEs for a specific technology and version
-        """
         if not version or version == "":
             return []
 
@@ -196,18 +193,33 @@ class CVEChecker:
 
         # Query NVD API for CVEs
         cves = await self._query_nvd_api(vendor, name, version)
+
+        # If no CVEs found for exact version, try broader search
+        if not cves and version != ".":
+            version_parts = version.split('.')
+            if len(version_parts) > 1:
+                # Try with major version only (e.g., 6.8.3 -> 6.8)
+                major_version = '.'.join(version_parts[:-1])
+                if major_version:
+                    logger.debug(f"Trying broader search for {name}:{major_version}")
+                    cves = await self._query_nvd_api(vendor, name, major_version)
+
+                # If still no CVEs, try with major version only (e.g., 6.8 -> 6)
+                if not cves and len(major_version.split('.')) > 1:
+                    major_only = major_version.split('.')[0]
+                    if major_only:
+                        logger.debug(f"Trying broader search for {name}:{major_only}")
+                        cves = await self._query_nvd_api(vendor, name, major_only)
+
         return cves
 
     async def _query_nvd_api(self, vendor: str, product: str, version: str) -> List[Dict]:
-        """
-        Query NVD API for CVEs
-        """
         try:
             # Construct CPE string
             cpe_match = f"cpe:2.3:a:{vendor}:{product}:{version}:*:*:*:*:*:*:*"
-            
+
             params = {
-                "cpeMatchString": cpe_match,
+                "virtualMatchString": cpe_match,
                 "resultsPerPage": 2000  # Maximum allowed
             }
 
@@ -216,26 +228,26 @@ class CVEChecker:
                     if response.status == 200:
                         data = await response.json()
                         cves = []
-                        
+
                         for item in data.get('vulnerabilities', []):
                             cve = item.get('cve', {})
                             cve_id = cve.get('id')
-                            
+
                             # Extract description
                             descriptions = cve.get('descriptions', [])
                             description = next((desc['value'] for desc in descriptions if desc.get('lang') == 'en'), '')
-                            
+
                             # Extract metrics (CVSS scores)
                             metrics = cve.get('metrics', {})
                             cvss_data = self._extract_cvss_data(metrics)
-                            
+
                             # Extract published date
                             published = cve.get('published')
-                            
+
                             # Extract references
                             refs = cve.get('references', [])
                             reference_urls = [ref.get('url') for ref in refs if ref.get('url')]
-                            
+
                             cves.append({
                                 'id': cve_id,
                                 'description': description,
@@ -244,8 +256,12 @@ class CVEChecker:
                                 'last_modified': cve.get('lastModified'),
                                 'references': reference_urls
                             })
-                        
+
                         return cves
+                    elif response.status == 404:
+                        # 404 может означать, что для данной версии нет CVE
+                        logger.debug(f"No CVEs found for {vendor}:{product}:{version} (status 404)")
+                        return []
                     else:
                         logger.error(f"NVD API request failed with status {response.status}")
                         return []
@@ -254,10 +270,6 @@ class CVEChecker:
             return []
 
     def _extract_cvss_data(self, metrics: Dict) -> Dict:
-        """
-        Extract CVSS data from vulnerability metrics
-        """
-        # Try to find CVSS v3.1, v3.0, or v2 data
         cvss_data = {}
         
         # Check for CVSS v3.1
@@ -291,9 +303,6 @@ class CVEChecker:
         return cvss_data
 
     def _map_vendor(self, technology_name: str) -> Optional[str]:
-        """
-        Map technology name to vendor for NVD lookup
-        """
         name_lower = technology_name.lower().replace(' ', '_').replace('.', '').replace('-', '_')
         
         # Direct match
@@ -309,9 +318,6 @@ class CVEChecker:
         return None
 
     async def check_cves_batch(self, technologies: List[Tuple[str, str]]) -> Dict[str, List[Dict]]:
-        """
-        Check CVEs for multiple technologies
-        """
         results = {}
         
         # Process in batches to avoid overwhelming the API
