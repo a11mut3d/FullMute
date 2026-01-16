@@ -1,6 +1,6 @@
 {
   "Laravel": {
-    "headers": ["X-Powered-By: Laravel", "X-Framework: Laravel"],
+    "headers": ["X-Powered-By: Laravel/([0-9.]+)|X-Powered-By: Laravel", "X-Framework: Laravel"],
     "html": [
       "csrf-token",
       "_token",
@@ -11,10 +11,11 @@
       "Route::",
       "<!-- Laravel -->"
     ],
+    "version_pattern": "Laravel/([0-9.]+)",
     "must_not_have": ["django", "rails"]
   },
   "Django": {
-    "headers": ["X-Powered-By: Django", "X-Frame-Options: SAMEORIGIN"],
+    "headers": ["X-Powered-By: Django/([0-9.]+)|X-Powered-By: Django", "X-Frame-Options: SAMEORIGIN"],
     "html": [
       "csrfmiddlewaretoken",
       "__admin__",
@@ -24,10 +25,11 @@
       "/admin/jsi18n/",
       "<!-- django -->"
     ],
+    "version_pattern": "Django/([0-9.]+)",
     "must_not_have": ["laravel", "rails"]
   },
   "Ruby on Rails": {
-    "headers": ["X-Runtime", "X-Rails", "X-Request-Id", "X-Powered-By: Ruby"],
+    "headers": ["X-Runtime", "X-Rails", "X-Request-Id", "X-Powered-By: Ruby on Rails/([0-9.]+)|X-Powered-By: Ruby"],
     "html": [
       "csrf-token",
       "rails",
@@ -36,10 +38,11 @@
       "action=\"/rails/",
       "<!-- Rails -->"
     ],
+    "version_pattern": "Ruby on Rails/([0-9.]+)",
     "must_not_have": ["django", "laravel"]
   },
   "Express.js": {
-    "headers": ["X-Powered-By: Express", "X-Powered-By: Express/"],
+    "headers": ["X-Powered-By: Express/([0-9.]+)|X-Powered-By: Express", "X-Powered-By: Express/([0-9.]+)|X-Powered-By: Express/"],
     "html": [
       "express",
       "Express",
@@ -48,10 +51,11 @@
       "res\\.render",
       "<!-- express -->"
     ],
+    "version_pattern": "Express/([0-9.]+)",
     "must_not_have": []
   },
   "Spring Boot": {
-    "headers": ["X-Application-Context", "X-SpringBoot-"],
+    "headers": ["X-Application-Context", "X-SpringBoot-([0-9.]+)|X-SpringBoot-"],
     "html": [
       "spring",
       "Spring",
@@ -60,10 +64,11 @@
       "@Service",
       "<!-- Spring Boot -->"
     ],
+    "version_pattern": "SpringBoot-([0-9.]+)",
     "must_not_have": []
   },
   "Symfony": {
-    "headers": ["X-Powered-By: Symfony", "X-Symfony-"],
+    "headers": ["X-Powered-By: Symfony/([0-9.]+)|X-Powered-By: Symfony", "X-Symfony-([0-9.]+)|X-Symfony-"],
     "html": [
       "symfony",
       "Symfony",
@@ -72,10 +77,11 @@
       "/web/bundles/",
       "<!-- Symfony -->"
     ],
+    "version_pattern": "(?:Symfony|X-Symfony)-([0-9.]+)",
     "must_not_have": []
   },
   "Yii": {
-    "headers": ["X-Powered-By: Yii Framework", "X-Yii-"],
+    "headers": ["X-Powered-By: Yii Framework/([0-9.]+)|X-Powered-By: Yii Framework", "X-Yii-([0-9.]+)|X-Yii-"],
     "html": [
       "yii",
       "Yii",
@@ -83,26 +89,29 @@
       "yiiActiveForm",
       "<!-- Yii Framework -->"
     ],
+    "version_pattern": "(?:Yii Framework|X-Yii)-([0-9.]+)",
     "must_not_have": []
   },
   "CodeIgniter": {
-    "headers": ["X-Powered-By: CodeIgniter", "CI-"],
+    "headers": ["X-Powered-By: CodeIgniter/([0-9.]+)|X-Powered-By: CodeIgniter", "CI-([0-9.]+)|CI-"],
     "html": [
       "codeigniter",
       "CodeIgniter",
       "ci_",
       "<!-- CodeIgniter -->"
     ],
+    "version_pattern": "(?:CodeIgniter|CI)-([0-9.]+)",
     "must_not_have": []
   },
   "Flask": {
-    "headers": ["X-Powered-By: Flask", "Server: Werkzeug"],
+    "headers": ["X-Powered-By: Flask/([0-9.]+)|X-Powered-By: Flask", "Server: Werkzeug"],
     "html": [
       "flask",
       "Flask",
       "<!-- flask -->",
       "url_for\\("
     ],
+    "version_pattern": "Flask/([0-9.]+)",
     "must_not_have": []
   }
 }
