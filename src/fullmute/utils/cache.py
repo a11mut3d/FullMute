@@ -3,7 +3,6 @@ import zlib
 import json
 from datetime import datetime, timedelta
 from contextlib import contextmanager
-from fullmute.db.engine import get_db_connection
 from fullmute.utils.logger import setup_logger
 
 logger = setup_logger()
@@ -13,10 +12,9 @@ class Cache:
         self.db_path = db_path
         self.ttl_hours = ttl_hours
 
-    @contextmanager
     def _get_connection(self):
-        with get_db_connection(self.db_path) as conn:
-            yield conn
+        """Create a direct connection to avoid circular import"""
+        return sqlite3.connect(self.db_path)
 
     def get_cached_response(self, url: str):
         try:
