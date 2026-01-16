@@ -1,116 +1,152 @@
-# FullMute
-A mass website scanner that detects technologies, surveillance cameras, and sensitive files.
+# FullMute Scanner
 
-This project has room to grow. You can even see some of the initial concepts in the code.
-## Peculiarities
-- CMS detection (WordPress, Joomla, Drupal, Magento, Shopify, etc.)
-- Definition of web servers (Nginx, Apache, IIS, LiteSpeed)
-- Framework detection (Laravel, Django, Ruby on Rails, etc.)
-- Search for surveillance cameras (Axis, Hikvision, Dahua, Ubiquiti, etc.)
-- Checking sensitive files (.env, .git, config.php, backup files)
-- Asynchronous scanning with proxy support
-- User-Agent Rotation and Random Delays
-- SQLite database for storing results
-- Extensibility by changing config
+FullMute is a powerful web scanning tool that identifies CMS, frameworks, web servers, routers, cameras, JavaScript libraries, programming languages, databases, plugins, and themes with CVE vulnerability checking.
+
+## Features
+
+- **Technology Detection**: Identifies CMS (WordPress, Joomla, Drupal, etc.), frameworks, web servers, routers, cameras
+- **Language & Database Detection**: PHP, Python, Java, Node.js, MySQL, PostgreSQL, MongoDB, etc.
+- **Plugin & Theme Detection**: Automatically detects installed CMS plugins and themes
+- **CVE Checking**: Automatic vulnerability checking for all detected technologies and versions
+- **Database Search**: Search command for various criteria (CVE, CMS, technologies, etc.)
+- **Database Storage**: All data stored in SQLite database
+- **Multithreading**: Supports parallel scanning of multiple domains
+
 ## Installation
-``` bash
-git clone https://github.com/yourusername/fullmute.git
-cd fullmute
+
+```bash
+git clone <repository-url>
+cd FullMute
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -e .
 ```
-## Requirements
-- Python 3.8 or higher
-- Installed dependencies from requirements.txt
+
 ## Usage
-### Basic commands
-Database initialization
-``` bash
-fullmute init database.db
-```
-Scanning domains from a file
-``` bash
-fullmute scan domains.txt --output results.json --max-concurrent 10 --timeout 15 --proxy
-```
-### scan command options
-- ```--output, -o``` - File to save results to (default: scan_results.json)
-- ```-max-concurrent, -c``` - Maximum number of concurrent requests (default: 10)
-- ```-timeout, -t``` - Request timeout in seconds (default: 15)
-- ```-proxy``` - Use proxy from proxies.txt
-- ```-delay-min``` - Minimum delay between requests (default: 1.0)
-- ```-delay-max``` - Maximum delay between requests (default: 3.0)
-### Scanning one domain
-``` bash
+
+### Scan a single domain
+
+```bash
 fullmute scan-one example.com
 ```
-Exporting results from the database
-``` bash
-fullmute export database.db --format json
-fullmute export database.db --format csv
+
+### Scan a list of domains from file
+
+```bash
+fullmute scan domains.txt
 ```
-## Input file format
-### File with domains
-Each line contains one domain or IP address:
-``` txt
-example.com
-github.com
-192.168.1.100
-subdomain.example.org
+
+### Initialize database
+
+```bash
+fullmute init fullmute.db
 ```
-### Proxy file
-Каждая строка содержит прокси в формате:
-``` txt
-protocol://host:port
+
+### Search in database
+
+```bash
+# Search by CVE
+fullmute search fullmute.db -t cve -q "CVE-2021"
+
+# Search by CMS
+fullmute search fullmute.db -t cms -q "WordPress"
+
+# Search by plugins
+fullmute search fullmute.db -t plugin -q "akismet"
+
+# Search by domains
+fullmute search fullmute.db -t domain -q "example.com"
+
+# Search by technologies
+fullmute search fullmute.db -t technology -q "nginx"
+
+# Search by web servers
+fullmute search fullmute.db -t server -q "Apache"
+
+# Search by databases
+fullmute search fullmute.db -t database -q "MySQL"
+
+# Search by programming languages
+fullmute search fullmute.db -t language -q "PHP"
 ```
-## Results Format
-### JSON output
-``` json
-{
-  "domain": "example.com",
-  "status_code": 200,
-  "technologies": {
-    "cms": ["WordPress"],
-    "server": ["Nginx"],
-    "framework": ["Laravel"],
-    "camera": ["Axis"]
-  },
-  "sensitive_files": [
-    {
-      "file_type": ".env",
-      "url": "http://example.com/.env",
-      "verification_result": "verified",
-      "content_sample": "DB_PASSWORD=secret123",
-      "status_code": 200
-    }
-  ],
-  "error": null
-}
+
+### View statistics
+
+```bash
+fullmute stats fullmute.db
 ```
-### CSV export
-When exporting to CSV, a file is created with the following columns:
-- domain
-- scanned_at
-- has_camera
-- is_alive
-- response_time
-- http_status
-- technologies
-- sensitive_files
-## Custom signatures
-Signatures are stored in JSON files in the ```config/signatures/``` directory. You can add your own signatures or edit existing ones.
-### Signature format
-``` json
-{
-  "TechnologyName": {
-    "headers": ["Header: Pattern"],
-    "html": ["HTML pattern"],
-    "urls": ["/specific-path"],
-    "cookies": ["cookie_name_pattern"],
-    "must_have": ["required_pattern"],
-    "must_not_have": ["exclusion_pattern"],
-    "confidence": 90
-  }
-}
+
+### Export results
+
+```bash
+fullmute export fullmute.db --format json
 ```
-## About the creator: 
-### **Author:** [allmuted](https://github.com/a11mut3d)
-### **Telegram channel:** https://t.me/rootlocalhostvibe
+
+## Capabilities
+
+### CMS and Framework Detection
+- WordPress, Joomla, Drupal, Magento, Shopify and others
+- Laravel, Django, Ruby on Rails, Express.js and others
+
+### Web Server Detection
+- Apache, Nginx, Microsoft-IIS, LiteSpeed, OpenResty and others
+
+### Router Detection
+- Cisco, D-Link, Netgear, Linksys, ASUS, Huawei, MikroTik, Ubiquiti and others
+
+### Camera Detection
+- Axis, Hikvision, Dahua, Vivotek, Bosch and others
+
+### JavaScript Library Detection
+- jQuery, React, Vue.js, Angular, Bootstrap and others
+
+### Programming Language Detection
+- PHP, Python, Java, Node.js, Ruby, Go, C# and others
+
+### Database Detection
+- MySQL, PostgreSQL, MongoDB, Redis, SQLite, Oracle and others
+
+### Plugin and Theme Detection
+- Automatic detection of installed CMS plugins and themes
+- Support for WordPress, Joomla, Drupal and other CMS
+
+### CVE Checking
+- Automatic vulnerability checking through NVD API
+- Shows threat level and CVSS scores
+- Stores CVE information in database
+
+## Architecture
+
+- **CLI**: Command-line interface for user interaction
+- **Core**: Main scanning logic and orchestration
+- **Detector**: Modules for detecting various technologies
+- **Utils**: Utility functions (HTTP client, stealth functions, etc.)
+- **DB**: Database operations (schema, queries)
+
+## Configuration
+
+Configuration file `config.yaml` allows customization of scanning parameters:
+
+```yaml
+scanner:
+  max_concurrent: 10
+  timeout: 15
+  proxy_enabled: false
+  min_delay: 1.0
+  max_delay: 3.0
+
+database:
+  path: fullmute.db
+```
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/NewFeature`)
+3. Commit changes (`git commit -m 'Add New Feature'`)
+4. Push to the branch (`git push origin feature/NewFeature`)
+5. Open a Pull Request
+
+## License
+
+MIT License
