@@ -1,42 +1,50 @@
 {
   "Nginx": {
-    "headers": ["Server: nginx", "X-Powered-By: nginx"],
+    "headers": ["Server: nginx/([0-9.]+)|Server: nginx", "X-Powered-By: nginx"],
     "urls": ["/nginx-status", "/server-status"],
-    "must_not_have": ["Apache", "IIS", "LiteSpeed"]
+    "must_not_have": ["Apache", "IIS", "LiteSpeed"],
+    "version_pattern": "nginx/([0-9.]+)"
   },
   "Apache": {
-    "headers": ["Server: Apache", "Server: Apache/.*", "X-Powered-By: Apache"],
+    "headers": ["Server: Apache/([0-9.]+)|Server: Apache", "Server: Apache/.*", "X-Powered-By: Apache"],
     "urls": ["/server-status", "/apache-status", "/mod_status"],
-    "must_not_have": ["nginx", "IIS"]
+    "must_not_have": ["nginx", "IIS"],
+    "version_pattern": "Apache/([0-9.]+)"
   },
   "IIS": {
-    "headers": ["Server: Microsoft-IIS", "Server: Microsoft-HTTPAPI", "X-Powered-By: ASP.NET"],
+    "headers": ["Server: Microsoft-IIS/([0-9.]+)|Server: Microsoft-IIS", "Server: Microsoft-HTTPAPI", "X-Powered-By: ASP.NET"],
     "urls": ["/iisstart.htm", "/iisadmin", "/aspnet_client/"],
-    "must_not_have": ["nginx", "Apache"]
+    "must_not_have": ["nginx", "Apache"],
+    "version_pattern": "Microsoft-IIS/([0-9.]+)"
   },
   "LiteSpeed": {
-    "headers": ["Server: LiteSpeed", "X-LiteSpeed-", "X-Litespeed-"],
+    "headers": ["Server: LiteSpeed/([0-9.]+)|Server: LiteSpeed", "X-LiteSpeed-", "X-Litespeed-"],
     "urls": ["/lsapi", "/ls_status"],
-    "must_not_have": ["nginx", "Apache", "IIS"]
+    "must_not_have": ["nginx", "Apache", "IIS"],
+    "version_pattern": "LiteSpeed/([0-9.]+)"
   },
   "Cloudflare": {
     "headers": ["Server: cloudflare", "CF-RAY", "CF-Cache-Status", "CF-Connecting-IP"],
     "urls": [],
-    "must_not_have": []
+    "must_not_have": [],
+    "version_pattern": ""
   },
   "Tomcat": {
-    "headers": ["Server: Apache-Coyote", "X-Powered-By: JSP", "Server: Tomcat"],
+    "headers": ["Server: Apache-Coyote/([0-9.]+)|Server: Apache-Coyote", "X-Powered-By: JSP", "Server: Tomcat/([0-9.]+)|Server: Tomcat"],
     "urls": ["/manager/html", "/tomcat-docs/", "/examples/"],
-    "must_not_have": []
+    "must_not_have": [],
+    "version_pattern": "(?:Apache-Coyote|Tomcat)/([0-9.]+)"
   },
   "Node.js": {
     "headers": ["X-Powered-By: Express", "X-Powered-By: nodejs"],
     "urls": [],
-    "must_not_have": ["Apache", "IIS", "nginx"]
+    "must_not_have": ["Apache", "IIS", "nginx"],
+    "version_pattern": ""
   },
   "Gunicorn": {
-    "headers": ["Server: gunicorn", "X-Gunicorn"],
+    "headers": ["Server: gunicorn/([0-9.]+)|Server: gunicorn", "X-Gunicorn"],
     "urls": [],
-    "must_not_have": []
+    "must_not_have": [],
+    "version_pattern": "gunicorn/([0-9.]+)"
   }
 }
