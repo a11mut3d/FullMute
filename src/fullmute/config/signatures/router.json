@@ -1,0 +1,240 @@
+{
+  "TP-Link": {
+    "headers": ["TP-LINK", "Router", "TP-LINK.*Router", "Server: TP-LINK", "tp-link.net"],
+    "html": [
+      "TP-LINK.*Configuration",
+      "TP-LINK.*Login",
+      "TP-LINK.*Wireless",
+      "tplogin\\.cn",
+      "TP-LINK.*Management",
+      "tplinklogin\\.net",
+      "TP-LINK.*Archer",
+      "TP-LINK.*TL-"
+    ],
+    "urls": ["/userRpm/LoginRpm\\.htm", "/webpages/login\\.html", "/login\\.cgi", "/userRpm/Index.htm", "/mainFrame\\.htm"],
+    "cookies": ["Authorization", "Cookie", "Session", "TP-LINK"],
+    "version_pattern": "",
+    "must_have": ["TP-LINK"]
+  },
+  "D-Link": {
+    "headers": ["D-LINK", "D-Link", "mydlink", "Server: D-Link", "dlink.com"],
+    "html": [
+      "D-LINK.*Configuration",
+      "D-LINK.*Login",
+      "D-LINK.*Router",
+      "mydlink\\.com",
+      "D-Link.*System",
+      "D-Link.*Wireless",
+      "dlink\\.com",
+      "D-Link.*ShareCenter"
+    ],
+    "urls": ["/login\\.html", "/session_key\\.cgi", "/lan\\.html", "/status\\.html", "/mydlink\\.html"],
+    "cookies": ["SESSIONID", "Authorization", "D-Link"],
+    "version_pattern": "",
+    "must_have": ["D-LINK|D-Link"]
+  },
+  "Netgear": {
+    "headers": ["NETGEAR", "Netgear", "ReadySHARE", "Server: NETGEAR", "netgear.com"],
+    "html": [
+      "NETGEAR.*Configuration",
+      "NETGEAR.*Login",
+      "NETGEAR.*Router",
+      "readycloud\\.com",
+      "NETGEAR.*Genie",
+      "netgear\\.com",
+      "NETGEAR.*Nighthawk",
+      "NETGEAR.*Orbi"
+    ],
+    "urls": ["/genie\\.html", "/login\\.cgi", "/setup\\.htm", "/cmn\\/css\\/", "/home\\.htm"],
+    "cookies": ["SessionID", "Authorization", "NETGEAR"],
+    "version_pattern": "",
+    "must_have": ["NETGEAR|Netgear"]
+  },
+  "Linksys": {
+    "headers": ["Linksys", "Linux.*httpd", "Server: Linksys", "linksys.com"],
+    "html": [
+      "Linksys.*Smart.*WiFi",
+      "Linksys.*Setup",
+      "Linksys.*Router",
+      "linksys\\.com",
+      "Linksys.*Admin",
+      "smartwifi\\.html",
+      "Linksys.*Velop",
+      "Linksys.*EA"
+    ],
+    "urls": ["/apply\\.cgi", "/login\\.htm", "/home\\.htm", "/Setup\\.htm", "/Status_Router\\.htm"],
+    "cookies": ["Session", "Authorization", "Linksys"],
+    "version_pattern": "",
+    "must_have": ["Linksys"]
+  },
+  "ASUS": {
+    "headers": ["ASUS", "AiCloud", "ASUSWRT", "Server: ASUS", "asus.com"],
+    "html": [
+      "ASUS.*Router",
+      "ASUS.*Administration",
+      "ASUS.*WRT",
+      "router\\.asus\\.com",
+      "ASUS.*Wireless",
+      "AiCloud.*Login",
+      "ASUS.*RT-",
+      "ASUSWRT"
+    ],
+    "urls": ["/Main_Login\\.asp", "/index\\.asp", "/Advanced_Main\\.asp", "/welcome\\.ico"],
+    "cookies": ["Asus", "Authorization", "ASUSWRT"],
+    "version_pattern": "",
+    "must_have": ["ASUS"]
+  },
+  "Cisco": {
+    "headers": ["Cisco", "IOS.*http", "cisco", "Server: Cisco", "cisco.com"],
+    "html": [
+      "Cisco.*Router",
+      "Cisco.*Configuration",
+      "Cisco.*Login",
+      "cisco\\.com",
+      "Cisco.*Device",
+      "Cisco.*Network",
+      "Cisco.*RV",
+      "Cisco.*ISR"
+    ],
+    "urls": ["/exec/show", "/login\\.html", "/index\\.html", "/cisco\\.html", "/rommon\\.html"],
+    "cookies": ["session", "Authorization", "Cisco"],
+    "version_pattern": "IOS ([0-9.]+)",
+    "must_have": ["Cisco"]
+  },
+  "Huawei": {
+    "headers": ["Huawei", "Home Gateway", "Server: Huawei", "huawei.com"],
+    "html": [
+      "Huawei.*Router",
+      "Huawei.*Gateway",
+      "Home.*Gateway",
+      "huawei\\.com",
+      "HG.*Series",
+      "HiLink",
+      "Huawei.*EchoLife",
+      "Huawei.*B683"
+    ],
+    "urls": ["/html\\/index\\.html", "/html\\/login\\.html", "/api\\/", "/html\\/home\\.html"],
+    "cookies": ["SessionID", "Authorization", "Huawei"],
+    "version_pattern": "",
+    "must_have": ["Huawei"]
+  },
+  "Tenda": {
+    "headers": ["Tenda", "TendaWeb", "Server: Tenda", "tendawifi.com"],
+    "html": [
+      "Tenda.*Router",
+      "Tenda.*Login",
+      "Tenda.*Setup",
+      "tendawifi\\.com",
+      "Tenda.*Configuration",
+      "Tenda.*AC",
+      "Tenda.*FH"
+    ],
+    "urls": ["/goform\\/SetIpAddr", "/login\\.html", "/index\\.html", "/main\\.html"],
+    "cookies": ["Authorization", "Session", "Tenda"],
+    "version_pattern": "",
+    "must_have": ["Tenda"]
+  },
+  "MikroTik": {
+    "headers": ["MikroTik", "RouterOS", "Mikrotik", "Server: MikroTik"],
+    "html": [
+      "MikroTik.*RouterOS",
+      "MikroTik.*Winbox",
+      "MikroTik.*Webfig",
+      "router\\.mikrotik\\.com",
+      "MikroTik.*Configuration",
+      "MikroTik.*ROS"
+    ],
+    "urls": ["/login\\.html", "/webfig", "/index\\.html", "/jsproxy"],
+    "cookies": ["SID", "Authorization", "MikroTik"],
+    "version_pattern": "RouterOS ([0-9.]+)",
+    "must_have": ["MikroTik|RouterOS"]
+  },
+  "Ubiquiti": {
+    "headers": ["UniFi", "ubnt", "UBNT", "Server: UniFi", "ui.com"],
+    "html": [
+      "UniFi.*Controller",
+      "UniFi.*Login",
+      "UBNT.*Router",
+      "unifi\\.ui\\.com",
+      "ubnt\\.com",
+      "UniFi.*Network",
+      "UniFi.*DreamMachine",
+      "EdgeMAX"
+    ],
+    "urls": ["/login", "/manage", "/dashboard", "/unifi", "/login\\.jsp"],
+    "cookies": ["TOKEN", "Authorization", "ubnt"],
+    "version_pattern": "",
+    "must_have": ["UniFi|UBNT|ubnt"]
+  },
+  "Zyxel": {
+    "headers": ["ZyXEL", "Server: ZyXEL", "zyxel.com"],
+    "html": [
+      "ZyXEL",
+      "ZyWALL",
+      "USG",
+      "zyxel\\.com",
+      "ZyXEL.*Configuration",
+      "ZyXEL.*Administrator"
+    ],
+    "urls": ["/cgi-bin", "/weblogin\\.html", "/login\\.cgi"],
+    "cookies": ["ZYXEL", "Session"],
+    "version_pattern": "",
+    "must_have": ["ZyXEL|ZyWALL"]
+  },
+  "MOTOROLA": {
+    "headers": ["Motorola", "SERVER: Motorola", "motorola.com"],
+    "html": [
+      "Motorola.*Router",
+      "Motorola.*Gateway",
+      "motorola\\.com",
+      "Motorola.*SB",
+      "Motorola.*MG"
+    ],
+    "urls": ["/cmn/", "/adv\\.asp", "/basic\\.asp"],
+    "cookies": ["Motorola", "Session"],
+    "version_pattern": "",
+    "must_have": ["Motorola"]
+  },
+  "BUFFALO": {
+    "headers": ["Buffalo", "SERVER: Buffalo", "buffalotech.com"],
+    "html": [
+      "Buffalo.*Configuration",
+      "Buffalo.*Login",
+      "buffalotech\\.com",
+      "Buffalo.*AirStation",
+      "Buffalo.*WZR"
+    ],
+    "urls": ["/login\\.cgi", "/setting/"],
+    "cookies": ["Buffalo", "Session"],
+    "version_pattern": "",
+    "must_have": ["Buffalo"]
+  },
+  "Belkin": {
+    "headers": ["Belkin", "SERVER: Belkin", "belkin.com"],
+    "html": [
+      "Belkin.*Router",
+      "Belkin.*Gateway",
+      "belkin\\.com",
+      "Belkin.*Setup",
+      "Belkin.*Admin"
+    ],
+    "urls": ["/login\\.htm", "/status\\.htm", "/setup\\.htm"],
+    "cookies": ["Belkin", "Session"],
+    "version_pattern": "",
+    "must_have": ["Belkin"]
+  },
+  "Synology": {
+    "headers": ["Server: Synology", "DSM", "synology.com"],
+    "html": [
+      "Synology.*DiskStation",
+      "Synology.*DSM",
+      "synology\\.com",
+      "DiskStation",
+      "Synology.*Router"
+    ],
+    "urls": ["/webman/", "/index\\.html", "/login\\.html"],
+    "cookies": ["did", "PHPSESSID"],
+    "version_pattern": "DSM ([0-9.]+)",
+    "must_have": ["Synology|DiskStation"]
+  }
+}

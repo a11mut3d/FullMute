@@ -1,0 +1,234 @@
+{
+  "jQuery": {
+    "headers": [],
+    "html": [
+      "jquery-([0-9.]+)\\.js|jquery.*\\.js",
+      "jQuery.*Library",
+      "jquery.com",
+      "\\.jquery\\.",
+      "jquery.*\\.min\\.js"
+    ],
+    "js": [
+      "jquery-([0-9.]+)\\.js|jquery.*\\.js",
+      "jQuery.*Library",
+      "jquery-([0-9.]+)\\.min\\.js|jquery.*\\.min\\.js",
+      "jquery.*\\.map",
+      "/jquery-"
+    ],
+    "urls": ["/jquery", "/jquery.*\\.js"],
+    "cookies": [],
+    "version_pattern": "jquery-([0-9.]+)\\.js",
+    "must_have": ["jquery|jQuery"]
+  },
+  "React": {
+    "headers": ["X-React"],
+    "html": [
+      "react-([0-9.]+)\\.js|react.*\\.js",
+      "react-dom-([0-9.]+)\\.js|react-dom.*\\.js",
+      "__REACT_DEVTOOLS_GLOBAL_HOOK__",
+      "__REACT_PROFILE__",
+      "react.*\\.development\\.js",
+      "react.*\\.production\\.min\\.js"
+    ],
+    "js": [
+      "react-([0-9.]+)\\.js|react.*\\.js",
+      "react-dom-([0-9.]+)\\.js|react-dom.*\\.js",
+      "react.*\\.development\\.js",
+      "react.*\\.production\\.min\\.js",
+      "/react/"
+    ],
+    "urls": ["/react", "/react.*\\.js"],
+    "cookies": [],
+    "version_pattern": "(?:react|react-dom)-([0-9.]+)\\.js",
+    "must_have": ["react|React"]
+  },
+  "Vue.js": {
+    "headers": ["X-Vue"],
+    "html": [
+      "vue-([0-9.]+)\\.js|vue.*\\.js",
+      "Vue\\.prototype",
+      "__vue__",
+      "vue.*\\.min\\.js",
+      "vue.*\\.development\\.js"
+    ],
+    "js": [
+      "vue-([0-9.]+)\\.js|vue.*\\.js",
+      "vue-([0-9.]+)\\.min\\.js|vue.*\\.min\\.js",
+      "vue.*\\.development\\.js",
+      "/vue/"
+    ],
+    "urls": ["/vue", "/vue.*\\.js"],
+    "cookies": [],
+    "version_pattern": "vue-([0-9.]+)\\.js",
+    "must_have": ["vue|Vue"]
+  },
+  "Angular": {
+    "headers": ["X-Angular"],
+    "html": [
+      "angular-([0-9.]+)\\.js|angular.*\\.js",
+      "ng-app",
+      "ng-controller",
+      "angular\\.module",
+      "angular.*\\.min\\.js",
+      "ng\\."
+    ],
+    "js": [
+      "angular-([0-9.]+)\\.js|angular.*\\.js",
+      "angular-([0-9.]+)\\.min\\.js|angular.*\\.min\\.js",
+      "/angular/"
+    ],
+    "urls": ["/angular", "/angular.*\\.js"],
+    "cookies": [],
+    "version_pattern": "angular-([0-9.]+)\\.js",
+    "must_have": ["angular|Angular"]
+  },
+  "Bootstrap": {
+    "headers": [],
+    "html": [
+      "bootstrap-([0-9.]+)\\.js|bootstrap.*\\.js",
+      "bootstrap-([0-9.]+)\\.css|bootstrap.*\\.css",
+      "bootstrap-theme.*\\.css",
+      "bootstrap.*\\.min\\.css",
+      "bootstrap.*\\.min\\.js"
+    ],
+    "js": [
+      "bootstrap-([0-9.]+)\\.js|bootstrap.*\\.js",
+      "bootstrap-([0-9.]+)\\.min\\.js|bootstrap.*\\.min\\.js",
+      "/bootstrap/"
+    ],
+    "urls": ["/bootstrap", "/bootstrap.*\\.js"],
+    "cookies": [],
+    "version_pattern": "bootstrap-([0-9.]+)\\.js",
+    "must_have": ["bootstrap"]
+  },
+  "Lodash": {
+    "headers": [],
+    "html": [
+      "lodash-([0-9.]+)\\.js|lodash.*\\.js",
+      "lodash.*\\.min\\.js",
+      "_\\.VERSION",
+      "_.templateSettings"
+    ],
+    "js": [
+      "lodash-([0-9.]+)\\.js|lodash.*\\.js",
+      "lodash.*\\.min\\.js",
+      "/lodash/"
+    ],
+    "urls": ["/lodash", "/lodash.*\\.js"],
+    "cookies": [],
+    "version_pattern": "lodash-([0-9.]+)\\.js",
+    "must_have": ["lodash|_\\."]
+  },
+  "Moment.js": {
+    "headers": [],
+    "html": [
+      "moment-([0-9.]+)\\.js|moment.*\\.js",
+      "moment\\.locale",
+      "moment\\.tz",
+      "moment.*\\.min\\.js"
+    ],
+    "js": [
+      "moment-([0-9.]+)\\.js|moment.*\\.js",
+      "moment.*\\.min\\.js",
+      "/moment/"
+    ],
+    "urls": ["/moment", "/moment.*\\.js"],
+    "cookies": [],
+    "version_pattern": "moment-([0-9.]+)\\.js",
+    "must_have": ["moment"]
+  },
+  "Axios": {
+    "headers": [],
+    "html": [
+      "axios-([0-9.]+)\\.js|axios.*\\.js",
+      "axios.*\\.min\\.js",
+      "axios\\.defaults",
+      "axios\\.create"
+    ],
+    "js": [
+      "axios-([0-9.]+)\\.js|axios.*\\.js",
+      "axios.*\\.min\\.js",
+      "/axios/"
+    ],
+    "urls": ["/axios", "/axios.*\\.js"],
+    "cookies": [],
+    "version_pattern": "axios-([0-9.]+)\\.js",
+    "must_have": ["axios"]
+  },
+  "Redux": {
+    "headers": [],
+    "html": [
+      "redux-([0-9.]+)\\.js|redux.*\\.js",
+      "redux.*\\.min\\.js",
+      "createStore",
+      "combineReducers",
+      "applyMiddleware"
+    ],
+    "js": [
+      "redux-([0-9.]+)\\.js|redux.*\\.js",
+      "redux.*\\.min\\.js",
+      "/redux/"
+    ],
+    "urls": ["/redux", "/redux.*\\.js"],
+    "cookies": [],
+    "version_pattern": "redux-([0-9.]+)\\.js",
+    "must_have": ["redux"]
+  },
+  "Webpack": {
+    "headers": ["X-Webpack"],
+    "html": [
+      "__webpack_require__",
+      "__webpack_public_path__",
+      "webpackHotUpdate",
+      "webpack-([0-9.]+)\\.js|webpack.*\\.js"
+    ],
+    "js": [
+      "webpack-([0-9.]+)\\.js|webpack.*\\.js",
+      "__webpack_require__",
+      "__webpack_public_path__",
+      "webpackHotUpdate"
+    ],
+    "urls": ["/webpack", "/webpack.*\\.js"],
+    "cookies": [],
+    "version_pattern": "webpack-([0-9.]+)\\.js",
+    "must_have": ["webpack"]
+  },
+  "Three.js": {
+    "headers": [],
+    "html": [
+      "three-([0-9.]+)\\.js|three.*\\.js",
+      "THREE\\.Scene",
+      "THREE\\.PerspectiveCamera",
+      "THREE\\.WebGLRenderer",
+      "three.*\\.min\\.js"
+    ],
+    "js": [
+      "three-([0-9.]+)\\.js|three.*\\.js",
+      "three.*\\.min\\.js",
+      "/three\\.js/"
+    ],
+    "urls": ["/three", "/three.*\\.js"],
+    "cookies": [],
+    "version_pattern": "three-([0-9.]+)\\.js",
+    "must_have": ["three|THREE"]
+  },
+  "D3.js": {
+    "headers": [],
+    "html": [
+      "d3-([0-9.]+)\\.js|d3.*\\.js",
+      "d3\\.select",
+      "d3\\.selectAll",
+      "d3\\.scale",
+      "d3.*\\.min\\.js"
+    ],
+    "js": [
+      "d3-([0-9.]+)\\.js|d3.*\\.js",
+      "d3.*\\.min\\.js",
+      "/d3/"
+    ],
+    "urls": ["/d3", "/d3.*\\.js"],
+    "cookies": [],
+    "version_pattern": "d3-([0-9.]+)\\.js",
+    "must_have": ["d3"]
+  }
+}
