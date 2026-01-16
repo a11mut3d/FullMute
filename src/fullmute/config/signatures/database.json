@@ -1,0 +1,109 @@
+{
+  "MySQL": {
+    "headers": ["X-MySQL-Version", "X-Database: MySQL", "X-DB-Engine: MySQL", "X-Database: mysql", "X-DB-Engine: mysql"],
+    "html": [
+      "mysql_query",
+      "mysql_connect",
+      "mysql_fetch_array",
+      "MySQL server version",
+      "mysql_num_rows",
+      "MariaDB",
+      "mysql_error",
+      "mysqli_connect",
+      "mysqli_query",
+      "mysql_pconnect",
+      "mysql_select_db",
+      "mysql_real_escape_string"
+    ],
+    "urls": ["/mysql", "/phpmyadmin", "/adminer", "/myadmin", "/mysql-admin", "/mysqladmin"],
+    "cookies": ["mysql", "mysqldb", "mysql_session", "mysql_login"],
+    "version_pattern": "MySQL ([0-9.]+)|MariaDB ([0-9.]+)",
+    "must_not_have": ["PostgreSQL", "MongoDB", "Redis"]
+  },
+  "PostgreSQL": {
+    "headers": ["X-PostgreSQL-Version", "X-Database: PostgreSQL", "X-DB-Engine: PostgreSQL"],
+    "html": [
+      "pg_connect",
+      "pg_query",
+      "pg_fetch_array",
+      "PostgreSQL",
+      "postgres",
+      "pg_exec"
+    ],
+    "urls": ["/pgadmin", "/phppgadmin"],
+    "cookies": ["postgresql", "postgres", "pgsql"],
+    "version_pattern": "PostgreSQL ([0-9.]+)",
+    "must_not_have": ["MySQL", "MongoDB", "Redis"]
+  },
+  "MongoDB": {
+    "headers": ["X-MongoDB-Version", "X-Database: MongoDB", "X-DB-Engine: MongoDB"],
+    "html": [
+      "mongodb",
+      "mongo_connect",
+      "MongoDB",
+      "db.collection",
+      "collection.find"
+    ],
+    "urls": ["/mongo", "/mongoadmin", "/rockmongo"],
+    "cookies": ["mongodb", "mongo", "mongosession"],
+    "version_pattern": "MongoDB ([0-9.]+)",
+    "must_not_have": ["MySQL", "PostgreSQL", "Redis"]
+  },
+  "Redis": {
+    "headers": ["X-Redis-Version", "X-Database: Redis", "X-DB-Engine: Redis"],
+    "html": [
+      "redis",
+      "redis_connect",
+      "Redis",
+      "redis-cli",
+      "KEYS *"
+    ],
+    "urls": ["/redis", "/rediweb"],
+    "cookies": ["redis", "redissession"],
+    "version_pattern": "Redis ([0-9.]+)",
+    "must_not_have": ["MySQL", "PostgreSQL", "MongoDB"]
+  },
+  "SQLite": {
+    "headers": ["X-SQLite-Version", "X-Database: SQLite"],
+    "html": [
+      "sqlite",
+      "SQLite",
+      "sqlite3",
+      "sqlite_query",
+      "sqlite_open"
+    ],
+    "urls": ["/sqlite", "/sqliteadmin"],
+    "cookies": ["sqlite", "sqlite_session"],
+    "version_pattern": "SQLite ([0-9.]+)",
+    "must_not_have": ["MySQL", "PostgreSQL", "MongoDB"]
+  },
+  "Oracle": {
+    "headers": ["X-Oracle-Version", "X-Database: Oracle", "X-DB-Engine: Oracle"],
+    "html": [
+      "oracle",
+      "Oracle",
+      "oracle_connect",
+      "PL/SQL",
+      "SELECT \\* FROM"
+    ],
+    "urls": ["/oracle", "/toad", "/sqldeveloper"],
+    "cookies": ["oracle", "oracle_sid"],
+    "version_pattern": "Oracle ([0-9.]+)",
+    "must_not_have": ["MySQL", "PostgreSQL", "MongoDB"]
+  },
+  "Microsoft SQL Server": {
+    "headers": ["X-MSSQL-Version", "X-Database: MSSQL", "X-DB-Engine: MSSQL"],
+    "html": [
+      "mssql",
+      "sqlsrv",
+      "MSSQL",
+      "Microsoft SQL Server",
+      "SELECT \\* FROM",
+      "sp_.*"
+    ],
+    "urls": ["/mssql", "/sqlserver"],
+    "cookies": ["mssql", "mssql_session"],
+    "version_pattern": "SQL Server ([0-9.]+)|Microsoft SQL Server ([0-9.]+)",
+    "must_not_have": ["MySQL", "PostgreSQL", "MongoDB"]
+  }
+}
