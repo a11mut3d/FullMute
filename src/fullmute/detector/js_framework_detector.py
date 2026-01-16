@@ -1,21 +1,22 @@
 from fullmute.detector.base import BaseDetector
 from typing import Dict, List, Any, Tuple
+import re
 
-class ServerDetector(BaseDetector):
+class JSFrameworkDetector(BaseDetector):
     def detect(self) -> List[Tuple[str, str]]:
-        detected_servers = []
+        detected_js_libs = []
 
         if not self.signatures:
-            return detected_servers
+            return detected_js_libs
 
-        for server_name, patterns in self.signatures.items():
-            if self._detect_single(server_name, patterns):
-                version = self._extract_version(server_name, patterns)
-                detected_servers.append((server_name, version))
+        for js_lib_name, patterns in self.signatures.items():
+            if self._detect_single(js_lib_name, patterns):
+                version = self._extract_version(js_lib_name, patterns)
+                detected_js_libs.append((js_lib_name, version))
 
-        return detected_servers
+        return detected_js_libs
 
-    def _detect_single(self, server_name: str, patterns: Dict[str, Any]) -> bool:
+    def _detect_single(self, js_lib_name: str, patterns: Dict[str, Any]) -> bool:
         must_not_have = patterns.get("must_not_have", [])
         if must_not_have and not self.check_must_not_have(must_not_have):
             return False
@@ -27,6 +28,7 @@ class ServerDetector(BaseDetector):
         methods = [
             (self.search_in_headers, patterns.get("headers", []), 2),
             (self.search_in_html, patterns.get("html", []), 1),
+            (self.search_in_js, patterns.get("js", []), 3),  
             (self.search_in_urls, patterns.get("urls", []), 1),
             (self.search_in_cookies, patterns.get("cookies", []), 2),
         ]
@@ -38,7 +40,7 @@ class ServerDetector(BaseDetector):
 
         return score >= required_score
 
-    def _extract_version(self, server_name: str, patterns: Dict[str, Any]) -> str:
+    def _extract_version(self, js_lib_name: str, patterns: Dict[str, Any]) -> str:
         version_pattern = patterns.get("version_pattern", "")
         if not version_pattern:
             return ""
@@ -51,6 +53,14 @@ class ServerDetector(BaseDetector):
         version = self.extract_version_from_html(version_pattern)
         if version:
             return version
+
+        
+        if self.html:
+            script_patterns = re.findall(r'<script.*?src=["\'](.*?)["\']', self.html)
+            for script in script_patterns:
+                version = self.extract_version(script, version_pattern)
+                if version:
+                    return version
 
         version = self.extract_version_from_urls(version_pattern)
         if version:

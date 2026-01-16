@@ -1,5 +1,5 @@
 import re
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple
 from fullmute.utils.logger import setup_logger
 
 logger = setup_logger()
@@ -11,7 +11,7 @@ class CameraDetector:
         self.headers = headers
         self.signatures = signatures
 
-    def detect(self) -> List[str]:
+    def detect(self) -> List[Tuple[str, str]]:
         detected_cameras = []
 
         if not self.signatures:
@@ -19,11 +19,12 @@ class CameraDetector:
 
         for camera_name, patterns in self.signatures.items():
             if self._detect_single(camera_name, patterns):
-                detected_cameras.append(camera_name)
+                version = self._extract_version(camera_name, patterns)
+                detected_cameras.append((camera_name, version))
 
         return detected_cameras
 
-    def _detect_single(self, camera_name: str, patterns: Dict[str, List[str]]) -> bool:
+    def _detect_single(self, camera_name: str, patterns: Dict[str, Any]) -> bool:
         score = 0
 
         if patterns.get("headers"):
@@ -60,3 +61,33 @@ class CameraDetector:
 
         required_score = patterns.get("confidence", 2)
         return score >= required_score
+
+    def _extract_version(self, camera_name: str, patterns: Dict[str, Any]) -> str:
+        version_pattern = patterns.get("version_pattern", "")
+        if not version_pattern:
+            return ""
+
+        
+        for header_name, header_value in self.headers.items():
+            header_string = f"{header_name}: {header_value}"
+            version = self._extract_version_from_content(header_string, version_pattern)
+            if version:
+                return version
+
+        
+        if self.html:
+            version = self._extract_version_from_content(self.html, version_pattern)
+            if version:
+                return version
+
+        return ""
+
+    def _extract_version_from_content(self, content: str, version_pattern: str) -> str:
+        """Extract version from content using the provided pattern"""
+        if not version_pattern:
+            return ""
+
+        match = re.search(version_pattern, content, re.IGNORECASE)
+        if match:
+            return match.group(1)  
+        return ""

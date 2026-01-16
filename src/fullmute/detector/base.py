@@ -1,6 +1,6 @@
 import re
 from abc import ABC, abstractmethod
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple
 
 class BaseDetector(ABC):
     def __init__(self, url: str, headers: Dict[str, str], html: str, cookies: Dict[str, str], signatures: Dict[str, Any]):
@@ -72,3 +72,40 @@ class BaseDetector(ABC):
             if self.search_in_html([pattern]) or self.search_in_headers([pattern]):
                 return False
         return True
+
+    def extract_version(self, content: str, version_pattern: str) -> str:
+        """Extract version from content using the provided pattern"""
+        if not version_pattern:
+            return ""
+
+        match = re.search(version_pattern, content, re.IGNORECASE)
+        if match:
+            return match.group(1)  
+        return ""
+
+    def extract_version_from_headers(self, version_pattern: str) -> str:
+        """Extract version from headers"""
+        for header_name, header_value in self.headers.items():
+            header_string = f"{header_name}: {header_value}"
+            version = self.extract_version(header_string, version_pattern)
+            if version:
+                return version
+        return ""
+
+    def extract_version_from_html(self, version_pattern: str) -> str:
+        """Extract version from HTML"""
+        if not self.html:
+            return ""
+        return self.extract_version(self.html, version_pattern)
+
+    def extract_version_from_urls(self, version_pattern: str) -> str:
+        """Extract version from URL"""
+        return self.extract_version(self.url, version_pattern)
+
+    def extract_version_from_cookies(self, version_pattern: str) -> str:
+        """Extract version from cookies"""
+        for cookie_name in self.cookies.keys():
+            version = self.extract_version(cookie_name, version_pattern)
+            if version:
+                return version
+        return ""

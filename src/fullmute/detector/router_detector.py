@@ -1,21 +1,21 @@
 from fullmute.detector.base import BaseDetector
 from typing import Dict, List, Any, Tuple
 
-class ServerDetector(BaseDetector):
+class RouterDetector(BaseDetector):
     def detect(self) -> List[Tuple[str, str]]:
-        detected_servers = []
+        detected_routers = []
 
         if not self.signatures:
-            return detected_servers
+            return detected_routers
 
-        for server_name, patterns in self.signatures.items():
-            if self._detect_single(server_name, patterns):
-                version = self._extract_version(server_name, patterns)
-                detected_servers.append((server_name, version))
+        for router_name, patterns in self.signatures.items():
+            if self._detect_single(router_name, patterns):
+                version = self._extract_version(router_name, patterns)
+                detected_routers.append((router_name, version))
 
-        return detected_servers
+        return detected_routers
 
-    def _detect_single(self, server_name: str, patterns: Dict[str, Any]) -> bool:
+    def _detect_single(self, router_name: str, patterns: Dict[str, Any]) -> bool:
         must_not_have = patterns.get("must_not_have", [])
         if must_not_have and not self.check_must_not_have(must_not_have):
             return False
@@ -38,7 +38,7 @@ class ServerDetector(BaseDetector):
 
         return score >= required_score
 
-    def _extract_version(self, server_name: str, patterns: Dict[str, Any]) -> str:
+    def _extract_version(self, router_name: str, patterns: Dict[str, Any]) -> str:
         version_pattern = patterns.get("version_pattern", "")
         if not version_pattern:
             return ""

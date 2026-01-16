@@ -1,8 +1,8 @@
 from fullmute.detector.base import BaseDetector
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Tuple
 
 class CMSDetector(BaseDetector):
-    def detect(self):
+    def detect(self) -> List[Tuple[str, str]]:
         detected_cms = []
 
         if not self.signatures:
@@ -10,7 +10,8 @@ class CMSDetector(BaseDetector):
 
         for cms_name, patterns in self.signatures.items():
             if self._detect_single(cms_name, patterns):
-                detected_cms.append(cms_name)
+                version = self._extract_version(cms_name, patterns)
+                detected_cms.append((cms_name, version))
 
         return detected_cms
 
@@ -36,3 +37,27 @@ class CMSDetector(BaseDetector):
         required_score = 1 if must_have else 2
 
         return score >= required_score
+
+    def _extract_version(self, cms_name: str, patterns: Dict[str, Any]) -> str:
+        version_pattern = patterns.get("version_pattern", "")
+        if not version_pattern:
+            return ""
+
+        
+        version = self.extract_version_from_headers(version_pattern)
+        if version:
+            return version
+
+        version = self.extract_version_from_html(version_pattern)
+        if version:
+            return version
+
+        version = self.extract_version_from_urls(version_pattern)
+        if version:
+            return version
+
+        version = self.extract_version_from_cookies(version_pattern)
+        if version:
+            return version
+
+        return ""
