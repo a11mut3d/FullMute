@@ -34,6 +34,8 @@ def get_db_connection(db_path: str):
     try:
         yield conn
     finally:
+        
+        
         pass
 
 def close_all_connections():
