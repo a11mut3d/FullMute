@@ -148,6 +148,6 @@ database:
 5. Open a Pull Request
 
 ## License
-creator: https://t.me/KuniDeveloper
+creator: https://t.me/rootlocalhostvibe
 
 MIT License
