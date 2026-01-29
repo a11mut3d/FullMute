@@ -149,5 +149,6 @@ database:
 
 ## License
 creator: https://t.me/rootlocalhostvibe
+Mute Ecosystem
 
 MIT License
