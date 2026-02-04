@@ -19,7 +19,8 @@
     "titles": ["AXIS.*Camera", "Network Camera", "Video Server", "AXIS.*Web Page"],
     "favicon": ["axis.ico", "favicon.ico"],
     "version_pattern": "(?:App-webs|AXIS|AMC) ([0-9.]+)",
-    "must_not_have": ["hikvision", "dahua"]
+    "must_have": ["AXIS", "axis-cgi", "/view/", "axis.com"],
+    "must_not_have": ["hikvision", "dahua", "router", "switch", "firewall"]
   },
   "Hikvision": {
     "headers": ["Server: Hikvision/([0-9.]+)|Server: Hikvision", "Server: App-webs/([0-9.]+)|Server: App-webs/", "WWW-Authenticate: Basic realm=\"Hikvision\"", "Server: hikvision"],
@@ -41,7 +42,8 @@
     "titles": ["Hikvision", "Web Video", "iVMS", "Hikvision.*DVR"],
     "favicon": ["hikvision.ico"],
     "version_pattern": "(?:HIKVISION|Hikvision) ([0-9.]+)",
-    "must_not_have": ["axis", "dahua"]
+    "must_have": ["Hikvision", "webVideoCtrl", "hikvision.com", "iVMS"],
+    "must_not_have": ["axis", "dahua", "router", "switch", "firewall"]
   },
   "Dahua": {
     "headers": ["Server: Dahua/([0-9.]+)|Server: Dahua", "Server: DHL-WEB/([0-9.]+)|Server: DHL-WEB", "WWW-Authenticate: Basic realm=\"Dahua\"", "Server: dahua"],
@@ -61,7 +63,8 @@
     "titles": ["Dahua", "Network Video Recorder", "DVR", "Dahua.*NVR"],
     "favicon": ["dahua.ico"],
     "version_pattern": "(?:DHSD|Dahua) ([0-9.]+)",
-    "must_not_have": ["axis", "hikvision"]
+    "must_have": ["Dahua", "webCom", "dahuasecurity.com", "WEBACTIVEX"],
+    "must_not_have": ["axis", "hikvision", "router", "switch", "firewall"]
   },
   "Ubiquiti": {
     "headers": ["Server: AirVision/([0-9.]+)|Server: AirVision", "Server: Ubiquiti/([0-9.]+)|Server: Ubiquiti", "X-Ubiquiti-", "Server: unifi"],
@@ -80,7 +83,8 @@
     "titles": ["UniFi", "Ubiquiti", "Network Video", "Unifi Video"],
     "favicon": ["ubiquiti.ico", "favicon-ubnt.ico"],
     "version_pattern": "(?:AirVision|Ubiquiti|UniFi) ([0-9.]+)",
-    "must_not_have": []
+    "must_have": ["UniFi", "unifi.ui.com", "ubnt", "unifi-video"],
+    "must_not_have": ["camera", "surveillance", "axis", "hikvision", "dahua"]
   },
   "Vivotek": {
     "headers": ["Server: Vivotek/([0-9.]+)|Server: Vivotek", "WWW-Authenticate: Basic realm=\"Vivotek\"", "Server: vivotek"],
@@ -98,7 +102,8 @@
     "titles": ["Vivotek", "Network Camera", "Vivotek.*IP Camera"],
     "favicon": ["vivotek.ico"],
     "version_pattern": "Vivotek ([0-9.]+)",
-    "must_not_have": []
+    "must_have": ["Vivotek", "liveView.shtml", "vivotek.com", "cameraView"],
+    "must_not_have": ["router", "switch", "firewall", "axis", "hikvision", "dahua"]
   },
   "Bosch": {
     "headers": ["Server: Bosch/([0-9.]+)|Server: Bosch", "WWW-Authenticate: Basic realm=\"Bosch\"", "Server: bosch"],
@@ -116,7 +121,8 @@
     "titles": ["Bosch", "Video Security", "Bosch.*Security"],
     "favicon": ["bosch.ico"],
     "version_pattern": "Bosch ([0-9.]+)",
-    "must_not_have": []
+    "must_have": ["Bosch", "bosch-security", "bosch.com", "VideoJet"],
+    "must_not_have": ["router", "switch", "firewall", "axis", "hikvision", "dahua"]
   },
   "Samsung": {
     "headers": ["Server: Samsung/([0-9.]+)|Server: Samsung", "Samsung-DVR/([0-9.]+)|Samsung-DVR", "Server: samsung"],
@@ -134,7 +140,8 @@
     "titles": ["Samsung", "Network Camera", "Samsung.*Security"],
     "favicon": ["samsung.ico"],
     "version_pattern": "(?:Samsung|SNS|Samsung-DVR) ([0-9.]+)",
-    "must_not_have": []
+    "must_have": ["Samsung", "samsung-techwin", "samsung.com", "SNS-"],
+    "must_not_have": ["router", "switch", "firewall", "axis", "hikvision", "dahua"]
   },
   "Sony": {
     "headers": ["Server: Sony/([0-9.]+)|Server: Sony", "WWW-Authenticate: Basic realm=\"Sony", "Server: sony"],
@@ -151,7 +158,8 @@
     "titles": ["Sony", "Network Camera", "Sony.*SNC"],
     "favicon": ["sony.ico"],
     "version_pattern": "SNC-([A-Z0-9]+) ([0-9.]+)",
-    "must_not_have": ["axis", "hikvision", "dahua"]
+    "must_have": ["Sony", "SNC-", "sony.net", "Network Camera"],
+    "must_not_have": ["router", "switch", "firewall", "axis", "hikvision", "dahua"]
   },
   "Panasonic": {
     "headers": ["Server: Panasonic/([0-9.]+)|Server: Panasonic", "WWW-Authenticate: Basic realm=\"Panasonic", "Server: panasonic"],
@@ -168,7 +176,8 @@
     "titles": ["Panasonic", "Network Camera", "Panasonic.*IP Camera"],
     "favicon": ["panasonic.ico"],
     "version_pattern": "Panasonic ([0-9.]+)",
-    "must_not_have": ["axis", "hikvision", "dahua"]
+    "must_have": ["Panasonic", "panasonic.com", "Network Camera", "BB-"],
+    "must_not_have": ["router", "switch", "firewall", "axis", "hikvision", "dahua"]
   },
   "Grandstream": {
     "headers": ["Server: Grandstream/([0-9.]+)|Server: Grandstream", "WWW-Authenticate: Basic realm=\"Grandstream", "Server: grandstream"],
@@ -184,7 +193,8 @@
     "titles": ["Grandstream", "Network Camera", "Grandstream.*Device"],
     "favicon": ["grandstream.ico"],
     "version_pattern": "Grandstream ([0-9.]+)",
-    "must_not_have": ["axis", "hikvision", "dahua"]
+    "must_have": ["Grandstream", "grandstream.com", "Network Camera"],
+    "must_not_have": ["router", "switch", "firewall", "axis", "hikvision", "dahua"]
   },
   "Avigilon": {
     "headers": ["Server: Avigilon/([0-9.]+)|Server: Avigilon", "WWW-Authenticate: Basic realm=\"Avigilon", "Server: avigilon"],
@@ -200,7 +210,8 @@
     "titles": ["Avigilon", "Control Center", "Avigilon.*System"],
     "favicon": ["avigilon.ico"],
     "version_pattern": "Avigilon ([0-9.]+)",
-    "must_not_have": ["axis", "hikvision", "dahua"]
+    "must_have": ["Avigilon", "avigilon.com", "Control Center"],
+    "must_not_have": ["router", "switch", "firewall", "axis", "hikvision", "dahua"]
   },
   "Arecont": {
     "headers": ["Server: Arecont/([0-9.]+)|Server: Arecont", "WWW-Authenticate: Basic realm=\"Arecont", "Server: arecont"],
@@ -216,7 +227,8 @@
     "titles": ["Arecont", "Vision", "Arecont.*Camera"],
     "favicon": ["arecont.ico"],
     "version_pattern": "Arecont ([0-9.]+)",
-    "must_not_have": ["axis", "hikvision", "dahua"]
+    "must_have": ["Arecont", "arecont.com", "Vision"],
+    "must_not_have": ["router", "switch", "firewall", "axis", "hikvision", "dahua"]
   },
   "Basler": {
     "headers": ["Server: Basler/([0-9.]+)|Server: Basler", "WWW-Authenticate: Basic realm=\"Basler", "Server: basler"],
@@ -232,7 +244,8 @@
     "titles": ["Basler", "Camera", "Basler.*acA"],
     "favicon": ["basler.ico"],
     "version_pattern": "Basler ([0-9.]+)",
-    "must_not_have": ["axis", "hikvision", "dahua"]
+    "must_have": ["Basler", "basler.com", "acA", "Camera"],
+    "must_not_have": ["router", "switch", "firewall", "axis", "hikvision", "dahua"]
   },
   "Canon": {
     "headers": ["Server: Canon/([0-9.]+)|Server: Canon", "WWW-Authenticate: Basic realm=\"Canon", "Server: canon"],
@@ -248,7 +261,8 @@
     "titles": ["Canon", "Network Camera", "Canon.*Camera"],
     "favicon": ["canon.ico"],
     "version_pattern": "Canon ([0-9.]+)",
-    "must_not_have": ["axis", "hikvision", "dahua"]
+    "must_have": ["Canon", "canon.com", "Network Camera", "VB-"],
+    "must_not_have": ["router", "switch", "firewall", "axis", "hikvision", "dahua"]
   },
   "FLIR": {
     "headers": ["Server: FLIR/([0-9.]+)|Server: FLIR", "WWW-Authenticate: Basic realm=\"FLIR", "Server: flir"],
@@ -264,6 +278,7 @@
     "titles": ["FLIR", "Thermal Camera", "FLIR.*System"],
     "favicon": ["flir.ico"],
     "version_pattern": "FLIR ([0-9.]+)",
-    "must_not_have": ["axis", "hikvision", "dahua"]
+    "must_have": ["FLIR", "flir.com", "Thermal Camera"],
+    "must_not_have": ["router", "switch", "firewall", "axis", "hikvision", "dahua"]
   }
 }

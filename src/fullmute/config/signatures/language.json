@@ -21,7 +21,8 @@
     "urls": [".php$", ".php3$", ".php4$", ".php5$", ".phtml$"],
     "cookies": ["PHPSESSID", "phpsessid", "PHP"],
     "version_pattern": "PHP/([0-9.]+)",
-    "must_not_have": ["Python", "Java", "Node.js", "Ruby"]
+    "must_have": ["X-Powered-By: PHP", "<?php", "PHPSESSID", "require_once"],
+    "must_not_have": ["Python", "Java", "Node.js", "Ruby", "django", "flask"]
   },
   "Python": {
     "headers": ["X-Powered-By: Python", "X-Generator: Python", "Server: Python", "X-Frame-Options: SAMEORIGIN"],
@@ -41,7 +42,8 @@
     "urls": [".py$", "/python", "/django", "/flask"],
     "cookies": ["python", "django", "csrftoken"],
     "version_pattern": "",
-    "must_not_have": ["PHP", "Java", "Node.js", "Ruby"]
+    "must_have": ["import ", "def ", "X-Powered-By: Python"],
+    "must_not_have": ["PHP", "Java", "Node.js", "Ruby", "laravel", "express"]
   },
   "Java": {
     "headers": ["X-Powered-By: Servlet", "X-Powered-By: JSP", "X-Powered-By: Java", "Server: Apache-Coyote", "X-Application-Context"],
@@ -60,7 +62,8 @@
     "urls": [".jsp$", ".jspx$", ".jws$", "/servlet", "/java", "/jsp"],
     "cookies": ["JSESSIONID", "java", "jsessionid"],
     "version_pattern": "Java/([0-9.]+)|Java ([0-9.]+)",
-    "must_not_have": ["PHP", "Python", "Node.js", "Ruby"]
+    "must_have": ["import java", "public class", "X-Powered-By: Servlet"],
+    "must_not_have": ["PHP", "Python", "Node.js", "Ruby", "laravel", "django"]
   },
   "Node.js": {
     "headers": ["X-Powered-By: Express", "X-Powered-By: Node", "X-Powered-By: Node.js", "Server: Node.js"],
@@ -83,7 +86,8 @@
     "urls": ["/node", "/npm", "/package.json", ".js$", "/socket.io"],
     "cookies": ["connect.sid", "node", "node_session"],
     "version_pattern": "Node\\.js/([0-9.]+)|Node ([0-9.]+)",
-    "must_not_have": ["PHP", "Python", "Java", "Ruby"]
+    "must_have": ["X-Powered-By: Node", "require(", "module.exports"],
+    "must_not_have": ["PHP", "Python", "Java", "Ruby", "laravel", "django"]
   },
   "Ruby": {
     "headers": ["X-Powered-By: Phusion Passenger", "X-Powered-By: Ruby", "X-Runtime"],
@@ -103,7 +107,8 @@
     "urls": [".rb$", ".rhtml$", "/ruby", "/rails", "/gems"],
     "cookies": ["_rails_session", "ruby", "rack.session"],
     "version_pattern": "Ruby/([0-9.]+)|Ruby ([0-9.]+)",
-    "must_not_have": ["PHP", "Python", "Java", "Node.js"]
+    "must_have": ["require '", "def ", "X-Powered-By: Ruby"],
+    "must_not_have": ["PHP", "Python", "Java", "Node.js", "laravel", "django"]
   },
   "Go": {
     "headers": ["Server: Go", "X-Powered-By: Go", "X-Go-Version"],
@@ -120,7 +125,8 @@
     "urls": [".go$", "/go", "/golang"],
     "cookies": ["go", "golang"],
     "version_pattern": "Go/([0-9.]+)|Go ([0-9.]+)",
-    "must_not_have": ["PHP", "Python", "Java", "Node.js", "Ruby"]
+    "must_have": ["package ", "import (", "func ", "Server: Go"],
+    "must_not_have": ["PHP", "Python", "Java", "Node.js", "Ruby", "laravel", "django"]
   },
   "C#": {
     "headers": ["X-Powered-By: ASP.NET", "X-AspNet-Version", "X-SourceFiles:.*\\.cs"],
@@ -139,7 +145,8 @@
     "urls": [".aspx$", ".ashx$", ".asmx$", ".ascx$", ".cs$", ".cshtml$"],
     "cookies": ["ASP.NET_SessionId", "ASPSESSION", "CSharp"],
     "version_pattern": "C#/([0-9.]+)|C# ([0-9.]+)",
-    "must_not_have": ["PHP", "Python", "Java", "Node.js", "Ruby"]
+    "must_have": ["using System", "namespace ", "X-Powered-By: ASP.NET"],
+    "must_not_have": ["PHP", "Python", "Java", "Node.js", "Ruby", "laravel", "django"]
   },
   "Perl": {
     "headers": ["X-Powered-By: Perl", "X-Generator: Perl"],
@@ -157,6 +164,7 @@
     "urls": [".pl$", ".pm$", ".cgi$", "/perl"],
     "cookies": ["perl", "cgi"],
     "version_pattern": "Perl/([0-9.]+)|Perl ([0-9.]+)",
-    "must_not_have": ["PHP", "Python", "Java", "Node.js", "Ruby"]
+    "must_have": ["use ", "my $", "#!/usr/bin/perl"],
+    "must_not_have": ["PHP", "Python", "Java", "Node.js", "Ruby", "laravel", "django"]
   }
 }

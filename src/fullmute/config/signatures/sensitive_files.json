@@ -3,7 +3,9 @@
     "paths": ["/.git/HEAD", "/.git/config", "/.git/index", "/.git/description"],
     "verification": {
       "method": "content",
-      "patterns": ["ref: refs/", "\\[core\\]", "repositoryformatversion"]
+      "patterns": ["ref: refs/", "\\[core\\]", "repositoryformatversion"],
+      "must_have": ["ref:", "refs/", "\\[core\\]"],
+      "must_not_have": ["<!DOCTYPE", "<html", "<body"]
     },
     "confidence": 95
   },
@@ -11,7 +13,9 @@
     "paths": ["/.git/", "/git/", "/.gitignore"],
     "verification": {
       "method": "directory_listing",
-      "patterns": ["HEAD", "config", "index", "objects"]
+      "patterns": ["HEAD", "config", "index", "objects"],
+      "must_have": ["HEAD", "config", "index", "objects"],
+      "must_not_have": ["forbidden", "not found", "404"]
     },
     "confidence": 80
   },
@@ -19,7 +23,9 @@
     "paths": ["/.env", "/.env.example", "/.env.local", "/.env.production", "/.env.dev", "/.env.test"],
     "verification": {
       "method": "content",
-      "patterns": ["API_KEY", "SECRET_KEY", "PASSWORD=", "DATABASE_URL=", "SECRET=", "TOKEN=", "KEY="]
+      "patterns": ["API_KEY", "SECRET_KEY", "PASSWORD=", "DATABASE_URL=", "SECRET=", "TOKEN=", "KEY="],
+      "must_have": ["=", "KEY", "PASSWORD", "SECRET"],
+      "must_not_have": ["<!DOCTYPE", "<html", "<body", "Not Found"]
     },
     "confidence": 90
   },
@@ -27,7 +33,9 @@
     "paths": ["/config.php", "/configuration.php", "/config.inc.php", "/settings.php", "/wp-config.php"],
     "verification": {
       "method": "content",
-      "patterns": ["define\\(", "\\$database", "\\$password", "\\$host", "DB_"]
+      "patterns": ["define\\(", "\\$database", "\\$password", "\\$host", "DB_"],
+      "must_have": ["<?php", "define", "\\$"],
+      "must_not_have": ["<!DOCTYPE", "<html", "<body", "Page not found"]
     },
     "confidence": 85
   },
@@ -39,7 +47,8 @@
     ],
     "verification": {
       "method": "extension",
-      "patterns": [".zip", ".tar", ".gz", ".sql", ".bak", ".old", ".rar"]
+      "patterns": [".zip", ".tar", ".gz", ".sql", ".bak", ".old", ".rar"],
+      "must_not_have": ["<!DOCTYPE", "<html", "<body", "Page not found"]
     },
     "confidence": 70
   },
@@ -51,7 +60,9 @@
     ],
     "verification": {
       "method": "content",
-      "patterns": ["\\[.*\\]", "ERROR", "WARNING", "INFO", "DEBUG", "Exception", "Stack trace"]
+      "patterns": ["\\[.*\\]", "ERROR", "WARNING", "INFO", "DEBUG", "Exception", "Stack trace"],
+      "must_have": ["\\[.*\\]", "ERROR", "WARNING", "INFO", "DEBUG", "Exception"],
+      "must_not_have": ["<!DOCTYPE", "<html", "<body", "Page not found"]
     },
     "confidence": 75
   },
@@ -63,7 +74,9 @@
     ],
     "verification": {
       "method": "login_form",
-      "patterns": ["password", "username", "login", "sign in", "auth", "form"]
+      "patterns": ["password", "username", "login", "sign in", "auth", "form"],
+      "must_have": ["password", "username", "login", "form"],
+      "must_not_have": ["forbidden", "access denied", "403"]
     },
     "confidence": 60
   },
@@ -74,7 +87,9 @@
     ],
     "verification": {
       "method": "config_content",
-      "patterns": ["Directory", "Rewrite", "Allow", "Deny", "xml", "txt"]
+      "patterns": ["Directory", "Rewrite", "Allow", "Deny", "xml", "txt"],
+      "must_have": ["Directory", "Rewrite", "Allow", "Deny", "User-agent", "Disallow", "Sitemap"],
+      "must_not_have": ["<!DOCTYPE", "<html", "<body", "Page not found"]
     },
     "confidence": 50
   },
@@ -85,7 +100,9 @@
     ],
     "verification": {
       "method": "directory_listing",
-      "patterns": [".idea", ".vscode", "workspace.xml", "project.xml"]
+      "patterns": [".idea", ".vscode", "workspace.xml", "project.xml"],
+      "must_have": [".idea", ".vscode", "workspace.xml", "project.xml", "settings.json"],
+      "must_not_have": ["forbidden", "not found", "404"]
     },
     "confidence": 65
   },
@@ -96,7 +113,9 @@
     ],
     "verification": {
       "method": "sql_content",
-      "patterns": ["CREATE TABLE", "INSERT INTO", "DROP TABLE", "ALTER TABLE"]
+      "patterns": ["CREATE TABLE", "INSERT INTO", "DROP TABLE", "ALTER TABLE"],
+      "must_have": ["CREATE", "TABLE", "INSERT", "INTO"],
+      "must_not_have": ["<!DOCTYPE", "<html", "<body", "Page not found"]
     },
     "confidence": 70
   }

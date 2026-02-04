@@ -18,7 +18,8 @@
     "urls": ["/mysql", "/phpmyadmin", "/adminer", "/myadmin", "/mysql-admin", "/mysqladmin"],
     "cookies": ["mysql", "mysqldb", "mysql_session", "mysql_login"],
     "version_pattern": "MySQL ([0-9.]+)|MariaDB ([0-9.]+)",
-    "must_not_have": ["PostgreSQL", "MongoDB", "Redis"]
+    "must_have": ["mysql", "X-Database: MySQL", "phpmyadmin", "mysql_query", "mysqli"],
+    "must_not_have": ["PostgreSQL", "MongoDB", "Redis", "django", "laravel"]
   },
   "PostgreSQL": {
     "headers": ["X-PostgreSQL-Version", "X-Database: PostgreSQL", "X-DB-Engine: PostgreSQL"],
@@ -33,7 +34,8 @@
     "urls": ["/pgadmin", "/phppgadmin"],
     "cookies": ["postgresql", "postgres", "pgsql"],
     "version_pattern": "PostgreSQL ([0-9.]+)",
-    "must_not_have": ["MySQL", "MongoDB", "Redis"]
+    "must_have": ["PostgreSQL", "pg_", "X-Database: PostgreSQL", "pgadmin"],
+    "must_not_have": ["MySQL", "MongoDB", "Redis", "django", "laravel"]
   },
   "MongoDB": {
     "headers": ["X-MongoDB-Version", "X-Database: MongoDB", "X-DB-Engine: MongoDB"],
@@ -47,7 +49,8 @@
     "urls": ["/mongo", "/mongoadmin", "/rockmongo"],
     "cookies": ["mongodb", "mongo", "mongosession"],
     "version_pattern": "MongoDB ([0-9.]+)",
-    "must_not_have": ["MySQL", "PostgreSQL", "Redis"]
+    "must_have": ["MongoDB", "db.collection", "X-Database: MongoDB", "mongo"],
+    "must_not_have": ["MySQL", "PostgreSQL", "Redis", "django", "laravel"]
   },
   "Redis": {
     "headers": ["X-Redis-Version", "X-Database: Redis", "X-DB-Engine: Redis"],
@@ -61,7 +64,8 @@
     "urls": ["/redis", "/rediweb"],
     "cookies": ["redis", "redissession"],
     "version_pattern": "Redis ([0-9.]+)",
-    "must_not_have": ["MySQL", "PostgreSQL", "MongoDB"]
+    "must_have": ["Redis", "redis-cli", "X-Database: Redis", "KEYS"],
+    "must_not_have": ["MySQL", "PostgreSQL", "MongoDB", "django", "laravel"]
   },
   "SQLite": {
     "headers": ["X-SQLite-Version", "X-Database: SQLite"],
@@ -75,7 +79,8 @@
     "urls": ["/sqlite", "/sqliteadmin"],
     "cookies": ["sqlite", "sqlite_session"],
     "version_pattern": "SQLite ([0-9.]+)",
-    "must_not_have": ["MySQL", "PostgreSQL", "MongoDB"]
+    "must_have": ["SQLite", "sqlite3", "X-Database: SQLite", "sqlite_query"],
+    "must_not_have": ["MySQL", "PostgreSQL", "MongoDB", "django", "laravel"]
   },
   "Oracle": {
     "headers": ["X-Oracle-Version", "X-Database: Oracle", "X-DB-Engine: Oracle"],
@@ -89,7 +94,8 @@
     "urls": ["/oracle", "/toad", "/sqldeveloper"],
     "cookies": ["oracle", "oracle_sid"],
     "version_pattern": "Oracle ([0-9.]+)",
-    "must_not_have": ["MySQL", "PostgreSQL", "MongoDB"]
+    "must_have": ["Oracle", "PL/SQL", "X-Database: Oracle", "oracle_connect"],
+    "must_not_have": ["MySQL", "PostgreSQL", "MongoDB", "django", "laravel"]
   },
   "Microsoft SQL Server": {
     "headers": ["X-MSSQL-Version", "X-Database: MSSQL", "X-DB-Engine: MSSQL"],
@@ -104,6 +110,7 @@
     "urls": ["/mssql", "/sqlserver"],
     "cookies": ["mssql", "mssql_session"],
     "version_pattern": "SQL Server ([0-9.]+)|Microsoft SQL Server ([0-9.]+)",
-    "must_not_have": ["MySQL", "PostgreSQL", "MongoDB"]
+    "must_have": ["SQL Server", "mssql", "X-Database: MSSQL", "sp_"],
+    "must_not_have": ["MySQL", "PostgreSQL", "MongoDB", "django", "laravel"]
   }
 }
