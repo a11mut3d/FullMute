@@ -68,6 +68,24 @@ class SensitiveFileVerifier:
     def _verify_content(self, content: str, verification: Dict[str, Any]) -> bool:
         method = verification.get("method", "content")
         patterns = verification.get("patterns", [])
+        must_have = verification.get("must_have", [])
+        must_not_have = verification.get("must_not_have", [])
+
+        # Проверяем must_not_have условия
+        if must_not_have:
+            for pattern in must_not_have:
+                if re.search(pattern, content, re.IGNORECASE):
+                    return False
+
+        # Проверяем must_have условия
+        if must_have:
+            found_required = False
+            for pattern in must_have:
+                if re.search(pattern, content, re.IGNORECASE):
+                    found_required = True
+                    break
+            if not found_required:
+                return False
 
         if method == "content" and patterns:
             for pattern in patterns:
@@ -81,5 +99,38 @@ class SensitiveFileVerifier:
             for pattern in patterns:
                 if re.search(pattern, content, re.IGNORECASE):
                     return True
+
+        elif method == "directory_listing":
+            # Для проверки списка каталогов проверяем наличие нескольких ключевых элементов
+            found_elements = 0
+            for pattern in patterns:
+                if re.search(pattern, content, re.IGNORECASE):
+                    found_elements += 1
+            # Требуем хотя бы 2 совпадения для подтверждения
+            return found_elements >= 2
+
+        elif method == "config_content":
+            # Для конфигурационных файлов требуем больше уверенности
+            found_elements = 0
+            for pattern in patterns:
+                if re.search(pattern, content, re.IGNORECASE):
+                    found_elements += 1
+            return found_elements >= 1
+
+        elif method == "login_form":
+            # Для форм входа проверяем наличие нескольких признаков
+            found_elements = 0
+            for pattern in patterns:
+                if re.search(pattern, content, re.IGNORECASE):
+                    found_elements += 1
+            return found_elements >= 2
+
+        elif method == "sql_content":
+            # Для SQL-дампов проверяем наличие ключевых команд
+            found_elements = 0
+            for pattern in patterns:
+                if re.search(pattern, content, re.IGNORECASE):
+                    found_elements += 1
+            return found_elements >= 1
 
         return False

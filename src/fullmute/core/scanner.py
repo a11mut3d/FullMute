@@ -25,7 +25,8 @@ class FullMuteScanner:
             max_retries=self.config.get('max_retries', 3),
             timeout=self.config.get('timeout', 15),
             proxy_enabled=self.config.get('proxy_enabled', False),
-            proxy_file=self.config.get('proxy_file')
+            proxy_file=self.config.get('proxy_file'),
+            bypass_cloudflare=self.config.get('bypass_cloudflare', True)
         )
 
         self.verifier = SensitiveFileVerifier(
@@ -39,7 +40,11 @@ class FullMuteScanner:
         )
 
         
-        self.cve_checker = CVEChecker()
+        self.cve_checker = CVEChecker(
+            nvd_api_key=self.config.get('nvd_api_key'),
+            max_retries=self.config.get('nvd_max_retries', 3),
+            initial_delay=self.config.get('nvd_initial_delay', 1.0)
+        )
 
         self.stats = {
             'total': 0,
