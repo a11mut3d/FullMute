@@ -65,6 +65,7 @@ class TechDetector:
                 url=self.url,
                 html=self.html,
                 headers=self.headers,
+                cookies=self.cookies,
                 signatures=self.signatures['camera']
             )
             camera_results = camera_detector.detect()
