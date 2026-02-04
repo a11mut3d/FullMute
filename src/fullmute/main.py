@@ -11,7 +11,7 @@ def print_ascii_art():
 \_/   \____/\____/\____/\_/  \|\____/ \_/ \____\
     """
     print(ascii_art)
-    print("FullMute - Advanced Web Scanner\n")
+    print("FullMute - Advanced Web Scanner || MuteEcosystem\n")
 
 def entrypoint():
     if len(sys.argv) == 1:
