@@ -11,6 +11,10 @@ scanner:
   max_delay: 3.0
   rotate_user_agents: true
   verify_ssl: false
+  bypass_cloudflare: true
+  nvd_api_key: ""  # Add your NVD API key here if you have one
+  nvd_max_retries: 3
+  nvd_initial_delay: 1.0
 
 signatures:
   path: "./config/signatures"
