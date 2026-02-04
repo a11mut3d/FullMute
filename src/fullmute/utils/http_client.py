@@ -4,15 +4,18 @@ import asyncio
 from aiohttp import ClientTimeout, ClientSession
 from fullmute.config.user_agents import USER_AGENTS
 from fullmute.utils.logger import setup_logger
+from fullmute.utils.cloudflare_bypass import CloudflareBypass
 
 logger = setup_logger()
 
 class HttpClient:
-    def __init__(self, max_retries=3, timeout=15, proxy_enabled=False, proxy_file=None):
+    def __init__(self, max_retries=3, timeout=15, proxy_enabled=False, proxy_file=None, bypass_cloudflare=True):
         self.max_retries = max_retries
         self.timeout = timeout
         self.proxy_enabled = proxy_enabled
         self.proxies = []
+        self.bypass_cloudflare = bypass_cloudflare
+        self.cf_bypass = CloudflareBypass(max_retries=max_retries, timeout=timeout)
 
         if proxy_enabled and proxy_file:
             self.load_proxies(proxy_file)
@@ -60,11 +63,25 @@ class HttpClient:
                         headers_dict = dict(response.headers)
                         cookies_dict = {k: v.value for k, v in response.cookies.items()}
 
+                        # Проверяем, является ли ответ Cloudflare защитой
+                        if response.status == 403 or self._is_cloudflare_challenge(html):
+                            if self.bypass_cloudflare:
+                                logger.info(f"Detected Cloudflare protection for {url}, attempting bypass...")
+                                return await self.cf_bypass.bypass_cloudflare(url, headers)
+                            else:
+                                logger.warning(f"Received 403/Cloudflare for {url} but bypass is disabled")
+
                         return html, headers_dict, cookies_dict, response.status
 
             except (aiohttp.ClientError, asyncio.TimeoutError) as e:
                 retries += 1
                 logger.warning(f"Error fetching {url}: {e}. Retry {retries}/{self.max_retries}")
+
+                # Если это Cloudflare ошибка, пробуем обход
+                if "cloudflare" in str(e).lower() and self.bypass_cloudflare:
+                    logger.info(f"Detected Cloudflare error for {url}, attempting bypass...")
+                    return await self.cf_bypass.bypass_cloudflare(url, headers)
+
                 if retries < self.max_retries:
                     await asyncio.sleep(2 ** retries)
                 else:
@@ -72,3 +89,19 @@ class HttpClient:
                     return None, {}, {}, 0
 
         return None, {}, {}, 0
+
+    def _is_cloudflare_challenge(self, html: str) -> bool:
+        """Проверяет, является ли ответ Cloudflare challenge"""
+        cloudflare_indicators = [
+            "Checking your browser before accessing",
+            "You are being redirected",
+            "Please turn JavaScript on and reload the page",
+            "enable JavaScript in your browser",
+            "Checking your browser",
+            "Just a moment",
+            "Cloudflare",
+            "Ray ID:"
+        ]
+
+        html_lower = html.lower()
+        return any(indicator.lower() in html_lower for indicator in cloudflare_indicators)
