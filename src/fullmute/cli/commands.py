@@ -22,7 +22,7 @@ def cli(ctx, config):
     ctx.ensure_object(dict)
     setup_logging()
     ctx.obj['config'] = _load_config(Path(config))
-    logging_config = ctx.obj['config']['logging']
+    logging_config = ctx.obj['config'].get('logging')
     if logging_config:
         setup_logging(
             level=logging_config.get('level', logging.INFO),
