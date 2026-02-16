@@ -1,9 +1,15 @@
 {
-  "Nginx": {
-    "headers": ["Server: nginx/([0-9.]+)|Server: nginx", "X-Powered-By: nginx"],
+  "OpenResty": {
+    "headers": ["Server: openresty/([0-9.]+)|Server: openresty", "X-Powered-By: openresty"],
     "urls": ["/nginx-status", "/server-status"],
     "must_not_have": ["Apache", "IIS", "LiteSpeed"],
-    "version_pattern": "nginx/([0-9.]+)"
+    "version_pattern": "openresty/([0-9.]+)"
+  },
+  "Nginx": {
+    "headers": ["Server: nginx/([0-9.]+)|Server: nginx", "X-Powered-By: nginx", "Server: openresty/([0-9.]+)|Server: openresty"],
+    "urls": ["/nginx-status", "/server-status"],
+    "must_not_have": ["Apache", "IIS", "LiteSpeed"],
+    "version_pattern": "(?:nginx|openresty)/([0-9.]+)"
   },
   "Apache": {
     "headers": ["Server: Apache/([0-9.]+)|Server: Apache", "Server: Apache/.*", "X-Powered-By: Apache"],
