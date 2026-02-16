@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS domains (
     is_alive BOOLEAN DEFAULT 1,
     response_time INTEGER,
     http_status INTEGER,
+    final_url TEXT,
     technologies TEXT,
     sensitive_files TEXT
 );

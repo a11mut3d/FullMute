@@ -14,10 +14,39 @@ def init_db(db_path: str):
     p.parent.mkdir(parents=True, exist_ok=True)
 
     conn = sqlite3.connect(db_path)
+
+    # Проверяем, существует ли таблица domains и столбец final_url
+    cursor = conn.cursor()
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='domains';")
+    table_exists = cursor.fetchone() is not None
+
+    # Создаем или обновляем схему
     conn.executescript(SCHEMA)
+
+    # Если таблица existed, добавляем недостающие столбцы
+    if table_exists:
+        _update_schema_if_needed(conn)
+
     conn.commit()
     conn.close()
     logger.info(f"Database initialized at {db_path}")
+
+def _update_schema_if_needed(conn):
+    """Обновляет схему базы данных, если она устарела"""
+    cursor = conn.cursor()
+
+    # Проверяем, существует ли столбец final_url
+    cursor.execute("PRAGMA table_info(domains)")
+    columns = [column[1] for column in cursor.fetchall()]
+
+    if 'final_url' not in columns:
+        try:
+            cursor.execute("ALTER TABLE domains ADD COLUMN final_url TEXT")
+            logger.info("Added final_url column to domains table")
+        except sqlite3.Error as e:
+            logger.warning(f"Could not add final_url column: {e}")
+
+    # Здесь можно добавить другие проверки для будущих обновлений схемы
 
 @contextmanager
 def get_db_connection(db_path: str):

@@ -27,20 +27,43 @@ class DBQueries:
     def add_domain(self, domain_data: dict):
         try:
             with self._get_cursor() as cursor:
-                cursor.execute('''
-                    INSERT OR REPLACE INTO domains
-                    (domain, scanned_at, has_camera, is_alive, response_time, http_status, technologies, sensitive_files)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                ''', (
-                    domain_data.get('domain'),
-                    domain_data.get('scanned_at', datetime.now()),
-                    domain_data.get('has_camera', False),
-                    domain_data.get('is_alive', True),
-                    domain_data.get('response_time'),
-                    domain_data.get('http_status'),
-                    json.dumps(domain_data.get('technologies', [])),
-                    json.dumps(domain_data.get('sensitive_files', []))
-                ))
+                # Проверяем, существует ли столбец final_url
+                cursor.execute("PRAGMA table_info(domains)")
+                columns = [column[1] for column in cursor.fetchall()]
+
+                if 'final_url' in columns:
+                    # Если столбец final_url существует, используем его
+                    cursor.execute('''
+                        INSERT OR REPLACE INTO domains
+                        (domain, scanned_at, has_camera, is_alive, response_time, http_status, final_url, technologies, sensitive_files)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ''', (
+                        domain_data.get('domain'),
+                        domain_data.get('scanned_at', datetime.now()),
+                        domain_data.get('has_camera', False),
+                        domain_data.get('is_alive', True),
+                        domain_data.get('response_time'),
+                        domain_data.get('http_status'),
+                        domain_data.get('final_url'),
+                        json.dumps(domain_data.get('technologies', [])),
+                        json.dumps(domain_data.get('sensitive_files', []))
+                    ))
+                else:
+                    # Если столбца final_url нет, используем старую схему
+                    cursor.execute('''
+                        INSERT OR REPLACE INTO domains
+                        (domain, scanned_at, has_camera, is_alive, response_time, http_status, technologies, sensitive_files)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    ''', (
+                        domain_data.get('domain'),
+                        domain_data.get('scanned_at', datetime.now()),
+                        domain_data.get('has_camera', False),
+                        domain_data.get('is_alive', True),
+                        domain_data.get('response_time'),
+                        domain_data.get('http_status'),
+                        json.dumps(domain_data.get('technologies', [])),
+                        json.dumps(domain_data.get('sensitive_files', []))
+                    ))
         except Exception as e:
             logger.error(f"Failed to add domain {domain_data.get('domain')}: {e}")
 
