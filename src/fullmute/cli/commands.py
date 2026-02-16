@@ -302,6 +302,9 @@ def scan_one(ctx, domain):
             click.echo(f"Error: {result['error']}")
         else:
             click.echo(f"Status: {result.get('status_code', 'N/A')}")
+            # Показываем финальный URL, если он отличается от исходного
+            if 'final_url' in result and result['final_url'] != domain:
+                click.echo(f"Redirected to: {result['final_url']}")
 
             technologies = result.get('technologies', {})
             if technologies:
@@ -375,29 +378,79 @@ def export(db_path, format):
         from fullmute.db.queries import DBQueries
 
         db = DBQueries(db_path)
+
+        # Получаем все домены
         domains = db.fetch_all_domains()
+
+        # Для каждого домена получаем связанную информацию
+        detailed_data = []
+        for domain_row in domains:
+            domain_dict = dict(domain_row)
+            domain_id = domain_dict['id']
+
+            # Получаем технологии для этого домена
+            with db._get_cursor() as cursor:
+                cursor.execute('SELECT * FROM technologies WHERE domain_id = ?', (domain_id,))
+                tech_rows = cursor.fetchall()
+                technologies = [dict(row) for row in tech_rows]
+
+                # Получаем плагины для этого домена
+                cursor.execute('SELECT * FROM plugins WHERE domain_id = ?', (domain_id,))
+                plugin_rows = cursor.fetchall()
+                plugins = [dict(row) for row in plugin_rows]
+
+                # Получаем чувствительные файлы для этого домена
+                cursor.execute('SELECT * FROM sensitive_files WHERE domain_id = ?', (domain_id,))
+                file_rows = cursor.fetchall()
+                sensitive_files = [dict(row) for row in file_rows]
+
+            # Добавляем информацию о технологиях в словарь домена
+            domain_dict['technologies'] = technologies
+            domain_dict['plugins'] = plugins
+            domain_dict['sensitive_files'] = sensitive_files
+
+            detailed_data.append(domain_dict)
 
         if format == 'json':
             output_file = 'export.json'
-            data = []
-            for domain in domains:
-                domain_dict = dict(domain)
-                data.append(domain_dict)
-
             with open(output_file, 'w') as f:
-                json.dump(data, f, indent=2)
+                json.dump(detailed_data, f, indent=2)
 
             click.echo(f"Exported to {output_file}")
 
         elif format == 'csv':
             output_file = 'export.csv'
             import csv
-            with open(output_file, 'w', newline='') as f:
-                if domains:
-                    writer = csv.DictWriter(f, fieldnames=domains[0].keys())
+            with open(output_file, 'w', newline='', encoding='utf-8') as f:
+                if detailed_data:
+                    # Для CSV формата мы будем использовать flattened структуру
+                    flattened_data = []
+                    for item in detailed_data:
+                        flat_item = item.copy()
+
+                        # Преобразуем списки в строки для CSV
+                        tech_names = [f"{t['category']}:{t['name']}" for t in item.get('technologies', [])]
+                        flat_item['technologies'] = '; '.join(tech_names)
+
+                        plugin_names = [f"{p['plugin_name']}" for p in item.get('plugins', [])]
+                        flat_item['plugins'] = '; '.join(plugin_names)
+
+                        file_paths = [f['file_path'] for f in item.get('sensitive_files', [])]
+                        flat_item['sensitive_files'] = '; '.join(file_paths)
+
+                        # Удаляем вложенные структуры, которые не подходят для CSV
+                        del flat_item['technologies']  # временно удаляем, чтобы заменить ниже
+                        flat_item['tech_details'] = '; '.join(tech_names)
+                        flat_item['plugin_details'] = '; '.join(plugin_names)
+                        flat_item['file_details'] = '; '.join(file_paths)
+
+                        flattened_data.append(flat_item)
+
+                    fieldnames = flattened_data[0].keys() if flattened_data else []
+                    writer = csv.DictWriter(f, fieldnames=fieldnames)
                     writer.writeheader()
-                    for domain in domains:
-                        writer.writerow(dict(domain))
+                    for item in flattened_data:
+                        writer.writerow(item)
 
             click.echo(f"Exported to {output_file}")
 
