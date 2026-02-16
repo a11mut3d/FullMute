@@ -107,7 +107,8 @@ class HttpClient:
                     if response.status == 403 or self._is_cloudflare_challenge(html):
                         if self.bypass_cloudflare:
                             logger.info(f"Detected Cloudflare protection for {url}, attempting bypass...")
-                            return await self.cf_bypass.bypass_cloudflare(url, headers)
+                            html, headers_dict, cookies_dict, status = await self.cf_bypass.bypass_cloudflare(url, headers)
+                            return html, headers_dict, cookies_dict, status, url
                         else:
                             logger.warning(f"Received 403/Cloudflare for {url} but bypass is disabled")
 
@@ -120,7 +121,8 @@ class HttpClient:
                 # Если это Cloudflare ошибка, пробуем обход
                 if "cloudflare" in str(e).lower() and self.bypass_cloudflare:
                     logger.info(f"Detected Cloudflare error for {url}, attempting bypass...")
-                    return await self.cf_bypass.bypass_cloudflare(url, headers)
+                    html, headers_dict, cookies_dict, status = self.cf_bypass.bypass_cloudflare(url, headers)
+                    return html, headers_dict, cookies_dict, status, url
 
                 if retries < self.max_retries:
                     await asyncio.sleep(2 ** retries)
