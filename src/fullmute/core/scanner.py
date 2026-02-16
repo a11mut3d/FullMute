@@ -26,7 +26,8 @@ class FullMuteScanner:
             timeout=self.config.get('timeout', 15),
             proxy_enabled=self.config.get('proxy_enabled', False),
             proxy_file=self.config.get('proxy_file'),
-            bypass_cloudflare=self.config.get('bypass_cloudflare', True)
+            bypass_cloudflare=self.config.get('bypass_cloudflare', True),
+            max_redirects=self.config.get('max_redirects', 5)  # Максимальное количество редиректов
         )
 
         self.verifier = SensitiveFileVerifier(
@@ -72,8 +73,9 @@ class FullMuteScanner:
         try:
             url = f"http://{domain}" if not domain.startswith("http") else domain
 
-            html, headers_dict, cookies_dict, status_code = await self.http_client.fetch(url)
+            html, headers_dict, cookies_dict, status_code, final_url = await self.http_client.fetch(url)
             results["status_code"] = status_code
+            results["final_url"] = final_url  # Сохраняем финальный URL в результатах
 
             if html is None:
                 results["error"] = "Failed to fetch site data"
@@ -83,7 +85,7 @@ class FullMuteScanner:
             self.stats['successful'] += 1
 
             tech_detector = TechDetector(
-                url=url,
+                url=final_url,  # Используем финальный URL после редиректов
                 headers=headers_dict,
                 html=html,
                 cookies=cookies_dict,
@@ -150,12 +152,12 @@ class FullMuteScanner:
                     self.stats['with_cves'] += 1
                     logger.info(f"Found CVEs for {domain}: {len(cve_results)} technology(s) affected")
 
-            async with aiohttp.ClientSession() as session:
-                sensitive_files = await self.verifier.verify(session, url)
-                results["sensitive_files"] = sensitive_files
+            # Проверяем чувствительные файлы на финальном URL после редиректов
+            sensitive_files = await self.verifier.verify(None, results.get('final_url', url))
+            results["sensitive_files"] = sensitive_files
 
-                if sensitive_files:
-                    self.stats['with_files'] += 1
+            if sensitive_files:
+                self.stats['with_files'] += 1
 
             self._save_to_db(domain, results)
 
@@ -174,7 +176,8 @@ class FullMuteScanner:
                 'domain': domain,
                 'has_camera': len(results.get('cameras', [])) > 0,
                 'is_alive': results.get('error') is None,
-                'http_status': results.get('status_code', 0)
+                'http_status': results.get('status_code', 0),
+                'final_url': results.get('final_url', '')  # Используем финальный URL из результатов
             }
 
             self.db.add_domain(domain_data)
@@ -182,11 +185,11 @@ class FullMuteScanner:
             domain_id = self.db.get_domain_id(domain)
 
             if domain_id:
-                
+
                 technology_ids = {}
                 for tech_type, tech_list in results.get('technologies', {}).items():
                     for tech in tech_list:
-                        
+
                         name = tech
                         version = ""
 
@@ -194,7 +197,9 @@ class FullMuteScanner:
                             parts = tech.rsplit(' (', 1)
                             if len(parts) == 2:
                                 name = parts[0]
-                                version = parts[1][:-1]  
+                                version = parts[1][:-1]
+                        # Если версия не найдена в формате "название (версия)", оставляем как есть
+                        # и name будет равен всей строке tech, а version останется пустым
 
                         tech_data = {
                             'domain_id': domain_id,
@@ -339,14 +344,52 @@ class FullMuteScanner:
 
         async def scan_with_semaphore(domain):
             async with semaphore:
-                return await self.scan_domain(domain)
+                # Устанавливаем таймаут на сканирование одного домена
+                try:
+                    result = await asyncio.wait_for(
+                        self.scan_domain(domain),
+                        timeout=self.config.get('timeout', 15) * 3  # Утроенный таймаут
+                    )
+                    return result
+                except asyncio.TimeoutError:
+                    logger.warning(f"Timeout scanning domain {domain}")
+                    return {
+                        "domain": domain,
+                        "technologies": {},
+                        "cameras": [],
+                        "sensitive_files": [],
+                        "cves": {},
+                        "error": "Timeout during scan",
+                        "status_code": 0
+                    }
 
         tasks = [scan_with_semaphore(domain) for domain in domains]
 
         results = []
         for i in range(0, len(tasks), max_concurrent):
             batch = tasks[i:i + max_concurrent]
-            batch_results = await asyncio.gather(*batch, return_exceptions=True)
+            # Устанавливаем таймаут на обработку пакета заданий
+            try:
+                batch_results = await asyncio.wait_for(
+                    asyncio.gather(*batch, return_exceptions=True),
+                    timeout=self.config.get('timeout', 15) * 5  # Пятикратный таймаут для пакета
+                )
+            except asyncio.TimeoutError:
+                logger.warning(f"Timeout processing batch of domains")
+                # Возвращаем пустые результаты для этого пакета
+                batch_results = []
+                for _ in range(len(batch)):
+                    domain_idx = i + len(results)
+                    if domain_idx < len(domains):
+                        results.append({
+                            "domain": domains[domain_idx],
+                            "technologies": {},
+                            "cameras": [],
+                            "sensitive_files": [],
+                            "cves": {},
+                            "error": "Timeout during scan",
+                            "status_code": 0
+                        })
 
             for result in batch_results:
                 if isinstance(result, Exception):
@@ -356,6 +399,9 @@ class FullMuteScanner:
 
             processed = i + len(batch)
             logger.info(f"Progress: {processed}/{len(domains)} domains processed")
+
+        # Закрываем HTTP-сессию после завершения сканирования
+        await self.http_client.close()
 
         self._print_stats()
 
