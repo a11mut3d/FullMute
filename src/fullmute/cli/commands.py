@@ -1,7 +1,12 @@
+from typing import Any
+
 import click
 import json
 import asyncio
 from pathlib import Path
+
+import yaml
+
 from fullmute.core.orchestrator import ScanOrchestrator
 from fullmute.detector.signature_loader import SignatureLoader
 from fullmute.db.engine import init_db
@@ -14,7 +19,7 @@ logger = setup_logger()
 @click.pass_context
 def cli(ctx, config):
     ctx.ensure_object(dict)
-    ctx.obj['config'] = config
+    ctx.obj['config'] = _load_config(Path(config))
 
 @cli.command()
 @click.argument('db_path')
@@ -267,9 +272,9 @@ def scan(ctx, domains_file, output, max_concurrent, timeout, proxy, delay_min, d
         return
 
     try:
-        orchestrator = ScanOrchestrator(ctx.obj['config'])
+        config = ctx.obj['config']
+        orchestrator = ScanOrchestrator(config)
 
-        config = orchestrator.config
         config['scanner']['max_concurrent'] = max_concurrent
         config['scanner']['timeout'] = timeout
         config['scanner']['proxy_enabled'] = proxy
@@ -291,7 +296,8 @@ def scan(ctx, domains_file, output, max_concurrent, timeout, proxy, delay_min, d
 @click.pass_context
 def scan_one(ctx, domain):
     try:
-        orchestrator = ScanOrchestrator(ctx.obj['config'])
+        config = ctx.obj['config']
+        orchestrator = ScanOrchestrator(config)
         result = asyncio.run(orchestrator.scan_single(domain))
 
         click.echo("\n" + "="*50)
@@ -531,6 +537,20 @@ def stats(db_path):
 
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
+
+
+def _load_config(config_path: Path) -> dict[str, Any]:
+    if not config_path.exists():
+        logger.warning(f"Config file not found at {config_path}, using defaults")
+        return {}
+
+    try:
+        with open(config_path, 'r', encoding='utf-8') as f:
+            return yaml.safe_load(f)
+    except Exception as e:
+        logger.error(f"Failed to load config: {e}")
+        return {}
+
 
 if __name__ == "__main__":
     cli()

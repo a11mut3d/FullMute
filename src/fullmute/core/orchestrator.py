@@ -1,5 +1,6 @@
 import asyncio
-import yaml
+from typing import Any
+
 import json
 from pathlib import Path
 from fullmute.core.scanner import FullMuteScanner
@@ -9,22 +10,9 @@ from fullmute.db.engine import init_db
 logger = setup_logger()
 
 class ScanOrchestrator:
-    def __init__(self, config_path: str = "config.yaml"):
-        self.config_path = Path(config_path)
-        self.config = self._load_config()
+    def __init__(self, config: dict[str, Any]):
+        self.config = config
         self.scanner = None
-
-    def _load_config(self):
-        if not self.config_path.exists():
-            logger.warning(f"Config file not found at {self.config_path}, using defaults")
-            return {}
-
-        try:
-            with open(self.config_path, 'r', encoding='utf-8') as f:
-                return yaml.safe_load(f)
-        except Exception as e:
-            logger.error(f"Failed to load config: {e}")
-            return {}
 
     def initialize(self):
         db_path = self.config.get('database', {}).get('path', 'fullmute.db')
