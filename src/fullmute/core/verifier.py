@@ -1,10 +1,11 @@
+import logging
+
 import aiohttp
 import re
 import asyncio
 from typing import List, Dict, Any
-from fullmute.utils.logger import setup_logger
 
-logger = setup_logger()
+logger = logging.getLogger('fullmute')
 
 class SensitiveFileVerifier:
     def __init__(self, signatures: Dict[str, Any], timeout: int = 10):

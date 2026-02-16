@@ -1,4 +1,4 @@
-from .logger import setup_logger
+from .logger import setup_logging
 from .http_client import HttpClient
 from .stealth import Stealth
 from .cache import Cache
@@ -10,7 +10,7 @@ from .nvd_client import NVDClient
 from .cve_checker import CVEChecker
 
 __all__ = [
-    'setup_logger',
+    'setup_logging',
     'HttpClient',
     'Stealth',
     'Cache',

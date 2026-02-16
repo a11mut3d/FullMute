@@ -1,9 +1,9 @@
+import logging
 import random
 import aiohttp
 from typing import List
-from fullmute.utils.logger import setup_logger
 
-logger = setup_logger()
+logger = logging.getLogger('fullmute')
 
 class ProxyManager:
     def __init__(self, proxy_file: str = None):

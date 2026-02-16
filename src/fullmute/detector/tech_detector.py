@@ -1,3 +1,4 @@
+import logging
 from typing import Dict, Any, List
 from fullmute.detector.cms_detector import CMSDetector
 from fullmute.detector.server_detector import ServerDetector
@@ -8,9 +9,8 @@ from fullmute.detector.js_framework_detector import JSFrameworkDetector
 from fullmute.detector.database_detector import DatabaseDetector
 from fullmute.detector.language_detector import LanguageDetector
 from fullmute.detector.plugin_detector import PluginDetector
-from fullmute.utils.logger import setup_logger
 
-logger = setup_logger()
+logger = logging.getLogger('fullmute')
 
 class TechDetector:
     def __init__(self, url: str, headers: Dict[str, str], html: str, cookies: Dict[str, str], signatures: Dict[str, Any]):

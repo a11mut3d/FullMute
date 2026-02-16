@@ -1,10 +1,10 @@
+import logging
 import random
 import time
 import requests
 from fake_useragent import UserAgent
-from fullmute.utils.logger import setup_logger
 
-logger = setup_logger()
+logger = logging.getLogger('fullmute')
 
 class Stealth:
     def __init__(self, min_delay=1.0, max_delay=5.0, rotate_user_agents=True):

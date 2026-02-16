@@ -1,11 +1,12 @@
 import asyncio
+import logging
+
 import aiohttp
 import random
 from typing import Tuple, Dict, Any
 from fullmute.config.user_agents import USER_AGENTS
-from fullmute.utils.logger import setup_logger
 
-logger = setup_logger()
+logger = logging.getLogger('fullmute')
 
 class CloudflareBypass:
     def __init__(self, max_retries=3, timeout=30):

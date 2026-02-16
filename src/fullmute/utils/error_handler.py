@@ -1,9 +1,9 @@
+import logging
 import time
 import requests
 from requests.exceptions import RequestException, Timeout, ConnectionError
-from fullmute.utils.logger import setup_logger
 
-logger = setup_logger()
+logger = logging.getLogger('fullmute')
 
 class ErrorHandler:
     def __init__(self, max_retries=3, backoff_factor=2, timeout=10):

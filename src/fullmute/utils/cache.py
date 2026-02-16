@@ -1,11 +1,11 @@
+import logging
 import sqlite3
 import zlib
 import json
 from datetime import datetime, timedelta
 from contextlib import contextmanager
-from fullmute.utils.logger import setup_logger
 
-logger = setup_logger()
+logger = logging.getLogger('fullmute')
 
 class Cache:
     def __init__(self, db_path: str, ttl_hours: int = 24):

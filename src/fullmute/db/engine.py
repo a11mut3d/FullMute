@@ -1,11 +1,11 @@
+import logging
 import sqlite3
 import threading
 from pathlib import Path
 from contextlib import contextmanager
 from fullmute.db.schema import SCHEMA
-from fullmute.utils.logger import setup_logger
 
-logger = setup_logger()
+logger = logging.getLogger('fullmute')
 
 _thread_local = threading.local()
 

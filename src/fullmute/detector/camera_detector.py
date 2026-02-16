@@ -1,9 +1,9 @@
+import logging
 import re
 from typing import List, Dict, Any, Tuple
 from fullmute.detector.base import BaseDetector
-from fullmute.utils.logger import setup_logger
 
-logger = setup_logger()
+logger = logging.getLogger('fullmute')
 
 class CameraDetector(BaseDetector):
     def __init__(self, url: str, html: str, headers: Dict[str, str], cookies: Dict[str, str], signatures: Dict[str, Any]):

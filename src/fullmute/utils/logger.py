@@ -3,8 +3,8 @@ import sys
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
-def setup_logger(name="fullmute", level="INFO", file_path=None, max_mb=50, backups=5):
-    logger = logging.getLogger(name)
+def setup_logging(level="INFO", file_path=None, max_mb=50, backups=5):
+    logger = logging.getLogger()
 
     logger.handlers.clear()
 
@@ -31,5 +31,3 @@ def setup_logger(name="fullmute", level="INFO", file_path=None, max_mb=50, backu
         )
         file_handler.setFormatter(formatter)
         logger.addHandler(file_handler)
-
-    return logger

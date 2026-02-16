@@ -1,3 +1,4 @@
+import logging
 from typing import Any
 
 import click
@@ -10,16 +11,25 @@ import yaml
 from fullmute.core.orchestrator import ScanOrchestrator
 from fullmute.detector.signature_loader import SignatureLoader
 from fullmute.db.engine import init_db
-from fullmute.utils.logger import setup_logger
+from fullmute.utils.logger import setup_logging
 
-logger = setup_logger()
+logger = logging.getLogger('fullmute')
 
 @click.group()
 @click.option('--config', default='config.yaml', help='Path to config file')
 @click.pass_context
 def cli(ctx, config):
     ctx.ensure_object(dict)
+    setup_logging()
     ctx.obj['config'] = _load_config(Path(config))
+    logging_config = ctx.obj['config']['logging']
+    if logging_config:
+        setup_logging(
+            level=logging_config.get('level', logging.INFO),
+            file_path=logging_config.get('file'),
+            max_mb=logging_config.get('max_mb', 50),
+            backups=logging_config.get('backups', 5))
+
 
 @cli.command()
 @click.argument('db_path')

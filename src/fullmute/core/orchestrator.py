@@ -1,13 +1,13 @@
 import asyncio
+import logging
 from typing import Any
 
 import json
 from pathlib import Path
 from fullmute.core.scanner import FullMuteScanner
-from fullmute.utils.logger import setup_logger
 from fullmute.db.engine import init_db
 
-logger = setup_logger()
+logger = logging.getLogger('fullmute')
 
 class ScanOrchestrator:
     def __init__(self, config: dict[str, Any]):

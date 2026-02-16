@@ -1,10 +1,11 @@
+import logging
+
 import aiohttp
 import asyncio
 import json
 from typing import Dict, List, Optional, Tuple
-from fullmute.utils.logger import setup_logger
 
-logger = setup_logger()
+logger = logging.getLogger('fullmute')
 
 class CVEChecker:
     """

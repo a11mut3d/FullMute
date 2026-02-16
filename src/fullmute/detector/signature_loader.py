@@ -1,10 +1,10 @@
 import json
+import logging
 import re
 from pathlib import Path
 from typing import Dict, Any, List
-from fullmute.utils.logger import setup_logger
 
-logger = setup_logger()
+logger = logging.getLogger('fullmute')
 
 class SignatureLoader:
     def __init__(self, signatures_dir: str = None):

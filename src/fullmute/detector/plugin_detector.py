@@ -1,8 +1,8 @@
+import logging
 import re
 from typing import List, Tuple
-from fullmute.utils.logger import setup_logger
 
-logger = setup_logger()
+logger = logging.getLogger('fullmute')
 
 class PluginDetector:
     """

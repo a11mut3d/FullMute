@@ -1,10 +1,11 @@
 import asyncio
+import logging
+
 import aiohttp
 import time
 from typing import List, Tuple
-from fullmute.utils.logger import setup_logger
 
-logger = setup_logger()
+logger = logging.getLogger('fullmute')
 
 class PerformanceOptimizer:
     def __init__(self, max_concurrent_requests=10, request_timeout=10):

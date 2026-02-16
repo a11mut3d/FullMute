@@ -1,10 +1,10 @@
 import json
+import logging
 from datetime import datetime
 from contextlib import contextmanager
 import sqlite3
-from fullmute.utils.logger import setup_logger
 
-logger = setup_logger()
+logger = logging.getLogger('fullmute')
 
 class DBQueries:
     def __init__(self, db_path: str):

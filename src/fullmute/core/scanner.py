@@ -1,4 +1,6 @@
 import asyncio
+import logging
+
 import aiohttp
 from typing import List, Dict, Any
 from fullmute.detector.signature_loader import SignatureLoader
@@ -6,11 +8,10 @@ from fullmute.detector.tech_detector import TechDetector
 from fullmute.core.verifier import SensitiveFileVerifier
 from fullmute.db.queries import DBQueries
 from fullmute.utils.http_client import HttpClient
-from fullmute.utils.logger import setup_logger
 from fullmute.utils.stealth import Stealth
 from fullmute.utils.cve_checker import CVEChecker
 
-logger = setup_logger()
+logger = logging.getLogger('fullmute')
 
 class FullMuteScanner:
     def __init__(self, db_path: str, config: Dict[str, Any] = None):

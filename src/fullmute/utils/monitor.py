@@ -1,9 +1,10 @@
+import logging
+
 import psutil
 import time
 import threading
-from fullmute.utils.logger import setup_logger
 
-logger = setup_logger()
+logger = logging.getLogger('fullmute')
 
 class Monitor:
     def __init__(self, interval=10):

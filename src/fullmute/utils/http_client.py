@@ -1,12 +1,13 @@
+import logging
+
 import aiohttp
 import random
 import asyncio
 from aiohttp import ClientTimeout, ClientSession, TCPConnector
 from fullmute.config.user_agents import USER_AGENTS
-from fullmute.utils.logger import setup_logger
 from fullmute.utils.cloudflare_bypass import CloudflareBypass
 
-logger = setup_logger()
+logger = logging.getLogger('fullmute')
 
 class HttpClient:
     def __init__(self, max_retries=3, timeout=15, proxy_enabled=False, proxy_file=None, bypass_cloudflare=True):
