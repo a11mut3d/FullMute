@@ -1,0 +1,424 @@
+{% extends "base.html" %}
+
+{% block title %}New Scan - FullMute Web{% endblock %}
+
+{% block body %}
+<div class="min-h-screen bg-dark-bg" x-data="newScanApp()" x-init="init()">
+
+    <div class="flex h-screen overflow-hidden">
+
+        <!-- Sidebar -->
+        <aside class="w-64 bg-dark-card border-r border-dark-border flex flex-col">
+            <div class="p-6 border-b border-dark-border">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-primary-600 to-primary-800 flex items-center justify-center">
+                        <i class="fas fa-shield-halved text-white"></i>
+                    </div>
+                    <span class="text-xl font-bold">FullMute</span>
+                </div>
+            </div>
+
+            <nav class="flex-1 p-4 space-y-2 overflow-y-auto">
+                <a href="/dashboard" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-dark-border/50 transition-colors">
+                    <i class="fas fa-chart-line w-5"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="/targets" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-dark-border/50 transition-colors">
+                    <i class="fas fa-bullseye w-5"></i>
+                    <span>Targets</span>
+                </a>
+                <a href="/scans" class="flex items-center space-x-3 px-4 py-3 rounded-lg bg-primary-600/20 text-primary-400">
+                    <i class="fas fa-radar w-5"></i>
+                    <span>Scans</span>
+                </a>
+                <a href="/reports" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-dark-border/50 transition-colors">
+                    <i class="fas fa-file-pdf w-5"></i>
+                    <span>Reports</span>
+                </a>
+                <a href="/faq" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-dark-border/50 transition-colors">
+                    <i class="fas fa-question-circle w-5"></i>
+                    <span>FAQ</span>
+                </a>
+                <a href="/settings" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-dark-border/50 transition-colors">
+                    <i class="fas fa-cog w-5"></i>
+                    <span>Settings</span>
+                </a>
+            </nav>
+
+            <div class="p-4 border-t border-dark-border">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-8 h-8 rounded-full bg-primary-600 flex items-center justify-center">
+                            <span class="text-sm font-semibold" x-text="user?.username?.[0]?.toUpperCase()"></span>
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium" x-text="user?.username"></p>
+                            <p class="text-xs text-gray-400 capitalize" x-text="user?.role"></p>
+                        </div>
+                    </div>
+                    <a href="/scans" class="text-gray-400 hover:text-white">
+                        <i class="fas fa-times"></i>
+                    </a>
+                </div>
+            </div>
+        </aside>
+
+        <main class="flex-1 overflow-y-auto">
+            <header class="gradient-header px-8 py-6 shadow-lg">
+                <div class="flex items-center justify-between">
+                    <h1 class="text-2xl font-bold">Create New Scan</h1>
+                    <a href="/scans" class="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors">
+                        <i class="fas fa-arrow-left mr-2"></i>Back to Scans
+                    </a>
+                </div>
+            </header>
+
+            <div class="p-8">
+                <div class="max-w-3xl mx-auto">
+                    <div class="bg-dark-card rounded-xl p-8 border border-dark-border">
+
+                        <form @submit.prevent="createScan">
+                            <div class="mb-6">
+                                <label class="block text-sm font-medium text-gray-300 mb-2">Scan Name</label>
+                                <input
+                                    type="text"
+                                    x-model="scanName"
+                                    required
+                                    placeholder="Security Audit Scan"
+                                    class="w-full px-4 py-2 bg-dark-bg border border-dark-border rounded-lg focus:ring-2 focus:ring-primary-500"
+                                >
+                            </div>
+
+                            <div class="mb-6">
+                                <label class="block text-sm font-medium text-gray-300 mb-2">Scan Type</label>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div @click="scanType = 'manual'"
+                                         :class="scanType === 'manual' ? 'border-primary-500 bg-primary-600/20' : 'border-dark-border bg-dark-bg'"
+                                         class="p-4 rounded-lg border cursor-pointer transition-colors">
+                                        <i class="fas fa-bolt text-2xl mb-2 text-primary-400"></i>
+                                        <p class="font-medium">Manual Scan</p>
+                                        <p class="text-sm text-gray-400">Run once immediately</p>
+                                    </div>
+                                    <div @click="scanType = 'scheduled'"
+                                         :class="scanType === 'scheduled' ? 'border-primary-500 bg-primary-600/20' : 'border-dark-border bg-dark-bg'"
+                                         class="p-4 rounded-lg border cursor-pointer transition-colors">
+                                        <i class="fas fa-clock text-2xl mb-2 text-primary-400"></i>
+                                        <p class="font-medium">Scheduled Scan</p>
+                                        <p class="text-sm text-gray-400">Recurring scan</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="mb-6" x-show="scanType === 'scheduled'">
+                                <label class="block text-sm font-medium text-gray-300 mb-2">Schedule</label>
+                                <select x-model="schedule" class="w-full px-4 py-2 bg-dark-bg border border-dark-border rounded-lg">
+                                    <option value="daily">Daily</option>
+                                    <option value="weekly">Weekly</option>
+                                    <option value="monthly">Monthly</option>
+                                </select>
+                                <p class="text-xs text-gray-400 mt-1">
+                                    <span x-show="schedule === 'daily'">Run every day at midnight</span>
+                                    <span x-show="schedule === 'weekly'">Run every Monday at midnight</span>
+                                    <span x-show="schedule === 'monthly'">Run on the 1st of each month at midnight</span>
+                                </p>
+                            </div>
+
+                            <div class="mb-6">
+                                <label class="block text-sm font-medium text-gray-300 mb-2">Select Targets</label>
+                                
+                                <!-- Group Selection -->
+                                <div class="mb-4">
+                                    <label class="block text-xs text-gray-400 mb-2">Or select by group:</label>
+                                    <div class="flex flex-wrap gap-2">
+                                        <template x-for="group in targetGroups" :key="group.id">
+                                            <button
+                                                type="button"
+                                                @click="selectGroup(group.id)"
+                                                :class="selectedGroupIds.includes(group.id) ? 'bg-primary-600 border-primary-500' : 'bg-dark-bg border-dark-border'"
+                                                class="px-3 py-1.5 text-sm border rounded-lg hover:border-primary-500 transition-colors"
+                                                x-text="group.name + ' (' + (group.target_count || 0) + ')'">
+                                            </button>
+                                        </template>
+                                        <span x-show="targetGroups.length === 0" class="text-xs text-gray-500">No groups available</span>
+                                    </div>
+                                </div>
+                                
+                                <!-- Individual Target Selection -->
+                                <div class="border border-dark-border rounded-lg max-h-64 overflow-y-auto">
+                                    <table class="w-full">
+                                        <thead class="bg-dark-bg sticky top-0">
+                                            <tr>
+                                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase">
+                                                    <input type="checkbox" @change="toggleAllTargets($event.target.checked)" class="rounded">
+                                                </th>
+                                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase">Domain</th>
+                                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase">Group</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-dark-border">
+                                            <template x-for="target in targets" :key="target.id">
+                                                <tr class="hover:bg-dark-border/30">
+                                                    <td class="px-4 py-2">
+                                                        <input type="checkbox" :value="target.id" x-model="selectedTargets" class="rounded">
+                                                    </td>
+                                                    <td class="px-4 py-2" x-text="target.domain"></td>
+                                                    <td class="px-4 py-2 text-sm text-gray-400" x-text="target.group_name || '-'"></td>
+                                                </tr>
+                                            </template>
+                                            <tr x-show="targets.length === 0">
+                                                <td colspan="3" class="px-4 py-8 text-center text-gray-400">
+                                                    No targets available. <a href="/targets" class="text-primary-400 hover:underline">Add targets first</a>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <p class="text-sm text-gray-400 mt-2">
+                                    <span x-text="selectedTargets.length"></span> targets selected
+                                </p>
+                            </div>
+
+                            <!-- Scan Options -->
+                            <div class="mb-6 p-4 bg-dark-bg rounded-lg border border-dark-border">
+                                <h3 class="text-sm font-medium text-gray-300 mb-3">
+                                    <i class="fas fa-sliders-h text-primary-400 mr-2"></i>
+                                    Scan Options
+                                </h3>
+                                
+                                <!-- Test Network (Port Scanning) -->
+                                <div class="flex items-start mb-4">
+                                    <input
+                                        type="checkbox"
+                                        id="testNetwork"
+                                        x-model="testNetwork"
+                                        class="mt-1 rounded"
+                                    >
+                                    <label for="testNetwork" class="ml-3 cursor-pointer">
+                                        <span class="block text-sm font-medium text-gray-300">
+                                            <i class="fas fa-network-wired text-blue-400 mr-2"></i>
+                                            Test Network (Port Scanning)
+                                        </span>
+                                        <span class="block text-xs text-gray-400">
+                                            Scan top 20 ports, grab service banners, detect versions and vulnerabilities.
+                                        </span>
+                                    </label>
+                                </div>
+                                
+                                <!-- Test Default Credentials -->
+                                <div class="flex items-start mb-4">
+                                    <input
+                                        type="checkbox"
+                                        id="testDefaultCreds"
+                                        x-model="testDefaultCredentials"
+                                        class="mt-1 rounded"
+                                    >
+                                    <label for="testDefaultCreds" class="ml-3 cursor-pointer">
+                                        <span class="block text-sm font-medium text-gray-300">
+                                            <i class="fas fa-key text-purple-400 mr-2"></i>
+                                            Test for Default Credentials
+                                        </span>
+                                        <span class="block text-xs text-gray-400">
+                                            Attempt to login using common default usernames and passwords on login forms.
+                                        </span>
+                                    </label>
+                                </div>
+                                
+                                <!-- Search Exploits -->
+                                <div class="flex items-start">
+                                    <input
+                                        type="checkbox"
+                                        id="searchExploits"
+                                        x-model="searchExploits"
+                                        class="mt-1 rounded"
+                                    >
+                                    <label for="searchExploits" class="ml-3 cursor-pointer">
+                                        <span class="block text-sm font-medium text-gray-300">
+                                            <i class="fas fa-bug text-red-400 mr-2"></i>
+                                            Search for Exploits (searchsploit)
+                                        </span>
+                                        <span class="block text-xs text-gray-400">
+                                            Search exploit-db for known exploits by CVE. Shows results only, doesn't download exploits.
+                                        </span>
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <div class="flex items-center justify-between pt-6 border-t border-dark-border">
+                                <a href="/scans" class="text-gray-400 hover:text-white">
+                                    <i class="fas fa-times mr-2"></i>Cancel
+                                </a>
+                                <button
+                                    type="submit"
+                                    :disabled="selectedTargets.length === 0 || loading"
+                                    class="px-6 py-3 bg-primary-600 hover:bg-primary-500 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    <span x-show="!loading">
+                                        <i class="fas fa-play mr-2"></i>
+                                        <span x-text="scanType === 'manual' ? 'Start Scan' : 'Create Schedule'"></span>
+                                    </span>
+                                    <span x-show="loading">
+                                        <i class="fas fa-circle-notch fa-spin mr-2"></i>Starting...
+                                    </span>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Loading Overlay -->
+        <div x-show="loading" x-cloak class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+            <div class="bg-dark-card rounded-xl p-8 shadow-2xl border border-dark-border">
+                <div class="flex items-center space-x-4">
+                    <i class="fas fa-circle-notch fa-spin text-4xl text-primary-400"></i>
+                    <div>
+                        <h3 class="text-xl font-bold text-white">Starting Scan...</h3>
+                        <p class="text-gray-400 text-sm mt-1">Please wait while your scan is being queued</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function newScanApp() {
+    return {
+        user: null,
+        targets: [],
+        targetGroups: [],
+        selectedTargets: [],
+        selectedGroupIds: [],
+        scanName: '',
+        scanType: 'manual',
+        schedule: 'weekly',
+        testNetwork: false,
+        testDefaultCredentials: false,
+        searchExploits: false,
+        loading: false,
+
+        async init() {
+            const userStr = localStorage.getItem('user');
+            if (userStr) {
+                this.user = JSON.parse(userStr);
+            } else {
+                window.location.href = '/login';
+                return;
+            }
+            await this.loadTargets();
+            await this.loadTargetGroups();
+        },
+
+        async loadTargets() {
+            try {
+                const token = localStorage.getItem('token');
+                const response = await fetch('/api/targets', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (response.ok) {
+                    this.targets = await response.json() || [];
+                }
+            } catch (err) {
+                console.error('Failed to load targets:', err);
+                this.targets = [];
+            }
+        },
+
+        async loadTargetGroups() {
+            try {
+                const token = localStorage.getItem('token');
+                const response = await fetch('/api/targets/groups', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (response.ok) {
+                    this.targetGroups = await response.json() || [];
+                }
+            } catch (err) {
+                console.error('Failed to load groups:', err);
+                this.targetGroups = [];
+            }
+        },
+
+        selectGroup(groupId) {
+            try {
+                const index = this.selectedGroupIds.indexOf(groupId);
+                if (index > -1) {
+                    this.selectedGroupIds.splice(index, 1);
+                } else {
+                    this.selectedGroupIds.push(groupId);
+                }
+
+                const selectedIds = new Set();
+                this.targets.forEach(target => {
+                    if (target.group_id && this.selectedGroupIds.includes(target.group_id)) {
+                        selectedIds.add(target.id);
+                    }
+                });
+
+                this.selectedTargets = Array.from(selectedIds);
+            } catch (err) {
+                console.error('Error selecting group:', err);
+            }
+        },
+
+        toggleAllTargets(checked) {
+            if (checked) {
+                this.selectedTargets = this.targets.map(t => t.id);
+            } else {
+                this.selectedTargets = [];
+            }
+        },
+
+        async createScan() {
+            if (this.selectedTargets.length === 0) {
+                alert('Please select at least one target');
+                return;
+            }
+
+            this.loading = true;
+            const token = localStorage.getItem('token');
+            const formData = new FormData();
+
+            if (this.scanType === 'scheduled') {
+                formData.append('name', this.scanName || 'Scheduled Scan');
+                formData.append('scan_type', 'scheduled');
+                formData.append('schedule_type', this.schedule);
+                formData.append('schedule_value', '0');
+            }
+
+            formData.append('target_ids', JSON.stringify(this.selectedTargets));
+            formData.append('test_network', this.testNetwork);
+            formData.append('test_default_credentials', this.testDefaultCredentials);
+            formData.append('search_exploits', this.searchExploits);
+
+            try {
+                this.loading = true;
+
+                // Небольшая задержка чтобы overlay точно показался
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                const response = await fetch('/api/scans/start', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` },
+                    body: formData
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    // Redirect using global scan ID
+                    window.location.href = `/scans/${data.id}`;
+                } else {
+                    const err = await response.json();
+                    alert('Error: ' + (err.detail || 'Failed to start scan'));
+                    this.loading = false;
+                }
+            } catch (err) {
+                alert('Error: ' + err.message);
+                this.loading = false;
+            }
+        }
+    }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,403 @@
+{% extends "base.html" %}
+
+{% block title %}My Settings - FullMute Web{% endblock %}
+
+{% block body %}
+<div class="min-h-screen bg-dark-bg" x-data="userSettingsApp()" x-init="init()">
+
+    <div class="flex h-screen overflow-hidden">
+
+        <!-- Sidebar -->
+        <aside class="w-64 bg-dark-card border-r border-dark-border flex flex-col">
+            <div class="p-6 border-b border-dark-border">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-primary-600 to-primary-800 flex items-center justify-center">
+                        <i class="fas fa-shield-halved text-white"></i>
+                    </div>
+                    <span class="text-xl font-bold">FullMute</span>
+                </div>
+            </div>
+
+            <nav class="flex-1 p-4 space-y-2 overflow-y-auto">
+                <a href="/dashboard" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-dark-border/50 transition-colors">
+                    <i class="fas fa-chart-line w-5"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="/targets" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-dark-border/50 transition-colors">
+                    <i class="fas fa-bullseye w-5"></i>
+                    <span>Targets</span>
+                </a>
+                <a href="/scans" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-dark-border/50 transition-colors">
+                    <i class="fas fa-radar w-5"></i>
+                    <span>Scans</span>
+                </a>
+                <a href="/reports" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-dark-border/50 transition-colors">
+                    <i class="fas fa-file-pdf w-5"></i>
+                    <span>Reports</span>
+                </a>
+                <a href="/user-settings" class="flex items-center space-x-3 px-4 py-3 rounded-lg bg-primary-600/20 text-primary-400">
+                    <i class="fas fa-user-gear w-5"></i>
+                    <span>My Settings</span>
+                </a>
+                <a href="/faq" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-dark-border/50 transition-colors">
+                    <i class="fas fa-question-circle w-5"></i>
+                    <span>FAQ</span>
+                </a>
+            </nav>
+
+            <div class="p-4 border-t border-dark-border">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-8 h-8 rounded-full bg-primary-600 flex items-center justify-center">
+                            <span class="text-sm font-semibold" x-text="user?.username?.[0]?.toUpperCase()"></span>
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium" x-text="user?.username"></p>
+                            <p class="text-xs text-gray-400 capitalize" x-text="user?.role"></p>
+                        </div>
+                    </div>
+                    <button @click="logout" class="text-gray-400 hover:text-white">
+                        <i class="fas fa-sign-out-alt"></i>
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+        <main class="flex-1 overflow-y-auto">
+            <header class="gradient-header px-8 py-6 shadow-lg">
+                <div class="flex items-center justify-between">
+                    <h1 class="text-2xl font-bold">My Settings</h1>
+                    <span class="text-sm text-white/70" x-text="new Date().toLocaleDateString()"></span>
+                </div>
+            </header>
+
+            <div class="p-8">
+                <div class="space-y-6">
+
+                    <!-- Personal Scanner Settings -->
+                    <div class="bg-dark-card rounded-xl p-6 border border-dark-border">
+                        <h3 class="text-lg font-semibold mb-4 flex items-center">
+                            <i class="fas fa-user-gear text-primary-400 mr-2"></i>
+                            Personal Scanner Settings
+                        </h3>
+                        <p class="text-sm text-gray-400 mb-6">
+                            Configure your personal NVD API key and proxy settings. These settings are private and won't be shared with other users.
+                        </p>
+
+                        <form @submit.prevent="saveSettings" class="space-y-6">
+
+                            <!-- NVD API Key -->
+                            <div>
+                                <label class="block text-sm font-medium text-gray-300 mb-2">
+                                    <i class="fas fa-key text-primary-400 mr-2"></i>
+                                    NVD API Key
+                                </label>
+                                <div class="flex gap-4">
+                                    <div class="flex-1">
+                                        <input
+                                            :type="showNvdKey ? 'text' : 'password'"
+                                            x-model="settings.nvd_api_key"
+                                            placeholder="Enter your NVD API key (optional)"
+                                            class="w-full px-4 py-2 bg-dark-bg border border-dark-border rounded-lg focus:ring-2 focus:ring-primary-500 text-sm"
+                                        >
+                                        <p class="text-xs text-gray-500 mt-2">
+                                            Get your free API key from <a href="https://nvd.nist.gov/developers/request-an-api-key" target="_blank" class="text-primary-400 hover:underline">NIST NVD</a>.
+                                            Required for CVE vulnerability checking.
+                                        </p>
+                                    </div>
+                                    <button type="button" @click="showNvdKey = !showNvdKey" class="px-4 py-2 bg-dark-bg border border-dark-border rounded-lg hover:border-primary-500">
+                                        <i :class="showNvdKey ? 'fas fa-eye-slash' : 'fas fa-eye'"></i>
+                                    </button>
+                                    <button type="button" @click="clearNvdKey" class="px-4 py-2 bg-red-600/20 border border-red-600 rounded-lg hover:bg-red-600/30 text-red-400">
+                                        <i class="fas fa-trash mr-2"></i>Clear
+                                    </button>
+                                </div>
+                                <div x-show="settings.nvd_api_key_set" class="mt-2 text-sm text-green-400">
+                                    <i class="fas fa-check-circle mr-1"></i>
+                                    API Key configured (<span x-text="settings.nvd_api_key_prefix"></span>)
+                                </div>
+                            </div>
+
+                            <!-- Proxy Settings -->
+                            <div class="border-t border-dark-border pt-6">
+                                <div class="flex items-center justify-between mb-4">
+                                    <label class="block text-sm font-medium text-gray-300">
+                                        <i class="fas fa-network-wired text-primary-400 mr-2"></i>
+                                        Enable Proxy
+                                    </label>
+                                    <label class="relative inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" x-model="settings.proxy_enabled" class="sr-only peer">
+                                        <div class="w-11 h-6 bg-dark-bg peer-focus:ring-2 peer-focus:ring-primary-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
+                                    </label>
+                                </div>
+
+                                <div x-show="settings.proxy_enabled" x-transition class="mt-4">
+                                    <label class="block text-sm font-medium text-gray-300 mb-2">
+                                        Proxy List (one per line)
+                                    </label>
+                                    <textarea
+                                        x-model="settings.proxy_list"
+                                        rows="6"
+                                        placeholder="http://proxy1.example.com:8080&#10;https://proxy2.example.com:3128&#10;socks5://proxy3.example.com:1080"
+                                        class="w-full px-4 py-2 bg-dark-bg border border-dark-border rounded-lg focus:ring-2 focus:ring-primary-500 text-sm font-mono"
+                                    ></textarea>
+                                    <p class="text-xs text-gray-500 mt-2">
+                                        Supported formats: http://, https://, socks5://, socks4://
+                                    </p>
+                                </div>
+                            </div>
+
+                            <!-- Scan Options -->
+                            <div class="border-t border-dark-border pt-6">
+                                <h4 class="text-md font-semibold mb-4 text-gray-300">Scan Options</h4>
+                                
+                                <!-- Port Scanning -->
+                                <div class="flex items-center justify-between mb-4 p-3 bg-dark-bg/50 rounded-lg">
+                                    <div class="flex-1">
+                                        <div class="flex items-center mb-1">
+                                            <i class="fas fa-door-open text-blue-400 mr-2"></i>
+                                            <span class="font-medium">Port Scanning</span>
+                                        </div>
+                                        <p class="text-xs text-gray-400">Scan top 20 ports for open services</p>
+                                    </div>
+                                    <label class="relative inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" x-model="settings.port_scan_enabled" class="sr-only peer">
+                                        <div class="w-11 h-6 bg-dark-bg peer-focus:ring-2 peer-focus:ring-primary-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
+                                    </label>
+                                </div>
+
+                                <!-- Port Scan with CVEs -->
+                                <div x-show="settings.port_scan_enabled" x-transition 
+                                     class="flex items-center justify-between mb-4 p-3 bg-dark-bg/50 rounded-lg ml-4 border-l-2 border-primary-500">
+                                    <div class="flex-1">
+                                        <div class="flex items-center mb-1">
+                                            <i class="fas fa-bug text-red-400 mr-2"></i>
+                                            <span class="font-medium">Port CVE Lookup</span>
+                                        </div>
+                                        <p class="text-xs text-gray-400">Search CVEs for detected port services (requires NVD API key)</p>
+                                    </div>
+                                    <label class="relative inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" x-model="settings.port_scan_with_cves" class="sr-only peer">
+                                        <div class="w-11 h-6 bg-dark-bg peer-focus:ring-2 peer-focus:ring-primary-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
+                                    </label>
+                                </div>
+
+                                <!-- Port Scan with Exploits -->
+                                <div x-show="settings.port_scan_with_cves" x-transition 
+                                     class="flex items-center justify-between mb-4 p-3 bg-dark-bg/50 rounded-lg ml-8 border-l-2 border-red-500">
+                                    <div class="flex-1">
+                                        <div class="flex items-center mb-1">
+                                            <i class="fas fa-crosshairs text-orange-400 mr-2"></i>
+                                            <span class="font-medium">Port Exploit Search</span>
+                                        </div>
+                                        <p class="text-xs text-gray-400">Find exploits for port CVEs on Exploit-DB</p>
+                                    </div>
+                                    <label class="relative inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" x-model="settings.port_scan_with_exploits" class="sr-only peer">
+                                        <div class="w-11 h-6 bg-dark-bg peer-focus:ring-2 peer-focus:ring-primary-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
+                                    </label>
+                                </div>
+
+                                <!-- Test Default Credentials -->
+                                <div class="flex items-center justify-between mb-4 p-3 bg-dark-bg/50 rounded-lg">
+                                    <div class="flex-1">
+                                        <div class="flex items-center mb-1">
+                                            <i class="fas fa-key text-purple-400 mr-2"></i>
+                                            <span class="font-medium">Test Default Credentials</span>
+                                        </div>
+                                        <p class="text-xs text-gray-400">Test default username/password on login forms</p>
+                                    </div>
+                                    <label class="relative inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" x-model="settings.test_default_credentials" class="sr-only peer">
+                                        <div class="w-11 h-6 bg-dark-bg peer-focus:ring-2 peer-focus:ring-primary-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
+                                    </label>
+                                </div>
+
+                                <!-- Search Exploits -->
+                                <div class="flex items-center justify-between mb-4 p-3 bg-dark-bg/50 rounded-lg">
+                                    <div class="flex-1">
+                                        <div class="flex items-center mb-1">
+                                            <i class="fas fa-file-code text-yellow-400 mr-2"></i>
+                                            <span class="font-medium">Web Exploit Search</span>
+                                        </div>
+                                        <p class="text-xs text-gray-400">Find exploits for web CVEs on Exploit-DB</p>
+                                    </div>
+                                    <label class="relative inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" x-model="settings.search_exploits" class="sr-only peer">
+                                        <div class="w-11 h-6 bg-dark-bg peer-focus:ring-2 peer-focus:ring-primary-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <!-- Save Button -->
+                            <div class="flex justify-end pt-4">
+                                <button type="submit" class="px-6 py-2 bg-primary-600 hover:bg-primary-500 rounded-lg transition-colors">
+                                    <i class="fas fa-save mr-2"></i>Save Settings
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- What FullMute Can Do -->
+                    <div class="bg-dark-card rounded-xl p-6 border border-dark-border">
+                        <h3 class="text-lg font-semibold mb-4 flex items-center">
+                            <i class="fas fa-shield-virus text-primary-400 mr-2"></i>
+                            What FullMute Can Do
+                        </h3>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="p-4 bg-dark-bg/50 rounded-lg border border-dark-border hover:border-primary-600/50 transition-all hover:shadow-lg hover:shadow-primary-500/10">
+                                <div class="flex items-center mb-2">
+                                    <i class="fas fa-tag text-blue-400 mr-2"></i>
+                                    <span class="font-medium">Technology Detection</span>
+                                </div>
+                                <p class="text-sm text-gray-400">Identify CMS, frameworks, servers, databases, programming languages, and JavaScript libraries.</p>
+                            </div>
+                            
+                            <div class="p-4 bg-dark-bg/50 rounded-lg border border-dark-border hover:border-primary-600/50 transition-all hover:shadow-lg hover:shadow-primary-500/10">
+                                <div class="flex items-center mb-2">
+                                    <i class="fas fa-bug text-red-400 mr-2"></i>
+                                    <span class="font-medium">CVE Vulnerability Check</span>
+                                </div>
+                                <p class="text-sm text-gray-400">Find known vulnerabilities for detected technologies using NVD database.</p>
+                            </div>
+                            
+                            <div class="p-4 bg-dark-bg/50 rounded-lg border border-dark-border hover:border-primary-600/50 transition-all hover:shadow-lg hover:shadow-primary-500/10">
+                                <div class="flex items-center mb-2">
+                                    <i class="fas fa-file-code text-yellow-400 mr-2"></i>
+                                    <span class="font-medium">Sensitive File Detection</span>
+                                </div>
+                                <p class="text-sm text-gray-400">Discover exposed .git directories, .env files, configs, backups, and admin panels.</p>
+                            </div>
+                            
+                            <div class="p-4 bg-dark-bg/50 rounded-lg border border-dark-border hover:border-primary-600/50 transition-all hover:shadow-lg hover:shadow-primary-500/10">
+                                <div class="flex items-center mb-2">
+                                    <i class="fas fa-key text-purple-400 mr-2"></i>
+                                    <span class="font-medium">Default Credentials Check</span>
+                                </div>
+                                <p class="text-sm text-gray-400">Test for default username/password combinations on login forms.</p>
+                            </div>
+                            
+                            <div class="p-4 bg-dark-bg/50 rounded-lg border border-dark-border hover:border-primary-600/50 transition-all hover:shadow-lg hover:shadow-primary-500/10">
+                                <div class="flex items-center mb-2">
+                                    <i class="fas fa-video text-green-400 mr-2"></i>
+                                    <span class="font-medium">Camera/Router Detection</span>
+                                </div>
+                                <p class="text-sm text-gray-400">Identify IP cameras, routers, and IoT devices with default credentials.</p>
+                            </div>
+                            
+                            <div class="p-4 bg-dark-bg/50 rounded-lg border border-dark-border hover:border-primary-600/50 transition-all hover:shadow-lg hover:shadow-primary-500/10">
+                                <div class="flex items-center mb-2">
+                                    <i class="fas fa-file-pdf text-orange-400 mr-2"></i>
+                                    <span class="font-medium">PDF Reports</span>
+                                </div>
+                                <p class="text-sm text-gray-400">Generate professional security reports with risk assessment and recommendations.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script>
+function userSettingsApp() {
+    return {
+        user: null,
+        settings: {
+            nvd_api_key: '',
+            nvd_api_key_set: false,
+            nvd_api_key_prefix: null,
+            proxy_enabled: false,
+            proxy_list: '',
+            port_scan_enabled: false,
+            port_scan_with_cves: false,
+            port_scan_with_exploits: false,
+            test_default_credentials: false,
+            search_exploits: false
+        },
+        showNvdKey: false,
+
+        async init() {
+            const userStr = localStorage.getItem('user');
+            if (userStr) {
+                this.user = JSON.parse(userStr);
+            } else {
+                window.location.href = '/login';
+                return;
+            }
+
+            await this.loadSettings();
+        },
+
+        async loadSettings() {
+            const token = localStorage.getItem('token');
+            const response = await fetch('/api/settings', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (response.ok) {
+                const data = await response.json();
+                this.settings = {
+                    nvd_api_key: '',
+                    nvd_api_key_set: data.nvd_api_key_set || false,
+                    nvd_api_key_prefix: data.nvd_api_key_prefix || null,
+                    proxy_enabled: data.proxy_enabled || false,
+                    proxy_list: data.proxy_list || '',
+                    port_scan_enabled: data.port_scan_enabled || false,
+                    port_scan_with_cves: data.port_scan_with_cves || false,
+                    port_scan_with_exploits: data.port_scan_with_exploits || false,
+                    test_default_credentials: data.test_default_credentials || false,
+                    search_exploits: data.search_exploits || false
+                };
+            }
+        },
+
+        async saveSettings() {
+            const token = localStorage.getItem('token');
+            const formData = new FormData();
+            formData.append('nvd_api_key', this.settings.nvd_api_key || '');
+            formData.append('proxy_enabled', this.settings.proxy_enabled);
+            formData.append('proxy_list', this.settings.proxy_list || '');
+            formData.append('port_scan_enabled', this.settings.port_scan_enabled);
+            formData.append('port_scan_with_cves', this.settings.port_scan_with_cves);
+            formData.append('port_scan_with_exploits', this.settings.port_scan_with_exploits);
+            formData.append('test_default_credentials', this.settings.test_default_credentials);
+            formData.append('search_exploits', this.settings.search_exploits);
+
+            const response = await fetch('/api/settings', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` },
+                body: formData
+            });
+
+            if (response.ok) {
+                showSuccess('Settings saved successfully!');
+                await this.loadSettings();
+            } else {
+                const err = await response.json();
+                showError('Error: ' + (err.detail || 'Failed to save settings'));
+            }
+        },
+
+        clearNvdKey() {
+            if (!confirm('Clear your NVD API key?')) return;
+
+            this.settings.nvd_api_key = '';
+            this.settings.nvd_api_key_set = false;
+            this.settings.nvd_api_key_prefix = null;
+            this.saveSettings();
+        },
+
+        logout() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            document.cookie = "access_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/";
+            window.location.href = '/login';
+        }
+    }
+}
+</script>
+
+{% endblock %}

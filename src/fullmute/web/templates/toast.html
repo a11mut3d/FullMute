@@ -1,0 +1,62 @@
+<!-- Toast Notifications Component -->
+<div id="toast-container" class="fixed top-4 right-4 z-50 space-y-2"></div>
+
+<script>
+// Toast notification system with XSS protection
+function showToast(message, type = 'info') {
+    const container = document.getElementById('toast-container');
+    const toast = document.createElement('div');
+
+    const icons = {
+        success: '<i class="fas fa-check-circle"></i>',
+        error: '<i class="fas fa-exclamation-circle"></i>',
+        warning: '<i class="fas fa-exclamation-triangle"></i>',
+        info: '<i class="fas fa-info-circle"></i>'
+    };
+
+    const colors = {
+        success: 'bg-green-600 border-green-500',
+        error: 'bg-red-600 border-red-500',
+        warning: 'bg-yellow-600 border-yellow-500',
+        info: 'bg-blue-600 border-blue-500'
+    };
+
+    toast.className = `${colors[type]} border-l-4 text-white px-6 py-4 rounded shadow-lg flex items-center space-x-3 min-w-[300px] transform transition-all duration-300 translate-x-full opacity-0`;
+    
+    // Create elements safely to prevent XSS
+    const iconSpan = document.createElement('span');
+    iconSpan.className = 'text-xl';
+    iconSpan.innerHTML = icons[type];
+    
+    const messageSpan = document.createElement('span');
+    messageSpan.className = 'flex-1';
+    messageSpan.textContent = message; // Use textContent to prevent XSS
+    
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'text-white/70 hover:text-white';
+    closeBtn.innerHTML = '<i class="fas fa-times"></i>';
+    closeBtn.onclick = function() { this.parentElement.remove(); };
+    
+    toast.appendChild(iconSpan);
+    toast.appendChild(messageSpan);
+    toast.appendChild(closeBtn);
+
+    container.appendChild(toast);
+
+    // Animate in
+    setTimeout(() => {
+        toast.classList.remove('translate-x-full', 'opacity-0');
+    }, 10);
+
+    // Auto remove after 5 seconds
+    setTimeout(() => {
+        toast.classList.add('translate-x-full', 'opacity-0');
+        setTimeout(() => toast.remove(), 300);
+    }, 5000);
+}
+
+function showSuccess(message) { showToast(message, 'success'); }
+function showError(message) { showToast(message, 'error'); }
+function showWarning(message) { showToast(message, 'warning'); }
+function showInfo(message) { showToast(message, 'info'); }
+</script>

@@ -1,0 +1,368 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - FullMute Web{% endblock %}
+
+{% block body %}
+<div class="min-h-screen bg-dark-bg" x-data="dashboardApp()" x-init="init()">
+    
+    <!-- Sidebar Layout -->
+    <div class="flex h-screen overflow-hidden">
+        
+        <!-- Sidebar -->
+        <aside class="w-64 bg-dark-card border-r border-dark-border flex flex-col">
+            <!-- Logo -->
+            <div class="p-6 border-b border-dark-border">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-primary-600 to-primary-800 flex items-center justify-center">
+                        <i class="fas fa-shield-halved text-white"></i>
+                    </div>
+                    <span class="text-xl font-bold">FullMute</span>
+                </div>
+            </div>
+            
+            <!-- Navigation -->
+            <nav class="flex-1 p-4 space-y-2 overflow-y-auto">
+                <a href="/dashboard" class="flex items-center space-x-3 px-4 py-3 rounded-lg bg-primary-600/20 text-primary-400">
+                    <i class="fas fa-chart-line w-5"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="/targets" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-dark-border/50 transition-colors">
+                    <i class="fas fa-bullseye w-5"></i>
+                    <span>Targets</span>
+                </a>
+                <a href="/scans" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-dark-border/50 transition-colors">
+                    <i class="fas fa-radar w-5"></i>
+                    <span>Scans</span>
+                </a>
+                </a>
+                <a href="/reports" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-dark-border/50 transition-colors">
+                    <i class="fas fa-file-pdf w-5"></i>
+                    <span>Reports</span>
+                </a>
+                <template x-if="user && user.role === 'admin'">
+                    <a href="/settings" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-dark-border/50 transition-colors">
+                        <i class="fas fa-cog w-5"></i>
+                        <span>Settings</span>
+                    </a>
+                </template>
+            </nav>
+            
+            <!-- User -->
+            <div class="p-4 border-t border-dark-border">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-8 h-8 rounded-full bg-primary-600 flex items-center justify-center">
+                            <span class="text-sm font-semibold" x-text="user?.username?.[0]?.toUpperCase()"></span>
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium" x-text="user?.username"></p>
+                            <p class="text-xs text-gray-400 capitalize" x-text="user?.role"></p>
+                        </div>
+                    </div>
+                    <button @click="logout" class="text-gray-400 hover:text-white" title="Logout">
+                        <i class="fas fa-sign-out-alt"></i>
+                    </button>
+                </div>
+            </div>
+        </aside>
+        
+        <!-- Main Content -->
+        <main class="flex-1 overflow-y-auto">
+            <!-- Header -->
+            <header class="gradient-header px-8 py-6 shadow-lg">
+                <div class="flex items-center justify-between">
+                    <h1 class="text-2xl font-bold">Dashboard</h1>
+                    <div class="flex items-center space-x-4">
+                        <button @click="loadStats" class="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors">
+                            <i class="fas fa-sync-alt mr-2"></i>Refresh
+                        </button>
+                        <span class="text-sm text-white/70" x-text="new Date().toLocaleDateString()"></span>
+                    </div>
+                </div>
+            </header>
+            
+            <!-- Dashboard Content -->
+            <div class="p-8">
+                
+                <!-- Stats Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <!-- Total Targets -->
+                    <div class="bg-dark-card rounded-xl p-6 border border-dark-border card-hover">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-400 text-sm">Total Targets</p>
+                                <p class="text-3xl font-bold mt-1" x-text="stats.total_targets || 0"></p>
+                            </div>
+                            <div class="w-14 h-14 rounded-full bg-primary-600/20 flex items-center justify-center">
+                                <i class="fas fa-bullseye text-2xl text-primary-400"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Total Scans -->
+                    <div class="bg-dark-card rounded-xl p-6 border border-dark-border card-hover">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-400 text-sm">Total Scans</p>
+                                <p class="text-3xl font-bold mt-1" x-text="stats.total_scans || 0"></p>
+                            </div>
+                            <div class="w-14 h-14 rounded-full bg-green-600/20 flex items-center justify-center">
+                                <i class="fas fa-check-circle text-2xl text-green-400"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Running Scans -->
+                    <div class="bg-dark-card rounded-xl p-6 border border-dark-border card-hover">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-400 text-sm">Running Scans</p>
+                                <p class="text-3xl font-bold mt-1" x-text="stats.running_scans || 0"></p>
+                            </div>
+                            <div class="w-14 h-14 rounded-full bg-yellow-600/20 flex items-center justify-center">
+                                <i class="fas fa-spinner text-2xl text-yellow-400"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Scheduled Scans -->
+                    <div class="bg-dark-card rounded-xl p-6 border border-dark-border card-hover">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-400 text-sm">Scheduled</p>
+                                <p class="text-3xl font-bold mt-1" x-text="stats.scheduled_scans || 0"></p>
+                            </div>
+                            <div class="w-14 h-14 rounded-full bg-purple-600/20 flex items-center justify-center">
+                                <i class="fas fa-clock text-2xl text-purple-400"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Charts Row -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                    <!-- Scans Over Time -->
+                    <div class="bg-dark-card rounded-xl p-6 border border-dark-border">
+                        <h3 class="text-lg font-semibold mb-4">Scans Over Time</h3>
+                        <canvas id="scansChart" height="200"></canvas>
+                    </div>
+                    
+                    <!-- Vulnerabilities by Severity -->
+                    <div class="bg-dark-card rounded-xl p-6 border border-dark-border">
+                        <h3 class="text-lg font-semibold mb-4">Vulnerabilities by Severity</h3>
+                        <canvas id="severityChart" height="200"></canvas>
+                    </div>
+                </div>
+                
+                <!-- Recent Scans -->
+                <div class="bg-dark-card rounded-xl border border-dark-border">
+                    <div class="p-6 border-b border-dark-border">
+                        <h3 class="text-lg font-semibold">Recent Scans</h3>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead class="bg-dark-bg">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">ID</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Config</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Status</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Progress</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Created</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-dark-border">
+                                <template x-for="scan in recentScans" :key="scan.id">
+                                    <tr class="hover:bg-dark-border/30">
+                                        <td class="px-6 py-4 text-sm" x-text="'#' + scan.user_scan_number"></td>
+                                        <td class="px-6 py-4 text-sm" x-text="scan.config_name || 'Manual'"></td>
+                                        <td class="px-6 py-4">
+                                            <span class="px-2 py-1 rounded-full text-xs font-medium"
+                                                  :class="{
+                                                      'bg-green-600/20 text-green-400': scan.status === 'completed',
+                                                      'bg-yellow-600/20 text-yellow-400': scan.status === 'running',
+                                                      'bg-red-600/20 text-red-400': scan.status === 'failed',
+                                                      'bg-gray-600/20 text-gray-400': scan.status === 'cancelled'
+                                                  }"
+                                                  x-text="scan.status">
+                                            </span>
+                                        </td>
+                                        <td class="px-6 py-4">
+                                            <div class="flex items-center">
+                                                <div class="flex-1 bg-dark-bg rounded-full h-2 mr-2">
+                                                    <div class="bg-primary-600 h-2 rounded-full" 
+                                                         :style="'width: ' + (scan.progress || 0) + '%'"></div>
+                                                </div>
+                                                <span class="text-xs text-gray-400" x-text="(scan.progress || 0) + '%'"></span>
+                                            </div>
+                                        </td>
+                                        <td class="px-6 py-4 text-sm text-gray-400" x-text="formatDate(scan.created_at)"></td>
+                                        <td class="px-6 py-4">
+                                            <a :href="'/scans/' + scan.id" class="text-primary-400 hover:text-primary-300">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                        </td>
+                                    </tr>
+                                </template>
+                                <tr x-show="recentScans.length === 0">
+                                    <td colspan="6" class="px-6 py-8 text-center text-gray-400">
+                                        No scans yet. Create your first scan!
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+            </div>
+        </main>
+    </div>
+</div>
+
+<script>
+function dashboardApp() {
+    return {
+        user: null,
+        stats: {},
+        recentScans: [],
+        scansChart: null,
+        severityChart: null,
+        
+        async init() {
+            const userStr = localStorage.getItem('user');
+            if (userStr) {
+                this.user = JSON.parse(userStr);
+            } else {
+                window.location.href = '/login';
+                return;
+            }
+            
+            await this.loadStats();
+            await this.loadRecentScans();
+            this.initCharts();
+        },
+        
+        async loadStats() {
+            try {
+                const response = await this.fetchAPI('/api/dashboard/stats');
+                if (response) {
+                    this.stats = response;
+                }
+            } catch (err) {
+                console.error('Failed to load stats:', err);
+            }
+        },
+        
+        async loadRecentScans() {
+            try {
+                const response = await this.fetchAPI('/api/scans?limit=10');
+                if (response) {
+                    this.recentScans = response;
+                }
+            } catch (err) {
+                console.error('Failed to load recent scans:', err);
+            }
+        },
+        
+        initCharts() {
+            // Scans Over Time Chart
+            const scansCtx = document.getElementById('scansChart');
+            if (scansCtx) {
+                this.scansChart = new Chart(scansCtx, {
+                    type: 'line',
+                    data: {
+                        labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                        datasets: [{
+                            label: 'Scans',
+                            data: [5, 8, 12, 7, 15, 10, 6],
+                            borderColor: '#3b82f6',
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            tension: 0.4,
+                            fill: true
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                grid: { color: '#334155' },
+                                ticks: { color: '#94a3b8' }
+                            },
+                            x: {
+                                grid: { display: false },
+                                ticks: { color: '#94a3b8' }
+                            }
+                        }
+                    }
+                });
+            }
+            
+            // Severity Chart
+            const severityCtx = document.getElementById('severityChart');
+            if (severityCtx) {
+                this.severityChart = new Chart(severityCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Critical', 'High', 'Medium', 'Low'],
+                        datasets: [{
+                            data: [3, 8, 15, 22],
+                            backgroundColor: [
+                                '#ef4444',
+                                '#f97316',
+                                '#eab308',
+                                '#22c55e'
+                            ],
+                            borderWidth: 0
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: { color: '#94a3b8', padding: 15 }
+                            }
+                        }
+                    }
+                });
+            }
+        },
+        
+        async fetchAPI(url) {
+            const token = localStorage.getItem('token');
+            const response = await fetch(url, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            if (response.ok) {
+                return await response.json();
+            }
+            return null;
+        },
+        
+        formatDate(dateStr) {
+            if (!dateStr) return '-';
+            return new Date(dateStr).toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        },
+        
+        logout() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = '/login';
+        }
+    }
+}
+</script>
+{% endblock %}

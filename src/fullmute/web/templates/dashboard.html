@@ -1,0 +1,446 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - FullMute Web{% endblock %}
+
+{% block body %}
+<div class="min-h-screen bg-dark-bg" x-data="dashboardApp()" x-init="init()">
+    
+    <div class="flex h-screen overflow-hidden">
+        
+        <!-- Sidebar -->
+        <aside class="w-64 bg-dark-card border-r border-dark-border flex flex-col">
+            <div class="p-6 border-b border-dark-border">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-primary-600 to-primary-800 flex items-center justify-center">
+                        <i class="fas fa-shield-halved text-white"></i>
+                    </div>
+                    <span class="text-xl font-bold">FullMute</span>
+                </div>
+            </div>
+            
+            <nav class="flex-1 p-4 space-y-2 overflow-y-auto">
+                <a href="/dashboard" class="flex items-center space-x-3 px-4 py-3 rounded-lg bg-primary-600/20 text-primary-400">
+                    <i class="fas fa-chart-line w-5"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="/targets" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-dark-border/50 transition-colors">
+                    <i class="fas fa-bullseye w-5"></i>
+                    <span>Targets</span>
+                </a>
+                <a href="/scans" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-dark-border/50 transition-colors">
+                    <i class="fas fa-radar w-5"></i>
+                    <span>Scans</span>
+                </a>
+                <a href="/reports" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-dark-border/50 transition-colors">
+                    <i class="fas fa-file-pdf w-5"></i>
+                    <span>Reports</span>
+                </a>
+                <a href="/user-settings" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-dark-border/50 transition-colors">
+                    <i class="fas fa-user-gear w-5"></i>
+                    <span>My Settings</span>
+                </a>
+                <a href="/faq" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-dark-border/50 transition-colors">
+                    <i class="fas fa-question-circle w-5"></i>
+                    <span>FAQ</span>
+                </a>
+                <a href="/settings" x-show="user && user.role === 'admin'" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-dark-border/50 transition-colors">
+                    <i class="fas fa-cog w-5"></i>
+                    <span>Admin Settings</span>
+                </a>
+            </nav>
+            
+            <div class="p-4 border-t border-dark-border">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-8 h-8 rounded-full bg-primary-600 flex items-center justify-center">
+                            <span class="text-sm font-semibold" x-text="user?.username?.[0]?.toUpperCase()"></span>
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium" x-text="user?.username"></p>
+                            <p class="text-xs text-gray-400 capitalize" x-text="user?.role"></p>
+                        </div>
+                    </div>
+                    <button @click="logout" class="text-gray-400 hover:text-white">
+                        <i class="fas fa-sign-out-alt"></i>
+                    </button>
+                </div>
+            </div>
+        </aside>
+        
+        <main class="flex-1 overflow-y-auto">
+            <header class="gradient-header px-8 py-6 shadow-lg">
+                <div class="flex items-center justify-between">
+                    <h1 class="text-2xl font-bold">Dashboard</h1>
+                    <div class="flex items-center space-x-4">
+                        <button @click="loadStats" class="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors">
+                            <i class="fas fa-sync-alt mr-2"></i>Refresh
+                        </button>
+                        <span class="text-sm text-white/70" x-text="new Date().toLocaleDateString()"></span>
+                    </div>
+                </div>
+            </header>
+            
+            <div class="p-8">
+                
+                <!-- Stats Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <div class="bg-dark-card rounded-xl p-6 border border-dark-border card-hover">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-400 text-sm">Total Targets</p>
+                                <p class="text-3xl font-bold mt-1" x-text="stats.total_targets || 0"></p>
+                            </div>
+                            <div class="w-14 h-14 rounded-full bg-primary-600/20 flex items-center justify-center">
+                                <i class="fas fa-bullseye text-2xl text-primary-400"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-dark-card rounded-xl p-6 border border-dark-border card-hover">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-400 text-sm">Total Scans</p>
+                                <p class="text-3xl font-bold mt-1" x-text="stats.total_scans || 0"></p>
+                            </div>
+                            <div class="w-14 h-14 rounded-full bg-green-600/20 flex items-center justify-center">
+                                <i class="fas fa-check-circle text-2xl text-green-400"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-dark-card rounded-xl p-6 border border-dark-border card-hover">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-400 text-sm">Running Scans</p>
+                                <p class="text-3xl font-bold mt-1" x-text="stats.running_scans || 0"></p>
+                            </div>
+                            <div class="w-14 h-14 rounded-full bg-yellow-600/20 flex items-center justify-center">
+                                <i class="fas fa-spinner text-2xl text-yellow-400"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-dark-card rounded-xl p-6 border border-dark-border card-hover">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-400 text-sm">Scheduled</p>
+                                <p class="text-3xl font-bold mt-1" x-text="stats.scheduled_scans || 0"></p>
+                            </div>
+                            <div class="w-14 h-14 rounded-full bg-purple-600/20 flex items-center justify-center">
+                                <i class="fas fa-clock text-2xl text-purple-400"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Security Stats -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <div class="bg-dark-card rounded-xl p-6 border border-dark-border">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-400 text-sm">CMS Detected</p>
+                                <p class="text-3xl font-bold mt-1" x-text="stats.cms_count || 0"></p>
+                            </div>
+                            <div class="w-14 h-14 rounded-full bg-blue-600/20 flex items-center justify-center">
+                                <i class="fas fa-cube text-2xl text-blue-400"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-dark-card rounded-xl p-6 border border-dark-border">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-400 text-sm">Technologies</p>
+                                <p class="text-3xl font-bold mt-1" x-text="stats.total_technologies || 0"></p>
+                            </div>
+                            <div class="w-14 h-14 rounded-full bg-indigo-600/20 flex items-center justify-center">
+                                <i class="fas fa-tag text-2xl text-indigo-400"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-dark-card rounded-xl p-6 border border-dark-border">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-400 text-sm">Total CVEs</p>
+                                <p class="text-3xl font-bold mt-1 text-red-400" x-text="stats.total_cves || 0"></p>
+                            </div>
+                            <div class="w-14 h-14 rounded-full bg-red-600/20 flex items-center justify-center">
+                                <i class="fas fa-shield-virus text-2xl text-red-400"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-dark-card rounded-xl p-6 border border-dark-border">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-400 text-sm">Sensitive Files</p>
+                                <p class="text-3xl font-bold mt-1 text-yellow-400" x-text="stats.total_sensitive_files || 0"></p>
+                            </div>
+                            <div class="w-14 h-14 rounded-full bg-yellow-600/20 flex items-center justify-center">
+                                <i class="fas fa-file-code text-2xl text-yellow-400"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- CVEs by Severity -->
+                <div class="bg-dark-card rounded-xl p-6 border border-dark-border mb-8">
+                    <h3 class="text-lg font-semibold mb-4">
+                        <i class="fas fa-chart-pie text-red-400 mr-2"></i>CVEs by Severity
+                    </h3>
+                    <div class="grid grid-cols-4 gap-4">
+                        <div class="text-center p-4 bg-red-900/20 rounded-lg border border-red-800/30">
+                            <p class="text-3xl font-bold text-red-400" x-text="stats.cves_critical || 0"></p>
+                            <p class="text-sm text-gray-400 mt-1">Critical</p>
+                        </div>
+                        <div class="text-center p-4 bg-orange-900/20 rounded-lg border border-orange-800/30">
+                            <p class="text-3xl font-bold text-orange-400" x-text="stats.cves_high || 0"></p>
+                            <p class="text-sm text-gray-400 mt-1">High</p>
+                        </div>
+                        <div class="text-center p-4 bg-yellow-900/20 rounded-lg border border-yellow-800/30">
+                            <p class="text-3xl font-bold text-yellow-400" x-text="stats.cves_medium || 0"></p>
+                            <p class="text-sm text-gray-400 mt-1">Medium</p>
+                        </div>
+                        <div class="text-center p-4 bg-blue-900/20 rounded-lg border border-blue-800/30">
+                            <p class="text-3xl font-bold text-blue-400" x-text="stats.cves_low || 0"></p>
+                            <p class="text-sm text-gray-400 mt-1">Low</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Recent Scans -->
+                <div class="bg-dark-card rounded-xl border border-dark-border">
+                    <div class="p-6 border-b border-dark-border">
+                        <h3 class="text-lg font-semibold">Recent Scans</h3>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead class="bg-dark-bg">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">ID</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Target</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Status</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Progress</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Created</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-dark-border">
+                                <template x-for="scan in recentScans" :key="scan.id">
+                                    <tr class="hover:bg-dark-border/30">
+                                        <td class="px-6 py-4 text-sm" x-text="'#' + scan.user_scan_number"></td>
+                                        <td class="px-6 py-4 text-sm" x-text="scan.targets?.[0]?.domain || 'Multiple'"></td>
+                                        <td class="px-6 py-4">
+                                            <span class="px-2 py-1 rounded-full text-xs font-medium"
+                                                  :class="{
+                                                      'bg-green-600/20 text-green-400': scan.status === 'completed',
+                                                      'bg-yellow-600/20 text-yellow-400': scan.status === 'running',
+                                                      'bg-red-600/20 text-red-400': scan.status === 'failed',
+                                                      'bg-gray-600/20 text-gray-400': scan.status === 'cancelled'
+                                                  }"
+                                                  x-text="scan.status">
+                                            </span>
+                                        </td>
+                                        <td class="px-6 py-4">
+                                            <div class="flex items-center">
+                                                <div class="flex-1 bg-dark-bg rounded-full h-2 mr-2">
+                                                    <div class="bg-primary-600 h-2 rounded-full"
+                                                         :style="'width: ' + (scan.progress || 0) + '%'"></div>
+                                                </div>
+                                                <span class="text-xs text-gray-400" x-text="(scan.progress || 0) + '%'"></span>
+                                            </div>
+                                        </td>
+                                        <td class="px-6 py-4 text-sm text-gray-400" x-text="formatDate(scan.created_at)"></td>
+                                        <td class="px-6 py-4">
+                                            <a :href="'/scans/' + scan.id" class="text-primary-400 hover:text-primary-300">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                        </td>
+                                    </tr>
+                                </template>
+                                <tr x-show="recentScans.length === 0">
+                                    <td colspan="6" class="px-6 py-8 text-center text-gray-400">
+                                        No scans yet. Create your first scan!
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+            </div>
+        </main>
+    </div>
+
+    <!-- Quick Start Guide Modal -->
+    <div x-show="showGuide" style="display: none;" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-200"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0"
+         @click.self="showGuide = false">
+
+        <div class="bg-dark-card rounded-2xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-primary-700/50 shadow-2xl shadow-primary-500/20"
+             @click.stop
+             x-transition:enter="transition ease-out duration-300"
+             x-transition:enter-start="opacity-0 scale-95 translate-y-4"
+             x-transition:enter-end="opacity-100 scale-100 translate-y-0"
+             x-transition:leave="transition ease-in duration-200"
+             x-transition:leave-start="opacity-100 scale-100 translate-y-0"
+             x-transition:leave-end="opacity-0 scale-95 translate-y-4">
+
+            <!-- Header -->
+            <div class="flex items-center justify-between mb-6 pb-4 border-b border-dark-border">
+                <h2 class="text-2xl font-bold flex items-center">
+                    <i class="fas fa-rocket text-primary-400 mr-3"></i>
+                    Welcome to FullMute!
+                </h2>
+                <button @click="showGuide = false; sessionStorage.setItem('guideDismissed', 'true')"
+                        class="text-gray-400 hover:text-white transition-colors p-2 hover:bg-dark-bg rounded-lg">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+
+            <!-- Steps -->
+            <div class="space-y-4 mb-6">
+                <!-- Step 1 -->
+                <div class="flex items-start gap-4 p-4 bg-gradient-to-r from-primary-900/30 to-dark-bg rounded-xl border border-primary-700/30">
+                    <div class="flex-shrink-0 w-10 h-10 rounded-full bg-primary-600 flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-primary-500/50">1</div>
+                    <div class="flex-1">
+                        <p class="font-semibold text-white text-lg">Add Your First Target</p>
+                        <p class="text-sm text-gray-400 mt-1">Go to <a href="/targets" class="text-primary-400 hover:underline font-medium">Targets</a> and add domains or IPs to scan. Support for custom ports like <code class="px-1.5 py-0.5 bg-dark-bg rounded text-xs">example.com:8080</code></p>
+                    </div>
+                </div>
+
+                <!-- Step 2 -->
+                <div class="flex items-start gap-4 p-4 bg-gradient-to-r from-primary-900/30 to-dark-bg rounded-xl border border-primary-700/30">
+                    <div class="flex-shrink-0 w-10 h-10 rounded-full bg-primary-600 flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-primary-500/50">2</div>
+                    <div class="flex-1">
+                        <p class="font-semibold text-white text-lg">Configure NVD API Key</p>
+                        <p class="text-sm text-gray-400 mt-1">Get your free API key from <a href="https://nvd.nist.gov/developers/request-an-api-key" target="_blank" class="text-primary-400 hover:underline font-medium">NIST NVD</a> for CVE vulnerability detection. Without it, CVE checks will be rate-limited.</p>
+                    </div>
+                </div>
+
+                <!-- Step 3 -->
+                <div class="flex items-start gap-4 p-4 bg-gradient-to-r from-primary-900/30 to-dark-bg rounded-xl border border-primary-700/30">
+                    <div class="flex-shrink-0 w-10 h-10 rounded-full bg-primary-600 flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-primary-500/50">3</div>
+                    <div class="flex-1">
+                        <p class="font-semibold text-white text-lg">Create Your First Scan</p>
+                        <p class="text-sm text-gray-400 mt-1">Visit <a href="/scans" class="text-primary-400 hover:underline font-medium">Scans</a> and start scanning your targets. Monitor real-time progress and view detailed results.</p>
+                    </div>
+                </div>
+
+                <!-- Step 4 -->
+                <div class="flex items-start gap-4 p-4 bg-gradient-to-r from-primary-900/30 to-dark-bg rounded-xl border border-primary-700/30">
+                    <div class="flex-shrink-0 w-10 h-10 rounded-full bg-primary-600 flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-primary-500/50">4</div>
+                    <div class="flex-1">
+                        <p class="font-semibold text-white text-lg">Review Results & Generate Reports</p>
+                        <p class="text-sm text-gray-400 mt-1">Check this <strong>Dashboard</strong> for statistics and <a href="/reports" class="text-primary-400 hover:underline font-medium">Reports</a> to export professional PDF reports.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pro Tip -->
+            <div class="p-4 bg-primary-600/10 border border-primary-600/30 rounded-xl mb-6">
+                <p class="text-sm text-primary-300">
+                    <i class="fas fa-lightbulb mr-2"></i>
+                    <strong>Pro Tip:</strong> Configure your NVD API key and proxy settings in <a href="/user-settings" class="underline font-medium">My Settings</a> page.
+                </p>
+            </div>
+
+            <!-- Footer Buttons -->
+            <div class="flex justify-between items-center pt-4 border-t border-dark-border">
+                <button @click="showGuide = false"
+                        class="text-sm text-gray-400 hover:text-white transition-colors">
+                    <i class="fas fa-times-circle mr-2"></i>Skip this guide
+                </button>
+                <button @click="showGuide = false; sessionStorage.setItem('guideDismissed', 'true')"
+                        class="px-6 py-2.5 bg-primary-600 hover:bg-primary-500 text-white rounded-lg transition-colors font-medium shadow-lg shadow-primary-500/30">
+                    <i class="fas fa-check mr-2"></i>Got it!
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function dashboardApp() {
+    return {
+        user: null,
+        stats: {},
+        recentScans: [],
+        showGuide: false,
+
+        async init() {
+            const token = localStorage.getItem('token');
+            const userStr = localStorage.getItem('user');
+
+            if (!token || !userStr) {
+                console.log('No token found, redirecting to login');
+                window.location.href = '/login';
+                return;
+            }
+
+            this.user = JSON.parse(userStr);
+            
+            // Check if guide was already dismissed (using sessionStorage for per-session)
+            const guideDismissed = sessionStorage.getItem('guideDismissed');
+            const showGuideForNewUser = guideDismissed !== 'true';
+            
+            console.log('Guide dismissed:', guideDismissed);
+            console.log('Show guide:', showGuideForNewUser);
+            this.showGuide = showGuideForNewUser;
+
+            await this.loadStats();
+            await this.loadRecentScans();
+            
+            // Auto-refresh stats every 10 seconds
+            setInterval(() => this.loadStats(), 10000);
+        },
+
+        async loadStats() {
+            const token = localStorage.getItem('token');
+            const response = await fetch('/api/dashboard/stats', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (response.ok) {
+                this.stats = await response.json();
+            }
+        },
+
+        async loadRecentScans() {
+            const token = localStorage.getItem('token');
+            const response = await fetch('/api/scans?limit=10', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (response.ok) {
+                this.recentScans = await response.json();
+            }
+        },
+
+        formatDate(dateStr) {
+            if (!dateStr) return '-';
+            return new Date(dateStr).toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        },
+
+        logout() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            // Clear cookie
+            document.cookie = "access_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/";
+            // Redirect to login
+            window.location.href = '/login';
+        }
+    }
+}
+</script>
+
+{% endblock %}

@@ -1,0 +1,622 @@
+{% extends "base.html" %}
+
+{% block title %}Targets - FullMute Web{% endblock %}
+
+{% block body %}
+<div class="min-h-screen bg-dark-bg" x-data="targetsApp()" x-init="init()">
+    
+    <div class="flex h-screen overflow-hidden">
+        
+        <!-- Sidebar -->
+        <aside class="w-64 bg-dark-card border-r border-dark-border flex flex-col">
+            <div class="p-6 border-b border-dark-border">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-primary-600 to-primary-800 flex items-center justify-center">
+                        <i class="fas fa-shield-halved text-white"></i>
+                    </div>
+                    <span class="text-xl font-bold">FullMute</span>
+                </div>
+            </div>
+            
+            <nav class="flex-1 p-4 space-y-2 overflow-y-auto">
+                <a href="/dashboard" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-dark-border/50 transition-colors">
+                    <i class="fas fa-chart-line w-5"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="/targets" class="flex items-center space-x-3 px-4 py-3 rounded-lg bg-primary-600/20 text-primary-400">
+                    <i class="fas fa-bullseye w-5"></i>
+                    <span>Targets</span>
+                </a>
+                <a href="/scans" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-dark-border/50 transition-colors">
+                    <i class="fas fa-radar w-5"></i>
+                    <span>Scans</span>
+                </a>
+                <a href="/reports" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-dark-border/50 transition-colors">
+                    <i class="fas fa-file-pdf w-5"></i>
+                    <span>Reports</span>
+                </a>
+                <a href="/user-settings" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-dark-border/50 transition-colors">
+                    <i class="fas fa-user-gear w-5"></i>
+                    <span>My Settings</span>
+                </a>
+                <a href="/faq" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-dark-border/50 transition-colors">
+                    <i class="fas fa-question-circle w-5"></i>
+                    <span>FAQ</span>
+                </a>
+                <a href="/settings" x-show="user && user.role === 'admin'" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-dark-border/50 transition-colors">
+                    <i class="fas fa-cog w-5"></i>
+                    <span>Admin Settings</span>
+                </a>
+            </nav>
+            
+            <div class="p-4 border-t border-dark-border">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-8 h-8 rounded-full bg-primary-600 flex items-center justify-center">
+                            <span class="text-sm font-semibold" x-text="user?.username?.[0]?.toUpperCase()"></span>
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium" x-text="user?.username"></p>
+                            <p class="text-xs text-gray-400 capitalize" x-text="user?.role"></p>
+                        </div>
+                    </div>
+                    <button @click="logout" class="text-gray-400 hover:text-white">
+                        <i class="fas fa-sign-out-alt"></i>
+                    </button>
+                </div>
+            </div>
+        </aside>
+        
+        <main class="flex-1 overflow-y-auto">
+            <header class="gradient-header px-8 py-6 shadow-lg">
+                <div class="flex items-center justify-between">
+                    <h1 class="text-2xl font-bold">Targets</h1>
+                    <span class="text-sm text-white/70" x-text="new Date().toLocaleDateString()"></span>
+                </div>
+            </header>
+            
+            <div class="p-8">
+                
+                <!-- Action Bar -->
+                <div class="flex items-center justify-between mb-6">
+                    <div class="flex items-center space-x-4">
+                        <div class="relative">
+                            <input 
+                                type="text" 
+                                x-model="search"
+                                @input="loadTargets()"
+                                placeholder="Search domains..."
+                                class="pl-10 pr-4 py-2 bg-dark-card border border-dark-border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                            >
+                            <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                        </div>
+                        
+                        <select 
+                            x-model="selectedGroup"
+                            @change="loadTargets()"
+                            class="px-4 py-2 bg-dark-card border border-dark-border rounded-lg focus:ring-2 focus:ring-primary-500"
+                        >
+                            <option value="">All Groups</option>
+                            <template x-for="group in groups" :key="group.id">
+                                <option :value="group.id" x-text="group.name"></option>
+                            </template>
+                        </select>
+                    </div>
+                    
+                    <div class="flex items-center space-x-3">
+                        <button @click="showMoveModal = true" :disabled="selectedTargets.length === 0" class="px-4 py-2 bg-dark-card border border-dark-border hover:border-primary-500 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                            <i class="fas fa-folder mr-2"></i>Move to Group
+                        </button>
+                        <button @click="showCreateGroupModal = true" class="px-4 py-2 bg-dark-card border border-dark-border hover:border-primary-500 rounded-lg transition-colors">
+                            <i class="fas fa-folder-plus mr-2"></i>New Group
+                        </button>
+                        <button @click="showDeleteGroupModal = true" :disabled="groups.length === 0" class="px-4 py-2 bg-red-600/20 border border-red-600 hover:bg-red-600/30 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                            <i class="fas fa-trash mr-2"></i>Delete Group
+                        </button>
+                        <button @click="showUploadModal = true; console.log('[DEBUG] Upload modal clicked, showUploadModal=', showUploadModal)" class="px-4 py-2 bg-dark-card border border-dark-border hover:border-primary-500 rounded-lg transition-colors">
+                            <i class="fas fa-upload mr-2"></i>Import TXT
+                        </button>
+                        <button @click="showAddModal = true" class="px-4 py-2 bg-primary-600 hover:bg-primary-500 rounded-lg transition-colors">
+                            <i class="fas fa-plus mr-2"></i>Add Target
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Targets Table -->
+                <div class="bg-dark-card rounded-xl border border-dark-border overflow-hidden">
+                    <table class="w-full">
+                        <thead class="bg-dark-bg">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">
+                                    <input type="checkbox" @change="toggleAllTargets($event.target.checked)" class="rounded">
+                                </th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Domain</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Group</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Last Scan</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Status</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-dark-border">
+                            <template x-for="target in targets" :key="target.id">
+                                <tr class="hover:bg-dark-border/30">
+                                    <td class="px-6 py-4">
+                                        <input type="checkbox" :value="target.id" x-model="selectedTargets" class="rounded">
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <div class="flex items-center">
+                                            <div class="w-8 h-8 rounded-full bg-primary-600/20 flex items-center justify-center mr-3">
+                                                <i class="fas fa-globe text-primary-400"></i>
+                                            </div>
+                                            <span class="font-medium" x-text="target.domain"></span>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 text-sm text-gray-400" x-text="target.group_name || '-'"></td>
+                                    <td class="px-6 py-4 text-sm text-gray-400" x-text="formatDate(target.last_scan_date)"></td>
+                                    <td class="px-6 py-4">
+                                        <span class="px-2 py-1 rounded-full text-xs font-medium"
+                                              :class="{
+                                                  'bg-green-600/20 text-green-400': target.last_scan_status === 'completed',
+                                                  'bg-yellow-600/20 text-yellow-400': target.last_scan_status === 'running',
+                                                  'bg-red-600/20 text-red-400': target.last_scan_status === 'failed',
+                                                  'bg-gray-600/20 text-gray-400': !target.last_scan_status
+                                              }"
+                                              x-text="target.last_scan_status || 'Never'">
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <div class="flex items-center space-x-3">
+                                            <button @click="deleteTarget(target.id)" class="text-red-400 hover:text-red-300" title="Delete">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </template>
+                            <tr x-show="targets.length === 0">
+                                <td colspan="6" class="px-6 py-8 text-center text-gray-400">
+                                    <i class="fas fa-bullseye text-4xl mb-3 opacity-50"></i>
+                                    <p>No targets found. Add your first target!</p>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+            </div>
+        </main>
+    </div>
+    
+    <!-- Add Target Modal -->
+    <div x-show="showAddModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div class="bg-dark-card rounded-xl p-6 w-full max-w-md border border-dark-border" @click.away="showAddModal = false">
+            <h3 class="text-xl font-semibold mb-4">Add New Target</h3>
+            <form @submit.prevent="addTarget">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Domain / IP</label>
+                    <input type="text" x-model="newTarget.domain" required placeholder="example.com or 192.168.1.1:8080" class="w-full px-4 py-2 bg-dark-bg border border-dark-border rounded-lg focus:ring-2 focus:ring-primary-500">
+                    <p class="text-xs text-gray-500 mt-1">Supports domains, IPs, and custom ports (e.g., example.com:8080)</p>
+                </div>
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Group (optional)</label>
+                    <select x-model="newTarget.group_id" class="w-full px-4 py-2 bg-dark-bg border border-dark-border rounded-lg focus:ring-2 focus:ring-primary-500">
+                        <option value="">No Group</option>
+                        <template x-for="group in groups" :key="group.id">
+                            <option :value="group.id" x-text="group.name"></option>
+                        </template>
+                    </select>
+                </div>
+                <div class="flex justify-end space-x-3">
+                    <button type="button" @click="showAddModal = false" class="px-4 py-2 bg-dark-bg border border-dark-border rounded-lg hover:border-primary-500">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-primary-600 hover:bg-primary-500 rounded-lg">Add Target</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Create Group Modal -->
+    <div x-show="showCreateGroupModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div class="bg-dark-card rounded-xl p-6 w-full max-w-md border border-dark-border" @click.away="showCreateGroupModal = false">
+            <h3 class="text-xl font-semibold mb-4">Create New Group</h3>
+            <form @submit.prevent="createGroup">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Group Name</label>
+                    <input type="text" x-model="newGroup.name" required placeholder="My Targets" class="w-full px-4 py-2 bg-dark-bg border border-dark-border rounded-lg focus:ring-2 focus:ring-primary-500">
+                </div>
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Description (optional)</label>
+                    <input type="text" x-model="newGroup.description" placeholder="Optional description" class="w-full px-4 py-2 bg-dark-bg border border-dark-border rounded-lg focus:ring-2 focus:ring-primary-500">
+                </div>
+                <div class="flex justify-end space-x-3">
+                    <button type="button" @click="showCreateGroupModal = false" class="px-4 py-2 bg-dark-bg border border-dark-border rounded-lg hover:border-primary-500">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-primary-600 hover:bg-primary-500 rounded-lg">Create Group</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Move to Group Modal -->
+    <div x-show="showMoveModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div class="bg-dark-card rounded-xl p-6 w-full max-w-md border border-dark-border" @click.away="showMoveModal = false">
+            <h3 class="text-xl font-semibold mb-4">Move Targets to Group</h3>
+            <p class="text-sm text-gray-400 mb-4">Selected: <span x-text="selectedTargets.length"></span> targets</p>
+            <form @submit.prevent="moveToGroup">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Select Group</label>
+                    <select x-model="moveToGroupId" class="w-full px-4 py-2 bg-dark-bg border border-dark-border rounded-lg focus:ring-2 focus:ring-primary-500">
+                        <option value="">No Group</option>
+                        <template x-for="group in groups" :key="group.id">
+                            <option :value="group.id" x-text="group.name"></option>
+                        </template>
+                    </select>
+                </div>
+                <div class="flex justify-end space-x-3">
+                    <button type="button" @click="showMoveModal = false" class="px-4 py-2 bg-dark-bg border border-dark-border rounded-lg hover:border-primary-500">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-primary-600 hover:bg-primary-500 rounded-lg">Move Targets</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Upload TXT Modal -->
+    <div x-show="showUploadModal" 
+         x-cloak 
+         class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+         @alpine:init="console.log('[DEBUG] Upload modal x-show value:', showUploadModal)">
+        <div class="bg-dark-card rounded-xl p-6 w-full max-w-md border border-dark-border" @click.away="showUploadModal = false">
+            <h3 class="text-xl font-semibold mb-4">Import Targets from TXT</h3>
+            <form @submit.prevent="uploadFile">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Select Group (optional)</label>
+                    <select x-model="uploadGroupId" class="w-full px-4 py-2 bg-dark-bg border border-dark-border rounded-lg focus:ring-2 focus:ring-primary-500">
+                        <option value="">No Group</option>
+                        <template x-for="group in groups" :key="group.id">
+                            <option :value="group.id" x-text="group.name"></option>
+                        </template>
+                    </select>
+                </div>
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-300 mb-2">TXT File</label>
+                    <input
+                        type="file"
+                        @change="uploadFileInput = $event.target.files[0]"
+                        accept=".txt"
+                        required
+                        class="w-full px-4 py-2 bg-dark-bg border border-dark-border rounded-lg focus:ring-2 focus:ring-primary-500"
+                    >
+                    <p class="text-xs text-gray-400 mt-1">One domain per line (e.g., example.com)</p>
+                </div>
+                <div class="flex justify-end space-x-3">
+                    <button type="button" @click="showUploadModal = false" class="px-4 py-2 bg-dark-bg border border-dark-border rounded-lg hover:border-primary-500">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-primary-600 hover:bg-primary-500 rounded-lg">Import</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Delete Group Modal -->
+    <div x-show="showDeleteGroupModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div class="bg-dark-card rounded-xl p-6 w-full max-w-md border border-dark-border" @click.away="showDeleteGroupModal = false">
+            <h3 class="text-xl font-semibold mb-4 text-red-400">
+                <i class="fas fa-exclamation-triangle mr-2"></i>Delete Group
+            </h3>
+            <p class="text-sm text-gray-400 mb-4">
+                Select a group to delete. This will also delete all targets in that group.
+            </p>
+            <form @submit.prevent="deleteGroup">
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Select Group</label>
+                    <select x-model="deleteGroupId" required class="w-full px-4 py-2 bg-dark-bg border border-dark-border rounded-lg focus:ring-2 focus:ring-red-500">
+                        <option value="">Select a group...</option>
+                        <template x-for="group in groups" :key="group.id">
+                            <option :value="group.id" x-text="group.name + ' (' + (group.target_count || 0) + ' targets)'"></option>
+                        </template>
+                    </select>
+                </div>
+                <div class="flex justify-end space-x-3">
+                    <button type="button" @click="showDeleteGroupModal = false" class="px-4 py-2 bg-dark-bg border border-dark-border rounded-lg hover:border-primary-500">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-red-600 hover:bg-red-500 rounded-lg">
+                        <i class="fas fa-trash mr-2"></i>Delete Group
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div x-show="loading" x-cloak class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+        <div class="bg-dark-card rounded-xl p-8 shadow-2xl border border-dark-border">
+            <div class="flex items-center space-x-4">
+                <i class="fas fa-circle-notch fa-spin text-4xl text-primary-400"></i>
+                <div>
+                    <h3 class="text-xl font-bold text-white">Adding Target...</h3>
+                    <p class="text-gray-400 text-sm mt-1">Please wait while target is being validated</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function targetsApp() {
+    return {
+        user: null,
+        targets: [],
+        groups: [],
+        search: '',
+        selectedGroup: '',
+        selectedTargets: [],
+        showAddModal: false,
+        showUploadModal: false,
+        showCreateGroupModal: false,
+        showMoveModal: false,
+        showDeleteGroupModal: false,
+        loading: false,
+        newTarget: { domain: '', group_id: '' },
+        newGroup: { name: '', description: '' },
+        moveToGroupId: '',
+        uploadGroupId: '',
+        uploadFileInput: null,
+        deleteGroupId: '',
+
+        async init() {
+            console.log('[targetsApp] Initializing...');
+            const tokenStr = localStorage.getItem('token');
+            console.log('[targetsApp] Token in localStorage:', tokenStr ? tokenStr.substring(0, 20) + '...' : 'null');
+            
+            const userStr = localStorage.getItem('user');
+            if (userStr) {
+                this.user = JSON.parse(userStr);
+                console.log('[targetsApp] User loaded:', this.user);
+            } else {
+                console.error('[targetsApp] No user in localStorage, redirecting to login');
+                window.location.href = '/login';
+                return;
+            }
+            await this.loadGroups();
+            await this.loadTargets();
+            console.log('[targetsApp] Initialization complete');
+        },
+
+        toggleAllTargets(checked) {
+            if (checked) {
+                this.selectedTargets = this.targets.map(t => t.id);
+            } else {
+                this.selectedTargets = [];
+            }
+        },
+
+        async loadTargets() {
+            const token = localStorage.getItem('token');
+            let url = '/api/targets?';
+            if (this.selectedGroup) url += `group_id=${this.selectedGroup}&`;
+            if (this.search) url += `search=${this.search}&`;
+            try {
+                const response = await fetch(url, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    this.targets = data || [];
+                } else {
+                    console.error('Failed to load targets:', response.status);
+                    this.targets = [];
+                }
+            } catch (err) {
+                console.error('Error loading targets:', err);
+                this.targets = [];
+            }
+        },
+
+        async loadGroups() {
+            const token = localStorage.getItem('token');
+            const response = await fetch('/api/targets/groups', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (response.ok) {
+                this.groups = await response.json();
+            }
+        },
+
+        async addTarget() {
+            this.loading = true;
+            const token = localStorage.getItem('token');
+            const formData = new FormData();
+            formData.append('domain', this.newTarget.domain);
+            if (this.newTarget.group_id) formData.append('group_id', this.newTarget.group_id);
+            try {
+                const response = await fetch('/api/targets', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` },
+                    body: formData
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    if (data.exists) {
+                        showInfo('Target already exists: ' + data.domain);
+                    } else {
+                        showSuccess('Target added successfully: ' + data.domain);
+                    }
+                    this.showAddModal = false;
+                    this.newTarget = { domain: '', group_id: '' };
+                    // Сбрасываем фильтры и загружаем заново
+                    this.selectedGroup = '';
+                    this.search = '';
+                    await this.loadTargets();
+                } else {
+                    showError('Error: ' + (data.detail || 'Failed to add target'));
+                }
+            } catch (err) {
+                showError('Error: ' + err.message);
+            } finally {
+                this.loading = false;
+            }
+        },
+
+        async createGroup() {
+            const token = localStorage.getItem('token');
+            const formData = new FormData();
+            formData.append('name', this.newGroup.name);
+            formData.append('description', this.newGroup.description || '');
+            const response = await fetch('/api/targets/groups', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` },
+                body: formData
+            });
+            if (response.ok) {
+                showSuccess('Group created successfully');
+                this.showCreateGroupModal = false;
+                this.newGroup = { name: '', description: '' };
+                this.loadGroups();
+            } else {
+                const err = await response.json();
+                showError('Error: ' + (err.detail || 'Failed to create group'));
+            }
+        },
+
+        async deleteGroup() {
+            if (!this.deleteGroupId) {
+                showError('Please select a group');
+                return;
+            }
+            const token = localStorage.getItem('token');
+            const response = await fetch(`/api/targets/groups/${this.deleteGroupId}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (response.ok) {
+                const data = await response.json();
+                showSuccess(`Group "${data.group_name}" deleted. ${data.deleted_targets} targets removed.`);
+                this.showDeleteGroupModal = false;
+                this.deleteGroupId = '';
+                this.loadGroups();
+                this.loadTargets();
+            } else {
+                const err = await response.json();
+                showError('Error: ' + (err.detail || 'Failed to delete group'));
+            }
+        },
+
+        async moveToGroup() {
+            if (this.selectedTargets.length === 0) {
+                showError('No targets selected');
+                this.showMoveModal = false;
+                return;
+            }
+            const token = localStorage.getItem('token');
+            let moved = 0;
+            for (const targetId of this.selectedTargets) {
+                const formData = new FormData();
+                if (this.moveToGroupId) {
+                    formData.append('group_id', this.moveToGroupId);
+                }
+                const response = await fetch(`/api/targets/${targetId}/move`, {
+                    method: 'PUT',
+                    headers: { 'Authorization': `Bearer ${token}` },
+                    body: formData
+                });
+                if (response.ok) {
+                    moved++;
+                }
+            }
+            if (moved > 0) {
+                showSuccess(`Moved ${moved} target(s) successfully`);
+                this.showMoveModal = false;
+                this.selectedTargets = [];
+                this.moveToGroupId = '';
+                this.loadTargets();
+            } else {
+                showError('Failed to move targets');
+            }
+        },
+
+        async deleteTarget(id) {
+            if (!confirm('Are you sure?')) return;
+            const token = localStorage.getItem('token');
+            try {
+                const response = await fetch(`/api/targets/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (response.ok) {
+                    showSuccess('Target deleted');
+                    // Remove from array immediately for better UX
+                    this.targets = this.targets.filter(t => t.id !== id);
+                    // Then reload to ensure consistency
+                    setTimeout(() => this.loadTargets(), 300);
+                } else {
+                    showError('Failed to delete');
+                }
+            } catch (err) {
+                showError('Error: ' + err.message);
+            }
+        },
+
+        formatDate(dateStr) {
+            if (!dateStr) return 'Never';
+            return new Date(dateStr).toLocaleDateString('en-US', {
+                month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+            });
+        },
+
+        async uploadFile() {
+            console.log('[uploadFile] Starting upload...');
+            
+            if (!this.uploadFileInput) {
+                console.error('[uploadFile] No file selected');
+                showError('Please select a file');
+                return;
+            }
+
+            console.log('[uploadFile] File:', this.uploadFileInput.name, 'Size:', this.uploadFileInput.size);
+
+            const token = localStorage.getItem('token');
+            console.log('[uploadFile] Token:', token ? token.substring(0, 20) + '...' : 'null');
+
+            const formData = new FormData();
+            formData.append('file', this.uploadFileInput);
+            if (this.uploadGroupId) {
+                formData.append('group_id', this.uploadGroupId);
+                console.log('[uploadFile] Group ID:', this.uploadGroupId);
+            }
+
+            console.log('[uploadFile] Sending request to /api/targets/bulk');
+
+            try {
+                const response = await fetch('/api/targets/bulk', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` },
+                    body: formData
+                });
+
+                console.log('[uploadFile] Response status:', response.status, response.statusText);
+
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('[uploadFile] Success:', data);
+                    showSuccess(`Imported ${data.added} targets successfully!`);
+                    this.showUploadModal = false;
+                    this.uploadFileInput = null;
+                    this.uploadGroupId = '';
+                    this.loadTargets();
+                } else {
+                    const err = await response.json();
+                    console.error('[uploadFile] Error:', err);
+                    showError('Error: ' + (err.detail || 'Failed to import'));
+                }
+            } catch (err) {
+                console.error('[uploadFile] Exception:', err);
+                showError('Error: ' + err.message);
+            }
+        },
+
+        logout() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            document.cookie = "access_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/";
+            window.location.href = '/login';
+        }
+    }
+}
+</script>
+{% endblock %}

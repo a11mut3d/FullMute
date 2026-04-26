@@ -1,0 +1,269 @@
+{% extends "base.html" %}
+
+{% block title %}FAQ - FullMute Web{% endblock %}
+
+{% block body %}
+<div class="min-h-screen bg-dark-bg" x-data="faqApp()" x-init="init()">
+    
+    <div class="flex h-screen overflow-hidden">
+        
+        <!-- Sidebar -->
+        <aside class="w-64 bg-dark-card border-r border-dark-border flex flex-col">
+            <div class="p-6 border-b border-dark-border">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-primary-600 to-primary-800 flex items-center justify-center">
+                        <i class="fas fa-shield-halved text-white"></i>
+                    </div>
+                    <span class="text-xl font-bold">FullMute</span>
+                </div>
+            </div>
+            
+            <nav class="flex-1 p-4 space-y-2 overflow-y-auto">
+                <a href="/dashboard" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-dark-border/50 transition-colors">
+                    <i class="fas fa-chart-line w-5"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="/targets" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-dark-border/50 transition-colors">
+                    <i class="fas fa-bullseye w-5"></i>
+                    <span>Targets</span>
+                </a>
+                <a href="/scans" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-dark-border/50 transition-colors">
+                    <i class="fas fa-radar w-5"></i>
+                    <span>Scans</span>
+                </a>
+                <a href="/reports" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-dark-border/50 transition-colors">
+                    <i class="fas fa-file-pdf w-5"></i>
+                    <span>Reports</span>
+                </a>
+                <a href="/user-settings" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-dark-border/50 transition-colors">
+                    <i class="fas fa-user-gear w-5"></i>
+                    <span>My Settings</span>
+                </a>
+                <a href="/faq" class="flex items-center space-x-3 px-4 py-3 rounded-lg bg-primary-600/20 text-primary-400">
+                    <i class="fas fa-question-circle w-5"></i>
+                    <span>FAQ</span>
+                </a>
+                <a href="/settings" x-show="user && user.role === 'admin'" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-dark-border/50 transition-colors">
+                    <i class="fas fa-cog w-5"></i>
+                    <span>Admin Settings</span>
+                </a>
+            </nav>
+            
+            <div class="p-4 border-t border-dark-border">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-8 h-8 rounded-full bg-primary-600 flex items-center justify-center">
+                            <span class="text-sm font-semibold" x-text="user?.username?.[0]?.toUpperCase()"></span>
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium" x-text="user?.username"></p>
+                            <p class="text-xs text-gray-400 capitalize" x-text="user?.role"></p>
+                        </div>
+                    </div>
+                    <button @click="logout" class="text-gray-400 hover:text-white">
+                        <i class="fas fa-sign-out-alt"></i>
+                    </button>
+                </div>
+            </div>
+        </aside>
+        
+        <main class="flex-1 overflow-y-auto">
+            <header class="gradient-header px-8 py-6 shadow-lg">
+                <div class="flex items-center justify-between">
+                    <h1 class="text-2xl font-bold">FAQ & Help</h1>
+                    <span class="text-sm text-white/70" x-text="new Date().toLocaleDateString()"></span>
+                </div>
+            </header>
+            
+            <div class="p-8">
+                <!-- About Section -->
+                <div class="bg-dark-card rounded-xl p-8 border border-dark-border mb-8">
+                    <h2 class="text-2xl font-bold mb-4 text-primary-400">
+                        <i class="fas fa-info-circle mr-2"></i>Что такое FullMute?
+                    </h2>
+                    <p class="text-gray-300 mb-4">
+                        <strong>FullMute</strong> — это мощный веб-сканер безопасности, предназначенный для автоматизированного сканирования веб-сайтов на наличие уязвимостей, технологий и чувствительных файлов.
+                    </p>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+                        <div class="p-4 bg-dark-bg rounded-lg border border-dark-border">
+                            <h3 class="font-semibold text-blue-400 mb-2">
+                                <i class="fas fa-search mr-2"></i>Обнаружение технологий
+                            </h3>
+                            <p class="text-sm text-gray-400">
+                                CMS (WordPress, Joomla, Drupal), фреймворки, веб-серверы, базы данных, языки программирования
+                            </p>
+                        </div>
+                        <div class="p-4 bg-dark-bg rounded-lg border border-dark-border">
+                            <h3 class="font-semibold text-red-400 mb-2">
+                                <i class="fas fa-shield-virus mr-2"></i>CVE уязвимости
+                            </h3>
+                            <p class="text-sm text-gray-400">
+                                Автоматическая проверка обнаруженных технологий на известные уязвимости через NVD API
+                            </p>
+                        </div>
+                        <div class="p-4 bg-dark-bg rounded-lg border border-dark-border">
+                            <h3 class="font-semibold text-yellow-400 mb-2">
+                                <i class="fas fa-file-code mr-2"></i>Чувствительные файлы
+                            </h3>
+                            <p class="text-sm text-gray-400">
+                                Поиск .git, .env, конфигов, бэкапов и других потенциально опасных файлов
+                            </p>
+                        </div>
+                        <div class="p-4 bg-dark-bg rounded-lg border border-dark-border">
+                            <h3 class="font-semibold text-purple-400 mb-2">
+                                <i class="fas fa-clock mr-2"></i>Планирование
+                            </h3>
+                            <p class="text-sm text-gray-400">
+                                Автоматическое сканирование по расписанию (ежедневно, еженедельно, ежемесячно)
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- How to Use Section -->
+                <div class="bg-dark-card rounded-xl p-8 border border-dark-border mb-8">
+                    <h2 class="text-2xl font-bold mb-6 text-primary-400">
+                        <i class="fas fa-book mr-2"></i>Как использовать
+                    </h2>
+                    
+                    <div class="space-y-6">
+                        <div class="flex items-start space-x-4">
+                            <div class="flex-shrink-0 w-8 h-8 rounded-full bg-primary-600 flex items-center justify-center text-white font-bold">1</div>
+                            <div>
+                                <h3 class="font-semibold text-lg mb-2">Добавьте цели (Targets)</h3>
+                                <p class="text-gray-400 mb-2">Перейдите на страницу <strong>Targets</strong> и добавьте домены для сканирования:</p>
+                                <ul class="text-sm text-gray-400 list-disc list-inside ml-4">
+                                    <li>Вручную через кнопку "Add Target"</li>
+                                    <li>Массово через "Import TXT" (один домен на строку)</li>
+                                    <li>Создавайте группы для организации целей</li>
+                                </ul>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-start space-x-4">
+                            <div class="flex-shrink-0 w-8 h-8 rounded-full bg-primary-600 flex items-center justify-center text-white font-bold">2</div>
+                            <div>
+                                <h3 class="font-semibold text-lg mb-2">Создайте сканирование</h3>
+                                <p class="text-gray-400 mb-2">Перейдите на страницу <strong>Scans</strong> и нажмите "New Scan":</p>
+                                <ul class="text-sm text-gray-400 list-disc list-inside ml-4">
+                                    <li>Выберите цели для сканирования</li>
+                                    <li>Выберите тип: Manual (один раз) или Scheduled (по расписанию)</li>
+                                    <li>Запустите сканирование</li>
+                                </ul>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-start space-x-4">
+                            <div class="flex-shrink-0 w-8 h-8 rounded-full bg-primary-600 flex items-center justify-center text-white font-bold">3</div>
+                            <div>
+                                <h3 class="font-semibold text-lg mb-2">Просмотр результатов</h3>
+                                <p class="text-gray-400 mb-2">Отслеживайте прогресс на странице <strong>Scans</strong>:</p>
+                                <ul class="text-sm text-gray-400 list-disc list-inside ml-4">
+                                    <li>Real-time прогресс сканирования</li>
+                                    <li>Найденные технологии и CVE</li>
+                                    <li>Обнаруженные чувствительные файлы</li>
+                                </ul>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-start space-x-4">
+                            <div class="flex-shrink-0 w-8 h-8 rounded-full bg-primary-600 flex items-center justify-center text-white font-bold">4</div>
+                            <div>
+                                <h3 class="font-semibold text-lg mb-2">Экспорт отчётов</h3>
+                                <p class="text-gray-400 mb-2">Перейдите на страницу <strong>Reports</strong>:</p>
+                                <ul class="text-sm text-gray-400 list-disc list-inside ml-4">
+                                    <li>Выберите группу целей</li>
+                                    <li>Скачайте JSON отчёт</li>
+                                    <li>Просмотрите сводную статистику</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Features Section -->
+                <div class="bg-dark-card rounded-xl p-8 border border-dark-border mb-8">
+                    <h2 class="text-2xl font-bold mb-6 text-primary-400">
+                        <i class="fas fa-star mr-2"></i>Возможности
+                    </h2>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="p-4 bg-dark-bg rounded-lg">
+                            <i class="fas fa-check-circle text-green-400 mb-2"></i>
+                            <p class="text-sm text-gray-300">Мультипользовательский режим</p>
+                        </div>
+                        <div class="p-4 bg-dark-bg rounded-lg">
+                            <i class="fas fa-check-circle text-green-400 mb-2"></i>
+                            <p class="text-sm text-gray-300">Изоляция данных (Organization-based)</p>
+                        </div>
+                        <div class="p-4 bg-dark-bg rounded-lg">
+                            <i class="fas fa-check-circle text-green-400 mb-2"></i>
+                            <p class="text-sm text-gray-300">Real-time мониторинг прогресса</p>
+                        </div>
+                        <div class="p-4 bg-dark-bg rounded-lg">
+                            <i class="fas fa-check-circle text-green-400 mb-2"></i>
+                            <p class="text-sm text-gray-300">Планирование сканирований</p>
+                        </div>
+                        <div class="p-4 bg-dark-bg rounded-lg">
+                            <i class="fas fa-check-circle text-green-400 mb-2"></i>
+                            <p class="text-sm text-gray-300">Экспорт отчётов (JSON)</p>
+                        </div>
+                        <div class="p-4 bg-dark-bg rounded-lg">
+                            <i class="fas fa-check-circle text-green-400 mb-2"></i>
+                            <p class="text-sm text-gray-300">Интеграция с NVD API</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Support Section -->
+                <div class="bg-gradient-to-r from-primary-900/30 to-primary-800/30 rounded-xl p-8 border border-primary-700">
+                    <h2 class="text-2xl font-bold mb-4 text-primary-400">
+                        <i class="fas fa-headset mr-2"></i>Техническая поддержка
+                    </h2>
+                    <p class="text-gray-300 mb-4">
+                        Если у вас возникли вопросы или проблемы, свяжитесь с нашей службой поддержки:
+                    </p>
+                    <div class="flex items-center space-x-4 mt-6">
+                        <div class="w-12 h-12 rounded-full bg-primary-600 flex items-center justify-center">
+                            <i class="fab fa-telegram text-2xl text-white"></i>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-400">Telegram поддержка:</p>
+                            <a href="https://t.me/kunideveloper" target="_blank" class="text-lg font-semibold text-primary-400 hover:text-primary-300">
+                                @kunideveloper
+                            </a>
+                        </div>
+                    </div>
+                    <p class="text-sm text-gray-500 mt-4">
+                        Mute Ecosystem © 2026
+                    </p>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script>
+function faqApp() {
+    return {
+        user: null,
+        
+        async init() {
+            const userStr = localStorage.getItem('user');
+            if (userStr) {
+                this.user = JSON.parse(userStr);
+            } else {
+                window.location.href = '/login';
+                return;
+            }
+        },
+        
+        logout() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            document.cookie = "access_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/";
+            window.location.href = '/login';
+        }
+    }
+}
+</script>
+{% endblock %}

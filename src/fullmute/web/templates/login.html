@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+
+{% block title %}Login - FullMute Web{% endblock %}
+
+{% block body %}
+<div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-dark-bg via-dark-card to-dark-bg"
+     x-data="loginForm()">
+    
+    <!-- Login Card -->
+    <div class="w-full max-w-md p-8 space-y-8 bg-dark-card rounded-2xl shadow-2xl border border-dark-border card-hover">
+        
+        <!-- Logo -->
+        <div class="text-center">
+            <div class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gradient-to-br from-primary-600 to-primary-800 mb-4">
+                <i class="fas fa-shield-halved text-4xl text-white"></i>
+            </div>
+            <h1 class="text-3xl font-bold text-white">FullMute Web</h1>
+            <p class="mt-2 text-gray-400">Advanced Web Security Scanner</p>
+        </div>
+        
+        <!-- Login Form -->
+        <form @submit.prevent="submitLogin" class="mt-8 space-y-6">
+            
+            <!-- API Key Input -->
+            <div>
+                <label for="api_key" class="block text-sm font-medium text-gray-300 mb-2">
+                    <i class="fas fa-key mr-2 text-primary-400"></i>API Key
+                </label>
+                <div class="relative">
+                    <input 
+                        type="password" 
+                        id="api_key" 
+                        x-model="apiKey"
+                        required
+                        class="w-full px-4 py-3 bg-dark-bg border border-dark-border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-white placeholder-gray-500 transition-all"
+                        placeholder="Enter your API key"
+                    >
+                    <button 
+                        type="button"
+                        @click="toggleKeyVisibility"
+                        class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white"
+                    >
+                        <i :class="showKey ? 'fas fa-eye-slash' : 'fas fa-eye'"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Error Message -->
+            <div x-show="error" x-cloak class="p-4 bg-red-900/30 border border-red-700 rounded-lg">
+                <div class="flex items-center">
+                    <i class="fas fa-exclamation-circle text-red-400 mr-2"></i>
+                    <span class="text-red-300 text-sm" x-text="error"></span>
+                </div>
+            </div>
+            
+            <!-- Submit Button -->
+            <button 
+                type="submit"
+                :disabled="loading"
+                class="w-full py-3 px-4 bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-500 hover:to-primary-600 text-white font-semibold rounded-lg shadow-lg transition-all transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+            >
+                <span x-show="!loading">
+                    <i class="fas fa-sign-in-alt mr-2"></i>Sign In
+                </span>
+                <span x-show="loading">
+                    <i class="fas fa-circle-notch fa-spin mr-2"></i>Authenticating...
+                </span>
+            </button>
+        </form>
+        
+        <!-- Footer -->
+        <div class="text-center text-gray-500 text-sm">
+            <p>Mute Ecosystem © 2026</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function loginForm() {
+    return {
+        apiKey: '',
+        showKey: false,
+        loading: false,
+        error: '',
+
+        toggleKeyVisibility() {
+            this.showKey = !this.showKey;
+            const input = document.getElementById('api_key');
+            input.type = this.showKey ? 'text' : 'password';
+        },
+
+        async submitLogin() {
+            this.loading = true;
+            this.error = '';
+            
+            console.log('[Login] Starting login process...');
+            console.log('[Login] API key length:', this.apiKey ? this.apiKey.length : 0);
+
+            try {
+                // Отправляем как FormData для совместимости с FastAPI Form()
+                const formData = new FormData();
+                formData.append('api_key', this.apiKey);
+
+                console.log('[Login] Sending request to /api/auth/login...');
+
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                console.log('[Login] Response status:', response.status);
+
+                const data = await response.json();
+                console.log('[Login] Response data:', data);
+
+                if (response.ok) {
+                    console.log('[Login] Login successful, storing token...');
+
+                    // Store token in localStorage (works regardless of cookie settings)
+                    localStorage.setItem('token', data.access_token);
+                    localStorage.setItem('user', JSON.stringify(data.user));
+
+                    // CSRF token уже установлен в cookie сервером, просто обновим meta tag
+                    if (data.csrf_token) {
+                        const metaTag = document.querySelector('meta[name="csrf-token"]');
+                        if (metaTag) {
+                            metaTag.setAttribute('content', data.csrf_token);
+                            console.log('[Login] CSRF token updated in meta tag');
+                        }
+                    }
+
+                    console.log('[Login] Token stored, redirecting to dashboard...');
+                    
+                    // SECURITY: Also set cookie (will work on HTTP if secure=false)
+                    document.cookie = `access_token=${data.access_token}; path=/; max-age=${24*60*60}; samesite=lax`;
+                    
+                    // Small delay to ensure cookie is set
+                    setTimeout(() => {
+                        window.location.href = '/dashboard';
+                    }, 500);
+                } else {
+                    this.error = data.detail || 'Authentication failed';
+                    console.error('[Login] Login failed:', data);
+                }
+            } catch (err) {
+                this.error = 'Connection error. Please try again.';
+                console.error('[Login] Login error:', err);
+            } finally {
+                this.loading = false;
+            }
+        }
+    }
+}
+</script>
+{% endblock %}

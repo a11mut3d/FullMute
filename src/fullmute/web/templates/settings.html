@@ -1,0 +1,622 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - FullMute Web{% endblock %}
+
+{% block body %}
+<div class="min-h-screen bg-dark-bg" x-data="settingsApp()" x-init="init()">
+
+    <div class="flex h-screen overflow-hidden">
+
+        <!-- Sidebar -->
+        <aside class="w-64 bg-dark-card border-r border-dark-border flex flex-col">
+            <div class="p-6 border-b border-dark-border">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-primary-600 to-primary-800 flex items-center justify-center">
+                        <i class="fas fa-shield-halved text-white"></i>
+                    </div>
+                    <span class="text-xl font-bold">FullMute</span>
+                </div>
+            </div>
+
+            <nav class="flex-1 p-4 space-y-2 overflow-y-auto">
+                <a href="/dashboard" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-dark-border/50 transition-colors">
+                    <i class="fas fa-chart-line w-5"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="/targets" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-dark-border/50 transition-colors">
+                    <i class="fas fa-bullseye w-5"></i>
+                    <span>Targets</span>
+                </a>
+                <a href="/scans" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-dark-border/50 transition-colors">
+                    <i class="fas fa-radar w-5"></i>
+                    <span>Scans</span>
+                </a>
+                <a href="/reports" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-dark-border/50 transition-colors">
+                    <i class="fas fa-file-pdf w-5"></i>
+                    <span>Reports</span>
+                </a>
+                <a href="/user-settings" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-dark-border/50 transition-colors">
+                    <i class="fas fa-user-gear w-5"></i>
+                    <span>My Settings</span>
+                </a>
+                <a href="/faq" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-dark-border/50 transition-colors">
+                    <i class="fas fa-question-circle w-5"></i>
+                    <span>FAQ</span>
+                </a>
+                <a href="/settings" class="flex items-center space-x-3 px-4 py-3 rounded-lg bg-primary-600/20 text-primary-400">
+                    <i class="fas fa-cog w-5"></i>
+                    <span>Admin Settings</span>
+                </a>
+            </nav>
+
+            <div class="p-4 border-t border-dark-border">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-8 h-8 rounded-full bg-primary-600 flex items-center justify-center">
+                            <span class="text-sm font-semibold" x-text="user?.username?.[0]?.toUpperCase()"></span>
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium" x-text="user?.username"></p>
+                            <p class="text-xs text-gray-400 capitalize" x-text="user?.role"></p>
+                        </div>
+                    </div>
+                    <button @click="logout" class="text-gray-400 hover:text-white">
+                        <i class="fas fa-sign-out-alt"></i>
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+        <main class="flex-1 overflow-y-auto">
+            <header class="gradient-header px-8 py-6 shadow-lg">
+                <div class="flex items-center justify-between">
+                    <h1 class="text-2xl font-bold">Settings</h1>
+                    <span class="text-sm text-white/70" x-text="new Date().toLocaleDateString()"></span>
+                </div>
+            </header>
+
+            <div class="p-8">
+                <div class="space-y-6">
+                    
+                    <!-- Personal Settings -->
+                    <div class="bg-dark-card rounded-xl p-6 border border-dark-border">
+                        <h3 class="text-lg font-semibold mb-4 flex items-center">
+                            <i class="fas fa-user-gear text-primary-400 mr-2"></i>
+                            Personal Scanner Settings
+                        </h3>
+                        <p class="text-sm text-gray-400 mb-6">
+                            Configure your personal NVD API key and proxy settings. These settings are private and won't be shared with other users.
+                        </p>
+
+                        <form @submit.prevent="saveSettings" class="space-y-6">
+                            
+                            <!-- NVD API Key -->
+                            <div>
+                                <label class="block text-sm font-medium text-gray-300 mb-2">
+                                    <i class="fas fa-key text-primary-400 mr-2"></i>
+                                    NVD API Key
+                                </label>
+                                <div class="flex gap-4">
+                                    <div class="flex-1">
+                                        <input
+                                            :type="showNvdKey ? 'text' : 'password'"
+                                            x-model="settings.nvd_api_key"
+                                            placeholder="Enter your NVD API key (optional)"
+                                            class="w-full px-4 py-2 bg-dark-bg border border-dark-border rounded-lg focus:ring-2 focus:ring-primary-500 text-sm"
+                                        >
+                                        <p class="text-xs text-gray-500 mt-2">
+                                            Get your free API key from <a href="https://nvd.nist.gov/developers/request-an-api-key" target="_blank" class="text-primary-400 hover:underline">NIST NVD</a>. 
+                                            Required for CVE vulnerability checking.
+                                        </p>
+                                    </div>
+                                    <button type="button" @click="showNvdKey = !showNvdKey" class="px-4 py-2 bg-dark-bg border border-dark-border rounded-lg hover:border-primary-500">
+                                        <i :class="showNvdKey ? 'fas fa-eye-slash' : 'fas fa-eye'"></i>
+                                    </button>
+                                    <button type="button" @click="clearNvdKey" class="px-4 py-2 bg-red-600/20 border border-red-600 rounded-lg hover:bg-red-600/30 text-red-400">
+                                        <i class="fas fa-trash mr-2"></i>Clear
+                                    </button>
+                                </div>
+                                <div x-show="settings.nvd_api_key_set" class="mt-2 text-sm text-green-400">
+                                    <i class="fas fa-check-circle mr-1"></i>
+                                    API Key configured (<span x-text="settings.nvd_api_key_prefix"></span>)
+                                </div>
+                            </div>
+
+                            <!-- Proxy Settings -->
+                            <div class="border-t border-dark-border pt-6">
+                                <div class="flex items-center justify-between mb-4">
+                                    <label class="block text-sm font-medium text-gray-300">
+                                        <i class="fas fa-network-wired text-primary-400 mr-2"></i>
+                                        Enable Proxy
+                                    </label>
+                                    <label class="relative inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" x-model="settings.proxy_enabled" class="sr-only peer">
+                                        <div class="w-11 h-6 bg-dark-bg peer-focus:ring-2 peer-focus:ring-primary-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
+                                    </label>
+                                </div>
+                                
+                                <div x-show="settings.proxy_enabled" class="mt-4">
+                                    <label class="block text-sm font-medium text-gray-300 mb-2">
+                                        Proxy List (one per line)
+                                    </label>
+                                    <textarea
+                                        x-model="settings.proxy_list"
+                                        rows="6"
+                                        placeholder="http://proxy1.example.com:8080&#10;https://proxy2.example.com:3128&#10;socks5://proxy3.example.com:1080"
+                                        class="w-full px-4 py-2 bg-dark-bg border border-dark-border rounded-lg focus:ring-2 focus:ring-primary-500 text-sm font-mono"
+                                    ></textarea>
+                                    <p class="text-xs text-gray-500 mt-2">
+                                        Supported formats: http://, https://, socks5://, socks4://
+                                    </p>
+                                </div>
+                            </div>
+
+                            <!-- Save Button -->
+                            <div class="flex justify-end pt-4">
+                                <button type="submit" class="px-6 py-2 bg-primary-600 hover:bg-primary-500 rounded-lg transition-colors">
+                                    <i class="fas fa-save mr-2"></i>Save Settings
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Global Scanner Settings -->
+                    <div x-show="user?.role === 'admin'" x-cloak>
+                        <h3 class="text-lg font-semibold mb-4 flex items-center">
+                            <i class="fas fa-globe text-blue-400 mr-2"></i>
+                            Global Scanner Settings
+                        </h3>
+                        <p class="text-sm text-gray-400 mb-4">
+                            These settings apply to ALL users. Use this to limit server resource usage.
+                        </p>
+                        <p class="text-xs text-blue-400 mb-4" x-show="user">
+                            Debug: User role = <span x-text="user?.role"></span>, Is Admin? <span x-text="user?.role === 'admin'"></span>
+                        </p>
+
+                        <form @submit.prevent="saveGlobalSettings" class="space-y-6">
+
+                            <!-- Max Concurrent Scans Per User -->
+                            <div>
+                                <label class="block text-sm font-medium text-gray-300 mb-2">
+                                    <i class="fas fa-tachometer-alt text-primary-400 mr-2"></i>
+                                    Max Concurrent Scans Per User
+                                </label>
+                                <div class="flex items-center gap-4">
+                                    <input
+                                        type="range"
+                                        x-model.number="globalSettings.max_concurrent_scans"
+                                        min="1"
+                                        max="20"
+                                        class="flex-1 h-2 bg-dark-bg rounded-lg appearance-none cursor-pointer"
+                                    >
+                                    <span class="text-lg font-bold text-primary-400 min-w-[3rem] text-center" x-text="globalSettings.max_concurrent_scans"></span>
+                                </div>
+                                <p class="text-xs text-gray-500 mt-2">
+                                    Maximum simultaneous scans allowed per user. Higher values increase server load.
+                                </p>
+                            </div>
+
+                            <!-- Save Button -->
+                            <div class="flex justify-end pt-4">
+                                <button type="submit" class="px-6 py-2 bg-primary-600 hover:bg-primary-500 rounded-lg transition-colors">
+                                    <i class="fas fa-save mr-2"></i>Save Global Settings
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Admin Section -->
+                    <div x-show="user?.role === 'admin'" class="border-t border-dark-border pt-6">
+                        <h3 class="text-lg font-semibold mb-4 flex items-center">
+                            <i class="fas fa-user-shield text-purple-400 mr-2"></i>
+                            Admin Settings
+                        </h3>
+                        
+                        <!-- Add User -->
+                        <div class="bg-dark-card rounded-xl p-6 border border-dark-border">
+                            <h4 class="text-md font-semibold mb-4">
+                                <i class="fas fa-user-plus text-primary-400 mr-2"></i>Add New User
+                            </h4>
+
+                            <form @submit.prevent="addUser" class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-300 mb-2">Username</label>
+                                    <input
+                                        type="text"
+                                        x-model="newUser.username"
+                                        required
+                                        placeholder="john.doe"
+                                        class="w-full px-4 py-2 bg-dark-bg border border-dark-border rounded-lg focus:ring-2 focus:ring-primary-500"
+                                    >
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-300 mb-2">Role</label>
+                                    <select x-model="newUser.role" class="w-full px-4 py-2 bg-dark-bg border border-dark-border rounded-lg focus:ring-2 focus:ring-primary-500">
+                                        <option value="scanner">Scanner (Can scan and view)</option>
+                                        <option value="admin">Admin (Full access)</option>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-300 mb-2">Expires In (days)</label>
+                                    <input
+                                        type="number"
+                                        x-model="newUser.expiresIn"
+                                        min="1"
+                                        max="365"
+                                        placeholder="30"
+                                        class="w-full px-4 py-2 bg-dark-bg border border-dark-border rounded-lg focus:ring-2 focus:ring-primary-500"
+                                    >
+                                </div>
+
+                                <div class="flex items-end">
+                                    <button type="submit" class="w-full px-4 py-2 bg-primary-600 hover:bg-primary-500 rounded-lg transition-colors">
+                                        <i class="fas fa-plus mr-2"></i>Add User
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+
+                        <!-- Users List -->
+                        <div class="bg-dark-card rounded-xl p-6 border border-dark-border mt-6">
+                            <h4 class="text-md font-semibold mb-4">
+                                <i class="fas fa-users text-primary-400 mr-2"></i>Existing Users
+                            </h4>
+                            <div class="overflow-x-auto">
+                                <table class="w-full">
+                                    <thead class="bg-dark-bg">
+                                        <tr>
+                                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase">Username</th>
+                                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase">Role</th>
+                                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase">API Key</th>
+                                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase">Expires</th>
+                                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-dark-border">
+                                        <template x-for="u in users" :key="u.id">
+                                            <tr>
+                                                <td class="px-4 py-2" x-text="u.username"></td>
+                                                <td class="px-4 py-2">
+                                                    <span class="px-2 py-1 rounded text-xs"
+                                                          :class="u.role === 'admin' ? 'bg-purple-600/20 text-purple-400' : 'bg-blue-600/20 text-blue-400'"
+                                                          x-text="u.role">
+                                                    </span>
+                                                </td>
+                                                <td class="px-4 py-2 text-sm text-gray-400" x-text="u.api_key_prefix"></td>
+                                                <td class="px-4 py-2 text-sm">
+                                                    <span x-show="u.expires_at" class="text-gray-300" x-text="formatDate(u.expires_at)"></span>
+                                                    <span x-show="!u.expires_at" class="text-gray-500">Never</span>
+                                                </td>
+                                                <td class="px-4 py-2">
+                                                    <div class="flex items-center space-x-2">
+                                                        <button @click="extendToken(u, 30)" class="text-green-400 hover:text-green-300 text-sm" title="Extend 30 days">
+                                                            <i class="fas fa-calendar-plus"></i>
+                                                        </button>
+                                                        <button @click="showExpiryModal(u)" class="text-blue-400 hover:text-blue-300 text-sm" title="Set Expiry">
+                                                            <i class="fas fa-calendar"></i>
+                                                        </button>
+                                                        <button @click="regenerateKey(u)" class="text-primary-400 hover:text-primary-300 text-sm" title="Regenerate Key">
+                                                            <i class="fas fa-sync-alt"></i>
+                                                        </button>
+                                                        <button @click="deleteUser(u)" class="text-red-400 hover:text-red-300 text-sm" title="Delete User">
+                                                            <i class="fas fa-trash"></i>
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Expiry Modal -->
+    <div x-show="showExpiryModalOpen" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div class="bg-dark-card rounded-xl p-6 w-full max-w-md border border-dark-border" @click.away="showExpiryModalOpen = false">
+            <h3 class="text-xl font-semibold mb-4">Set Expiration for <span x-text="selectedUser?.username"></span></h3>
+
+            <form @submit.prevent="setExpiry">
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Expiration Date</label>
+                    <input
+                        type="date"
+                        x-model="expiryDate"
+                        required
+                        class="w-full px-4 py-2 bg-dark-bg border border-dark-border rounded-lg focus:ring-2 focus:ring-primary-500"
+                    >
+                </div>
+
+                <div class="flex justify-end space-x-3">
+                    <button type="button" @click="showExpiryModalOpen = false" class="px-4 py-2 bg-dark-bg border border-dark-border rounded-lg hover:border-primary-500">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-primary-600 hover:bg-primary-500 rounded-lg">Set Expiration</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function settingsApp() {
+    return {
+        user: null,
+        users: [],
+        newUser: { username: '', role: 'scanner', expiresIn: 30 },
+        showExpiryModalOpen: false,
+        selectedUser: null,
+        expiryDate: '',
+        showNvdKey: false,
+        settings: {
+            nvd_api_key: '',
+            nvd_api_key_set: false,
+            nvd_api_key_prefix: null,
+            proxy_enabled: false,
+            proxy_list: ''
+        },
+        globalSettings: {
+            max_concurrent_scans: 3
+        },
+
+        async init() {
+            const userStr = localStorage.getItem('user');
+            if (userStr) {
+                this.user = JSON.parse(userStr);
+            } else {
+                window.location.href = '/login';
+                return;
+            }
+
+            await this.loadSettings();
+
+            if (this.user.role === 'admin') {
+                await this.loadUsers();
+                await this.loadGlobalSettings();
+            }
+        },
+
+        async loadSettings() {
+            const token = localStorage.getItem('token');
+            const response = await fetch('/api/settings', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (response.ok) {
+                const data = await response.json();
+                this.settings = {
+                    ...this.settings,
+                    nvd_api_key: '',
+                    nvd_api_key_set: data.nvd_api_key_set || false,
+                    nvd_api_key_prefix: data.nvd_api_key_prefix || null,
+                    proxy_enabled: data.proxy_enabled || false,
+                    proxy_list: data.proxy_list || ''
+                };
+            }
+        },
+
+        async saveSettings() {
+            const token = localStorage.getItem('token');
+            const formData = new FormData();
+            formData.append('nvd_api_key', this.settings.nvd_api_key || '');
+            formData.append('proxy_enabled', this.settings.proxy_enabled);
+            formData.append('proxy_list', this.settings.proxy_list || '');
+
+            const response = await fetch('/api/settings', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` },
+                body: formData
+            });
+
+            if (response.ok) {
+                showSuccess('Settings saved successfully!');
+                await this.loadSettings();
+            } else {
+                const err = await response.json();
+                showError('Error: ' + (err.detail || 'Failed to save settings'));
+            }
+        },
+
+        clearNvdKey() {
+            if (!confirm('Clear your NVD API key?')) return;
+
+            this.settings.nvd_api_key = '';
+            this.settings.nvd_api_key_set = false;
+            this.settings.nvd_api_key_prefix = null;
+            this.saveSettings();  // Сохраняем изменения
+        },
+
+        async loadUsers() {
+            const token = localStorage.getItem('token');
+            const response = await fetch('/api/auth/users', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (response.ok) {
+                this.users = await response.json();
+            }
+        },
+
+        async loadGlobalSettings() {
+            const token = localStorage.getItem('token');
+            try {
+                const response = await fetch('/api/admin/global-settings', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('Loaded global settings:', data);
+                    this.globalSettings = {
+                        max_concurrent_scans: data.max_concurrent_scans || 3
+                    };
+                    console.log('globalSettings set to:', this.globalSettings);
+                } else {
+                    console.error('Failed to load global settings:', response.status);
+                }
+            } catch (err) {
+                console.error('Error loading global settings:', err);
+            }
+        },
+
+        async saveGlobalSettings() {
+            const token = localStorage.getItem('token');
+            const formData = new FormData();
+            formData.append('max_concurrent_scans', this.globalSettings.max_concurrent_scans);
+
+            const response = await fetch('/api/admin/global-settings', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` },
+                body: formData
+            });
+
+            if (response.ok) {
+                showSuccess('Global settings saved successfully!');
+            } else {
+                const err = await response.json();
+                showError('Error: ' + (err.detail || 'Failed to save global settings'));
+            }
+        },
+
+        async addUser() {
+            const token = localStorage.getItem('token');
+            const formData = new FormData();
+            formData.append('username', this.newUser.username);
+            formData.append('role', this.newUser.role);
+
+            const response = await fetch('/api/auth/users', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` },
+                body: formData
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                alert(`User created! API Key: ${data.api_key}\n\nSave this key!`);
+
+                if (this.newUser.expiresIn && data.id) {
+                    const expiryDate = new Date();
+                    expiryDate.setDate(expiryDate.getDate() + parseInt(this.newUser.expiresIn));
+                    const expiryStr = expiryDate.toISOString().split('T')[0];
+
+                    await fetch(`/api/auth/users/${data.id}/set-expiry`, {
+                        method: 'POST',
+                        headers: { 'Authorization': `Bearer ${token}` },
+                        body: new URLSearchParams({ 'expires_at': expiryStr })
+                    });
+                }
+
+                this.newUser = { username: '', role: 'scanner', expiresIn: 30 };
+                this.loadUsers();
+            } else {
+                const err = await response.json();
+                showError('Error: ' + (err.detail || 'Failed to add user'));
+            }
+        },
+
+        async regenerateKey(user) {
+            if (!confirm(`Regenerate API key for ${user.username}?`)) return;
+
+            const token = localStorage.getItem('token');
+            const response = await fetch(`/api/auth/users/${user.id}/regenerate-key`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                alert(`New API Key: ${data.api_key}\n\nSave this key!`);
+                this.loadUsers();
+            }
+        },
+
+        async extendToken(user, days = 30) {
+            if (!confirm(`Extend token for ${user.username} by ${days} days?`)) return;
+
+            const token = localStorage.getItem('token');
+            const formData = new FormData();
+            formData.append('days', days);
+
+            const response = await fetch(`/api/auth/users/${user.id}/extend-token`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` },
+                body: formData
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                showSuccess(`Token extended until ${data.new_expires_at}`);
+                this.loadUsers();
+            } else {
+                const err = await response.json();
+                showError('Error: ' + (err.detail || 'Failed to extend token'));
+            }
+        },
+
+        async deleteUser(user) {
+            if (!confirm(`Delete user ${user.username}? This cannot be undone.`)) return;
+
+            const token = localStorage.getItem('token');
+            const response = await fetch(`/api/auth/users/${user.id}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (response.ok) {
+                showSuccess('User deleted successfully');
+                this.loadUsers();
+            } else {
+                const err = await response.json();
+                showError('Error: ' + (err.detail || 'Failed to delete user'));
+            }
+        },
+
+        showExpiryModal(user) {
+            this.selectedUser = user;
+            this.expiryDate = user.expires_at ? user.expires_at.split(' ')[0] : '';
+            this.showExpiryModalOpen = true;
+        },
+
+        async setExpiry() {
+            const token = localStorage.getItem('token');
+            const formData = new FormData();
+            formData.append('expires_at', this.expiryDate);
+
+            const response = await fetch(`/api/auth/users/${this.selectedUser.id}/set-token-expiry`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` },
+                body: formData
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                showSuccess(`Expiration set to ${this.expiryDate}`);
+                this.showExpiryModalOpen = false;
+                this.loadUsers();
+            } else {
+                const err = await response.json();
+                showError('Error: ' + (err.detail || 'Failed to set expiration'));
+            }
+        },
+
+        formatDate(dateStr) {
+            if (!dateStr) return 'Never';
+            return new Date(dateStr).toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+            });
+        },
+
+        logout() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            document.cookie = "access_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/";
+            window.location.href = '/login';
+        }
+    }
+}
+</script>
+{% endblock %}

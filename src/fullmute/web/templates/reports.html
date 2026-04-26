@@ -1,0 +1,215 @@
+{% extends "base.html" %}
+
+{% block title %}Reports - FullMute Web{% endblock %}
+
+{% block body %}
+<div class="min-h-screen bg-dark-bg" x-data="reportsApp()" x-init="init()">
+    
+    <div class="flex h-screen overflow-hidden">
+        
+        <!-- Sidebar -->
+        <aside class="w-64 bg-dark-card border-r border-dark-border flex flex-col">
+            <div class="p-6 border-b border-dark-border">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-primary-600 to-primary-800 flex items-center justify-center">
+                        <i class="fas fa-shield-halved text-white"></i>
+                    </div>
+                    <span class="text-xl font-bold">FullMute</span>
+                </div>
+            </div>
+            
+            <nav class="flex-1 p-4 space-y-2 overflow-y-auto">
+                <a href="/dashboard" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-dark-border/50 transition-colors">
+                    <i class="fas fa-chart-line w-5"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="/targets" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-dark-border/50 transition-colors">
+                    <i class="fas fa-bullseye w-5"></i>
+                    <span>Targets</span>
+                </a>
+                <a href="/scans" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-dark-border/50 transition-colors">
+                    <i class="fas fa-radar w-5"></i>
+                    <span>Scans</span>
+                </a>
+                <a href="/reports" class="flex items-center space-x-3 px-4 py-3 rounded-lg bg-primary-600/20 text-primary-400">
+                    <i class="fas fa-file-pdf w-5"></i>
+                    <span>Reports</span>
+                </a>
+                <a href="/user-settings" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-dark-border/50 transition-colors">
+                    <i class="fas fa-user-gear w-5"></i>
+                    <span>My Settings</span>
+                </a>
+                <a href="/faq" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-dark-border/50 transition-colors">
+                    <i class="fas fa-question-circle w-5"></i>
+                    <span>FAQ</span>
+                </a>
+                <a href="/settings" x-show="user && user.role === 'admin'" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-dark-border/50 transition-colors">
+                    <i class="fas fa-cog w-5"></i>
+                    <span>Admin Settings</span>
+                </a>
+            </nav>
+            
+            <div class="p-4 border-t border-dark-border">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-8 h-8 rounded-full bg-primary-600 flex items-center justify-center">
+                            <span class="text-sm font-semibold" x-text="user?.username?.[0]?.toUpperCase()"></span>
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium" x-text="user?.username"></p>
+                            <p class="text-xs text-gray-400 capitalize" x-text="user?.role"></p>
+                        </div>
+                    </div>
+                    <button @click="logout" class="text-gray-400 hover:text-white">
+                        <i class="fas fa-sign-out-alt"></i>
+                    </button>
+                </div>
+            </div>
+        </aside>
+        
+        <main class="flex-1 overflow-y-auto">
+            <header class="gradient-header px-8 py-6 shadow-lg">
+                <div class="flex items-center justify-between">
+                    <h1 class="text-2xl font-bold">Reports</h1>
+                    <span class="text-sm text-white/70" x-text="new Date().toLocaleDateString()"></span>
+                </div>
+            </header>
+            
+            <div class="p-8">
+                <div class="bg-dark-card rounded-xl p-8 border border-dark-border">
+                    <div class="text-center mb-8">
+                        <i class="fas fa-file-pdf text-6xl text-primary-400 mb-4"></i>
+                        <h2 class="text-2xl font-semibold mb-2">Generate Reports</h2>
+                        <p class="text-gray-400">Create comprehensive security reports for target groups</p>
+                    </div>
+                    
+                    <div class="max-w-2xl mx-auto">
+                        <div class="mb-6">
+                            <label class="block text-sm font-medium text-gray-300 mb-2">Select Target Group</label>
+                            <select x-model="selectedGroup" class="w-full px-4 py-2 bg-dark-bg border border-dark-border rounded-lg focus:ring-2 focus:ring-primary-500">
+                                <option value="">Select a group...</option>
+                                <template x-for="group in groups" :key="group.id">
+                                    <option :value="group.id" x-text="group.name"></option>
+                                </template>
+                            </select>
+                        </div>
+                        
+                        <div class="flex space-x-3">
+                            <button @click="downloadPDF" :disabled="!selectedGroup" class="flex-1 px-4 py-2 bg-primary-600 hover:bg-primary-500 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed">
+                                <i class="fas fa-file-pdf mr-2"></i>Download PDF
+                            </button>
+                            <button @click="downloadJSON" :disabled="!selectedGroup" class="flex-1 px-4 py-2 bg-dark-bg border border-dark-border hover:border-primary-500 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed">
+                                <i class="fas fa-file-code mr-2"></i>Download JSON
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script>
+function reportsApp() {
+    return {
+        user: null,
+        groups: [],
+        selectedGroup: '',
+        
+        async init() {
+            const userStr = localStorage.getItem('user');
+            if (userStr) {
+                this.user = JSON.parse(userStr);
+            } else {
+                window.location.href = '/login';
+                return;
+            }
+            await this.loadGroups();
+        },
+        
+        async loadGroups() {
+            const token = localStorage.getItem('token');
+            const response = await fetch('/api/targets/groups', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (response.ok) {
+                this.groups = await response.json();
+            }
+        },
+        
+        async downloadPDF() {
+            if (!this.selectedGroup) return;
+            const token = localStorage.getItem('token');
+            const url = `/api/reports/group/${this.selectedGroup}/download?format=pdf`;
+            console.log('Downloading PDF from:', url);
+            
+            // Fetch and download as blob
+            try {
+                const response = await fetch(url, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (!response.ok) {
+                    const err = await response.json();
+                    showError(err.detail || 'Failed to download PDF');
+                    return;
+                }
+                
+                const blob = await response.blob();
+                const downloadUrl = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = downloadUrl;
+                a.download = `fullmute_report_group${this.selectedGroup}_${new Date().toISOString().slice(0,19).replace(/[:-]/g,'').replace('T','_')}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(downloadUrl);
+                a.remove();
+                showSuccess('PDF downloaded successfully!');
+            } catch (err) {
+                console.error('Download error:', err);
+                showError('Error downloading PDF: ' + err.message);
+            }
+        },
+
+        async downloadJSON() {
+            if (!this.selectedGroup) return;
+            const token = localStorage.getItem('token');
+            const url = `/api/reports/group/${this.selectedGroup}/download?format=json`;
+            console.log('Downloading JSON from:', url);
+            
+            try {
+                const response = await fetch(url, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (!response.ok) {
+                    const err = await response.json();
+                    showError(err.detail || 'Failed to download JSON');
+                    return;
+                }
+                
+                const blob = await response.blob();
+                const downloadUrl = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = downloadUrl;
+                a.download = `fullmute_report_group${this.selectedGroup}_${new Date().toISOString().slice(0,19).replace(/[:-]/g,'').replace('T','_')}.json`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(downloadUrl);
+                a.remove();
+                showSuccess('JSON downloaded successfully!');
+            } catch (err) {
+                console.error('Download error:', err);
+                showError('Error downloading JSON: ' + err.message);
+            }
+        },
+
+        logout() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = '/login';
+        }
+    }
+}
+</script>
+{% endblock %}

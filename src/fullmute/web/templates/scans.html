@@ -1,0 +1,356 @@
+{% extends "base.html" %}
+
+{% block title %}Scans - FullMute Web{% endblock %}
+
+{% block body %}
+<div class="min-h-screen bg-dark-bg" x-data="scansApp()" x-init="init()">
+    
+    <div class="flex h-screen overflow-hidden">
+        
+        <!-- Sidebar -->
+        <aside class="w-64 bg-dark-card border-r border-dark-border flex flex-col">
+            <div class="p-6 border-b border-dark-border">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-primary-600 to-primary-800 flex items-center justify-center">
+                        <i class="fas fa-shield-halved text-white"></i>
+                    </div>
+                    <span class="text-xl font-bold">FullMute</span>
+                </div>
+            </div>
+            
+            <nav class="flex-1 p-4 space-y-2 overflow-y-auto">
+                <a href="/dashboard" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-dark-border/50 transition-colors">
+                    <i class="fas fa-chart-line w-5"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="/targets" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-dark-border/50 transition-colors">
+                    <i class="fas fa-bullseye w-5"></i>
+                    <span>Targets</span>
+                </a>
+                <a href="/scans" class="flex items-center space-x-3 px-4 py-3 rounded-lg bg-primary-600/20 text-primary-400">
+                    <i class="fas fa-radar w-5"></i>
+                    <span>Scans</span>
+                </a>
+                <a href="/reports" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-dark-border/50 transition-colors">
+                    <i class="fas fa-file-pdf w-5"></i>
+                    <span>Reports</span>
+                </a>
+                <a href="/user-settings" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-dark-border/50 transition-colors">
+                    <i class="fas fa-user-gear w-5"></i>
+                    <span>My Settings</span>
+                </a>
+                <a href="/faq" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-dark-border/50 transition-colors">
+                    <i class="fas fa-question-circle w-5"></i>
+                    <span>FAQ</span>
+                </a>
+                <a href="/settings" x-show="user && user.role === 'admin'" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-dark-border/50 transition-colors">
+                    <i class="fas fa-cog w-5"></i>
+                    <span>Admin Settings</span>
+                </a>
+            </nav>
+            
+            <div class="p-4 border-t border-dark-border">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-8 h-8 rounded-full bg-primary-600 flex items-center justify-center">
+                            <span class="text-sm font-semibold" x-text="user?.username?.[0]?.toUpperCase()"></span>
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium" x-text="user?.username"></p>
+                            <p class="text-xs text-gray-400 capitalize" x-text="user?.role"></p>
+                        </div>
+                    </div>
+                    <button @click="logout" class="text-gray-400 hover:text-white">
+                        <i class="fas fa-sign-out-alt"></i>
+                    </button>
+                </div>
+            </div>
+        </aside>
+        
+        <main class="flex-1 overflow-y-auto">
+            <header class="gradient-header px-8 py-6 shadow-lg">
+                <div class="flex items-center justify-between">
+                    <h1 class="text-2xl font-bold">Scans</h1>
+                    <span class="text-sm text-white/70" x-text="new Date().toLocaleDateString()"></span>
+                </div>
+            </header>
+            
+            <div class="p-8">
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="text-xl font-semibold">Scan Management</h2>
+                    <a href="/scans/new" class="px-4 py-2 bg-primary-600 hover:bg-primary-500 rounded-lg transition-colors">
+                        <i class="fas fa-plus mr-2"></i>New Scan
+                    </a>
+                </div>
+                
+                <!-- Active Scans -->
+                <div class="bg-dark-card rounded-xl p-6 border border-dark-border mb-8" x-show="activeScans.length > 0">
+                    <h3 class="text-lg font-semibold mb-4">
+                        <i class="fas fa-satellite-dish text-green-400 mr-2"></i>Active Scans
+                    </h3>
+                    <div class="space-y-4">
+                        <template x-for="scan in activeScans" :key="scan.id">
+                            <div class="p-4 bg-dark-bg rounded-lg border border-dark-border">
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="font-medium">Scan #<span x-text="scan.id"></span></span>
+                                    <span class="px-2 py-1 bg-yellow-600/20 text-yellow-400 rounded text-xs">Running</span>
+                                </div>
+                                <div class="flex items-center justify-between text-sm text-gray-400 mb-2">
+                                    <span x-text="scan.current_target || 'Preparing...'"></span>
+                                    <span x-text="scan.progress + '%'"></span>
+                                </div>
+                                <div class="w-full bg-dark-card rounded-full h-3">
+                                    <div class="bg-green-600 h-3 rounded-full transition-all duration-500"
+                                         :style="'width: ' + scan.progress + '%'"></div>
+                                </div>
+                                <div class="grid grid-cols-4 gap-4 mt-4 text-center">
+                                    <div>
+                                        <p class="text-xs text-gray-400">Technologies</p>
+                                        <p class="text-lg font-bold text-blue-400" x-text="scan.findings.technologies"></p>
+                                    </div>
+                                    <div>
+                                        <p class="text-xs text-gray-400">CVEs</p>
+                                        <p class="text-lg font-bold text-red-400" x-text="scan.findings.cves"></p>
+                                    </div>
+                                    <div>
+                                        <p class="text-xs text-gray-400">Sensitive Files</p>
+                                        <p class="text-lg font-bold text-yellow-400" x-text="scan.findings.sensitive_files"></p>
+                                    </div>
+                                    <div>
+                                        <p class="text-xs text-gray-400">Cameras</p>
+                                        <p class="text-lg font-bold text-purple-400" x-text="scan.findings.cameras"></p>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+                
+                <!-- Recent Scans -->
+                <div class="bg-dark-card rounded-xl border border-dark-border">
+                    <div class="p-6 border-b border-dark-border">
+                        <h3 class="text-lg font-semibold">Recent Scans</h3>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead class="bg-dark-bg">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">ID</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Target</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Status</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Progress</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Targets</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Findings</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Created</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-dark-border">
+                                <template x-for="scan in scans" :key="scan.id">
+                                    <tr class="hover:bg-dark-border/30">
+                                        <td class="px-6 py-4 text-sm" x-text="'#' + scan.user_scan_number"></td>
+                                        <td class="px-6 py-4">
+                                            <div class="flex items-center">
+                                                <i class="fas fa-globe text-primary-400 mr-2"></i>
+                                                <span class="font-medium" x-text="scan.targets?.[0]?.domain || (scan.total_targets > 1 ? 'Multiple' : 'N/A')"></span>
+                                            </div>
+                                        </td>
+                                        <td class="px-6 py-4">
+                                            <span class="px-2 py-1 rounded-full text-xs font-medium"
+                                                  :class="{
+                                                      'bg-green-600/20 text-green-400': scan.status === 'completed',
+                                                      'bg-yellow-600/20 text-yellow-400': scan.status === 'running',
+                                                      'bg-red-600/20 text-red-400': scan.status === 'failed',
+                                                      'bg-gray-600/20 text-gray-400': scan.status === 'cancelled',
+                                                      'bg-blue-600/20 text-blue-400': scan.status === 'pending'
+                                                  }"
+                                                  x-text="scan.status">
+                                            </span>
+                                        </td>
+                                        <td class="px-6 py-4">
+                                            <div class="flex items-center">
+                                                <div class="flex-1 bg-dark-bg rounded-full h-2 mr-2">
+                                                    <div class="bg-primary-600 h-2 rounded-full"
+                                                         :style="'width: ' + (scan.progress || 0) + '%'"></div>
+                                                </div>
+                                                <span class="text-xs text-gray-400" x-text="(scan.progress || 0) + '%'"></span>
+                                            </div>
+                                        </td>
+                                        <td class="px-6 py-4 text-sm" x-text="scan.total_targets"></td>
+                                        <td class="px-6 py-4 text-sm">
+                                            <div class="flex items-center space-x-2">
+                                                <span class="text-blue-400" title="CVEs"><i class="fas fa-shield-virus"></i> <span x-text="scan.progress_data?.findings?.cves || 0"></span></span>
+                                                <span class="text-yellow-400" title="Sensitive Files"><i class="fas fa-file-code"></i> <span x-text="scan.progress_data?.findings?.sensitive_files || 0"></span></span>
+                                            </div>
+                                        </td>
+                                        <td class="px-6 py-4 text-sm text-gray-400" x-text="formatDate(scan.created_at)"></td>
+                                        <td class="px-6 py-4">
+                                            <div class="flex items-center space-x-3">
+                                                <a :href="'/scans/' + scan.id" class="text-primary-400 hover:text-primary-300" title="View">
+                                                    <i class="fas fa-eye"></i>
+                                                </a>
+                                                <button x-show="scan.status === 'running'" @click="cancelScan(scan.id)" class="text-red-400 hover:text-red-300" title="Cancel">
+                                                    <i class="fas fa-stop"></i>
+                                                </button>
+                                                <button x-show="scan.status !== 'running'" @click="deleteScan(scan.id)" class="text-red-400 hover:text-red-300" title="Delete">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </template>
+                                <tr x-show="scans.length === 0">
+                                    <td colspan="8" class="px-6 py-8 text-center text-gray-400">
+                                        No scans yet. Create your first scan!
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script>
+function scansApp() {
+    return {
+        user: null,
+        scans: [],
+        activeScans: [],
+        targets: [],
+        
+        async init() {
+            const userStr = localStorage.getItem('user');
+            if (userStr) {
+                this.user = JSON.parse(userStr);
+            } else {
+                window.location.href = '/login';
+                return;
+            }
+            
+            await this.loadScans();
+            await this.loadTargets();
+            
+            // Poll for active scans every 3 seconds
+            setInterval(() => this.loadActiveScans(), 3000);
+        },
+        
+        async loadScans() {
+            const token = localStorage.getItem('token');
+            const response = await fetch('/api/scans?limit=50', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (response.ok) {
+                this.scans = await response.json();
+                this.activeScans = this.scans.filter(s => s.status === 'running');
+            }
+        },
+        
+        async loadActiveScans() {
+            const token = localStorage.getItem('token');
+            const response = await fetch('/api/scans?limit=50', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (response.ok) {
+                const allScans = await response.json();
+                this.activeScans = allScans.filter(s => s.status === 'running').map(scan => ({
+                    id: scan.id,
+                    progress: scan.progress,
+                    current_target: scan.progress_data?.current_target || '',
+                    findings: scan.progress_data?.findings || { technologies: 0, cves: 0, sensitive_files: 0, cameras: 0 }
+                }));
+            }
+        },
+        
+        async loadTargets() {
+            const token = localStorage.getItem('token');
+            const response = await fetch('/api/targets', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (response.ok) {
+                this.targets = await response.json();
+            }
+        },
+        
+        async createScan() {
+            const token = localStorage.getItem('token');
+            const formData = new FormData();
+            formData.append('target_ids', JSON.stringify(this.newScan.targetIds));
+            
+            if (this.newScan.type === 'scheduled') {
+                formData.append('name', this.newScan.name);
+                formData.append('scan_type', 'scheduled');
+                formData.append('schedule_type', this.newScan.schedule);
+                formData.append('schedule_value', '0'); // Default time
+            }
+            
+            const response = await fetch('/api/scans/start', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` },
+                body: formData
+            });
+            
+            if (response.ok) {
+                this.showNewScanModal = false;
+                this.newScan = { name: '', type: 'manual', schedule: 'weekly', targetIds: [] };
+                this.loadScans();
+            }
+        },
+        
+        async cancelScan(scanId) {
+            if (!confirm('Cancel this scan?')) return;
+            
+            const token = localStorage.getItem('token');
+            await fetch(`/api/scans/${scanId}/cancel`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            this.loadScans();
+        },
+        
+        async deleteScan(scanId) {
+            if (!confirm('Are you sure you want to delete this scan? This cannot be undone.')) return;
+
+            const token = localStorage.getItem('token');
+            try {
+                const response = await fetch(`/api/scans/${scanId}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (response.ok) {
+                    showSuccess('Scan deleted successfully');
+                    // Remove from array immediately for better UX
+                    this.scans = this.scans.filter(s => s.id !== scanId);
+                    // Then reload to ensure consistency
+                    setTimeout(() => this.loadScans(), 500);
+                } else {
+                    const err = await response.json();
+                    showError('Error: ' + (err.detail || 'Failed to delete scan'));
+                }
+            } catch (err) {
+                showError('Error: ' + err.message);
+            }
+        },
+        
+        formatDate(dateStr) {
+            if (!dateStr) return '-';
+            return new Date(dateStr).toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        },
+        
+        logout() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = '/login';
+        }
+    }
+}
+</script>
+{% endblock %}
