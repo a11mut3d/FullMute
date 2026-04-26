@@ -5,19 +5,12 @@ from fullmute.utils.logger import setup_logger
 logger = setup_logger()
 
 class PluginDetector:
-    """
-    Module for detecting CMS plugins, themes, and extensions by analyzing code and URLs
-    """
     def __init__(self, url: str, headers: dict, html: str):
         self.url = url
         self.headers = headers
         self.html = html
 
     def detect_plugins(self) -> dict:
-        """
-        Detect plugins for different CMS types by analyzing code and URLs
-        Returns a dictionary with CMS type as key and list of (plugin_name, version) tuples as value
-        """
         results = {}
 
         
@@ -42,12 +35,13 @@ class PluginDetector:
         if drupal_mods:
             results['drupal'] = drupal_mods
 
+        bitrix_comps = self.detect_bitrix_components()
+        if bitrix_comps:
+            results['bitrix'] = bitrix_comps
+
         return results
 
     def detect_wordpress_plugins(self) -> List[Tuple[str, str]]:
-        """
-        Detect WordPress plugins by analyzing HTML source code and URLs
-        """
         plugins = set()  
 
         
@@ -94,9 +88,6 @@ class PluginDetector:
         return list(plugins)
 
     def detect_wordpress_themes(self) -> List[Tuple[str, str]]:
-        """
-        Detect WordPress themes by analyzing HTML source code and URLs
-        """
         themes = set()
 
         
@@ -134,9 +125,6 @@ class PluginDetector:
         return list(themes)
 
     def detect_joomla_extensions(self) -> List[Tuple[str, str]]:
-        """
-        Detect Joomla extensions by analyzing HTML source code and URLs
-        """
         extensions = set()
 
         
@@ -161,9 +149,6 @@ class PluginDetector:
         return list(extensions)
 
     def detect_drupal_modules(self) -> List[Tuple[str, str]]:
-        """
-        Detect Drupal modules by analyzing HTML source code and URLs
-        """
         modules = set()
 
         
@@ -185,9 +170,6 @@ class PluginDetector:
         return list(modules)
 
     def _extract_version_from_path(self, path_fragment: str) -> str:
-        """
-        Extract version from URL paths or similar structures
-        """
         
         
         escaped_fragment = re.escape(path_fragment.replace('/', '/'))
@@ -205,9 +187,6 @@ class PluginDetector:
         return ""
 
     def _extract_version_from_text(self, item_name: str, text: str) -> str:
-        """
-        Extract version looking for the item name followed by version-like patterns
-        """
         
         patterns = [
             rf'{re.escape(item_name)}[^a-zA-Z0-9]*v?([0-9]+\.[0-9]+(?:\.[0-9]+)?)',
@@ -226,14 +205,44 @@ class PluginDetector:
         return ""
 
     def _is_likely_plugin(self, name: str) -> bool:
-        """
-        Determine if a name is likely to be a plugin name
-        """
-        
+
         plugin_indicators = [
-            'wp_', 'wc_', 'woocom', 'contact', 'social', 'seo', 'cache', 
+            'wp_', 'wc_', 'woocom', 'contact', 'social', 'seo', 'cache',
             'backup', 'security', 'gallery', 'slider', 'form', 'captcha'
         ]
-        
+
         name_lower = name.lower()
         return any(indicator in name_lower for indicator in plugin_indicators) or len(name) <= 50
+
+    def detect_bitrix_components(self) -> List[Tuple[str, str]]:
+        components = set()
+
+        
+        comp_pattern = r'/bitrix/components/([^/\"\'\s]+)/([^/\"\'\s]+)/'
+        matches = re.findall(comp_pattern, self.html, re.IGNORECASE)
+        for vendor, comp_name in matches:
+            full_comp = f"{vendor}/{comp_name}"
+            version = self._extract_version_from_path(f'/bitrix/components/{vendor}/{comp_name}/')
+            components.add((full_comp, version))
+
+        
+        bitrix_comp_pattern = r'bitrix:([^\'\"\s>]+)'
+        matches = re.findall(bitrix_comp_pattern, self.html, re.IGNORECASE)
+        for comp in matches:
+            version = self._extract_version_from_text(comp, self.html)
+            components.add((comp, version))
+
+        
+        template_pattern = r'/bitrix/templates/([^/\"\'\s]+)/'
+        matches = re.findall(template_pattern, self.html, re.IGNORECASE)
+        for template in matches:
+            components.add((f"template:{template}", ""))
+
+        
+        include_pattern = r'IncludeComponent\(\s*"([^"]+)"'
+        matches = re.findall(include_pattern, self.html, re.IGNORECASE)
+        for comp in matches:
+            version = self._extract_version_from_text(comp, self.html)
+            components.add((comp, version))
+
+        return list(components)

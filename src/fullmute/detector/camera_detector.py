@@ -7,7 +7,7 @@ logger = setup_logger()
 
 class CameraDetector(BaseDetector):
     def __init__(self, url: str, html: str, headers: Dict[str, str], cookies: Dict[str, str], signatures: Dict[str, Any]):
-        # Инициализируем с пустым html, headers, cookies, но передаем нужные значения
+        
         super().__init__(url, headers, html, cookies, signatures)
 
     def detect(self) -> List[Tuple[str, str]]:
@@ -67,7 +67,6 @@ class CameraDetector(BaseDetector):
         return ""
 
     def _extract_version_from_content(self, content: str, version_pattern: str) -> str:
-        """Extract version from content using the provided pattern"""
         if not version_pattern:
             return ""
 

@@ -111,15 +111,17 @@ class TechDetector:
         )
         plugin_results = plugin_detector.detect_plugins()
 
-        
+
         for cms_type, items in plugin_results.items():
             if cms_type == 'wordpress_themes':
                 results["themes"] = [f"{name} ({version})" if version else name for name, version in items]
             elif cms_type in ['wordpress', 'joomla', 'drupal']:
                 results["plugins"] = [f"{name} ({version})" if version else name for name, version in items]
-                
+
                 if cms_type == 'wordpress':
                     results["wp_plugins"] = [f"{name} ({version})" if version else name for name, version in items]
+            elif cms_type == 'bitrix':
+                results["bitrix_components"] = [f"{name} ({version})" if version else name for name, version in items]
 
         filtered_results = {}
         for category, items in results.items():
