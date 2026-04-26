@@ -1,6 +1,8 @@
 import asyncio
 import aiohttp
-from typing import List, Dict, Any
+import gc
+import time
+from typing import List, Dict, Any, Optional
 from fullmute.detector.signature_loader import SignatureLoader
 from fullmute.detector.tech_detector import TechDetector
 from fullmute.core.verifier import SensitiveFileVerifier
@@ -9,25 +11,34 @@ from fullmute.utils.http_client import HttpClient
 from fullmute.utils.logger import setup_logger
 from fullmute.utils.stealth import Stealth
 from fullmute.utils.cve_checker import CVEChecker
+from fullmute.detector.default_creds_checker import DefaultCredentialsChecker
 
 logger = setup_logger()
+
 
 class FullMuteScanner:
     def __init__(self, db_path: str, config: Dict[str, Any] = None):
         self.db_path = db_path
         self.config = config or {}
-
+        
+        self._closed = False
+        self._scan_count = 0
+        self._max_scans_before_cleanup = self.config.get('max_scans_before_cleanup', 50)
+        
         self.db = DBQueries(db_path)
         self.signature_loader = SignatureLoader()
         self.signatures = self.signature_loader.load_all()
 
+        max_concurrent = self.config.get('max_concurrent', 10)
         self.http_client = HttpClient(
             max_retries=self.config.get('max_retries', 3),
             timeout=self.config.get('timeout', 15),
             proxy_enabled=self.config.get('proxy_enabled', False),
             proxy_file=self.config.get('proxy_file'),
             bypass_cloudflare=self.config.get('bypass_cloudflare', True),
-            max_redirects=self.config.get('max_redirects', 5)  # Максимальное количество редиректов
+            max_redirects=self.config.get('max_redirects', 5),
+            max_concurrent=max_concurrent,
+            enable_session_cache=True
         )
 
         self.verifier = SensitiveFileVerifier(
@@ -40,11 +51,15 @@ class FullMuteScanner:
             rotate_user_agents=self.config.get('rotate_user_agents', True)
         )
 
-        
         self.cve_checker = CVEChecker(
             nvd_api_key=self.config.get('nvd_api_key'),
             max_retries=self.config.get('nvd_max_retries', 3),
             initial_delay=self.config.get('nvd_initial_delay', 1.0)
+        )
+
+        self.creds_checker = DefaultCredentialsChecker(
+            timeout=self.config.get('timeout', 10),
+            max_attempts=self.config.get('creds_max_attempts', 5)
         )
 
         self.stats = {
@@ -54,8 +69,11 @@ class FullMuteScanner:
             'with_technologies': 0,
             'with_files': 0,
             'with_cameras': 0,
-            'with_cves': 0
+            'with_cves': 0,
+            'with_default_creds': 0
         }
+        
+        logger.info(f"FullMuteScanner initialized: db={db_path}, max_concurrent={max_concurrent}")
 
     async def scan_domain(self, domain: str):
         self.stats['total'] += 1
@@ -66,6 +84,7 @@ class FullMuteScanner:
             "cameras": [],
             "sensitive_files": [],
             "cves": {},
+            "default_credentials": [],
             "error": None,
             "status_code": 0
         }
@@ -75,7 +94,7 @@ class FullMuteScanner:
 
             html, headers_dict, cookies_dict, status_code, final_url = await self.http_client.fetch(url)
             results["status_code"] = status_code
-            results["final_url"] = final_url  # Сохраняем финальный URL в результатах
+            results["final_url"] = final_url
 
             if html is None:
                 results["error"] = "Failed to fetch site data"
@@ -85,7 +104,7 @@ class FullMuteScanner:
             self.stats['successful'] += 1
 
             tech_detector = TechDetector(
-                url=final_url,  # Используем финальный URL после редиректов
+                url=final_url,
                 headers=headers_dict,
                 html=html,
                 cookies=cookies_dict,
@@ -152,16 +171,55 @@ class FullMuteScanner:
                     self.stats['with_cves'] += 1
                     logger.info(f"Found CVEs for {domain}: {len(cve_results)} technology(s) affected")
 
-            # Проверяем чувствительные файлы на финальном URL после редиректов
             sensitive_files = await self.verifier.verify(None, results.get('final_url', url))
             results["sensitive_files"] = sensitive_files
 
             if sensitive_files:
                 self.stats['with_files'] += 1
 
+            if self.config.get('test_default_credentials', True):
+                try:
+                    detected_tech = []
+                    for tech_type, tech_list in technologies.items():
+                        for tech in tech_list:
+                            if ' (' in tech:
+                                detected_tech.append(tech.split(' (')[0])
+                            else:
+                                detected_tech.append(tech)
+
+                    creds_result = await asyncio.wait_for(
+                        self.creds_checker.check_url(
+                            results.get('final_url', url),
+                            html,
+                            detected_tech
+                        ),
+                        timeout=30.0
+                    )
+
+                    if creds_result.get('successful_logins'):
+                        results["default_credentials"] = creds_result['successful_logins']
+                        self.stats['with_default_creds'] += 1
+                        logger.warning(
+                            f"FOUND DEFAULT CREDENTIALS on {domain}: "
+                            f"{len(creds_result['successful_logins'])} successful login(s)!"
+                        )
+                except asyncio.TimeoutError:
+                    logger.warning(f"Timeout checking default credentials for {domain}")
+                    results["default_credentials"] = []
+                except Exception as e:
+                    logger.debug(f"Error checking default credentials for {domain}: {e}")
+                    results["default_credentials"] = []
+            else:
+                results["default_credentials"] = []
+                logger.debug(f"Default credentials test disabled for {domain}")
+
             self._save_to_db(domain, results)
 
-            logger.info(f"Scanned {domain} - Tech: {len(technologies.get('cms', []))} CMS, CVEs: {len(results['cves'])}, Files: {len(sensitive_files)}")
+            logger.info(
+                f"Scanned {domain} - Tech: {len(technologies.get('cms', []))} CMS, "
+                f"CVEs: {len(results['cves'])}, Files: {len(sensitive_files)}, "
+                f"Default Cred: {len(results['default_credentials'])}"
+            )
 
         except Exception as e:
             logger.error(f"Error scanning {domain}: {e}")
@@ -177,7 +235,7 @@ class FullMuteScanner:
                 'has_camera': len(results.get('cameras', [])) > 0,
                 'is_alive': results.get('error') is None,
                 'http_status': results.get('status_code', 0),
-                'final_url': results.get('final_url', '')  # Используем финальный URL из результатов
+                'final_url': results.get('final_url', '')
             }
 
             self.db.add_domain(domain_data)
@@ -198,8 +256,6 @@ class FullMuteScanner:
                             if len(parts) == 2:
                                 name = parts[0]
                                 version = parts[1][:-1]
-                        # Если версия не найдена в формате "название (версия)", оставляем как есть
-                        # и name будет равен всей строке tech, а version останется пустым
 
                         tech_data = {
                             'domain_id': domain_id,
@@ -331,6 +387,17 @@ class FullMuteScanner:
                     }
                     self.db.add_sensitive_file(file_data)
 
+                for cred in results.get('default_credentials', []):
+                    cred_data = {
+                        'domain_id': domain_id,
+                        'login_url': cred.get('url', ''),
+                        'username': cred.get('username', ''),
+                        'password': cred.get('password', ''),
+                        'description': cred.get('description', ''),
+                        'detection_reason': cred.get('reason', '')
+                    }
+                    self.db.add_default_credential(cred_data)
+
         except Exception as e:
             logger.error(f"Failed to save results for {domain}: {e}")
 
@@ -341,18 +408,33 @@ class FullMuteScanner:
         logger.info(f"Starting scan of {len(domains)} domains with {max_concurrent} concurrent requests")
 
         semaphore = asyncio.Semaphore(max_concurrent)
+        
+        consecutive_failures = 0
+        max_consecutive_failures = max_concurrent * 2
 
         async def scan_with_semaphore(domain):
+            nonlocal consecutive_failures
             async with semaphore:
-                # Устанавливаем таймаут на сканирование одного домена
                 try:
                     result = await asyncio.wait_for(
                         self.scan_domain(domain),
-                        timeout=self.config.get('timeout', 15) * 3  # Утроенный таймаут
+                        timeout=self.config.get('timeout', 15) * 2
                     )
+                    
+                    if result.get('error') is None:
+                        consecutive_failures = 0
+                    else:
+                        consecutive_failures += 1
+                    
                     return result
                 except asyncio.TimeoutError:
-                    logger.warning(f"Timeout scanning domain {domain}")
+                    consecutive_failures += 1
+                    logger.warning(f"Timeout scanning domain {domain} (failures: {consecutive_failures})")
+                    
+                    if consecutive_failures >= max_consecutive_failures:
+                        logger.error(f"Too many consecutive failures ({consecutive_failures}), "
+                                   f"consider reducing concurrent scans or checking network")
+                    
                     return {
                         "domain": domain,
                         "technologies": {},
@@ -368,15 +450,13 @@ class FullMuteScanner:
         results = []
         for i in range(0, len(tasks), max_concurrent):
             batch = tasks[i:i + max_concurrent]
-            # Устанавливаем таймаут на обработку пакета заданий
             try:
                 batch_results = await asyncio.wait_for(
                     asyncio.gather(*batch, return_exceptions=True),
-                    timeout=self.config.get('timeout', 15) * 5  # Пятикратный таймаут для пакета
+                    timeout=self.config.get('timeout', 15) * 3
                 )
             except asyncio.TimeoutError:
                 logger.warning(f"Timeout processing batch of domains")
-                # Возвращаем пустые результаты для этого пакета
                 batch_results = []
                 for _ in range(len(batch)):
                     domain_idx = i + len(results)
@@ -394,18 +474,59 @@ class FullMuteScanner:
             for result in batch_results:
                 if isinstance(result, Exception):
                     logger.error(f"Task failed with exception: {result}")
+                    consecutive_failures += 1
                 else:
                     results.append(result)
 
             processed = i + len(batch)
-            logger.info(f"Progress: {processed}/{len(domains)} domains processed")
+            logger.info(f"Progress: {processed}/{len(domains)} domains processed "
+                       f"(consecutive failures: {consecutive_failures})")
+            
+            if processed % 20 == 0:
+                await self._periodic_cleanup()
 
-        # Закрываем HTTP-сессию после завершения сканирования
         await self.http_client.close()
 
         self._print_stats()
 
         return results
+
+    async def _periodic_cleanup(self):
+        self._scan_count += 1
+        
+        if self._scan_count >= self._max_scans_before_cleanup:
+            logger.debug("Running periodic garbage collection")
+            self._scan_count = 0
+            
+            gc.collect()
+            
+            try:
+                await self.http_client.close()
+                logger.debug("HTTP session recycled")
+            except Exception as e:
+                logger.debug(f"Error during HTTP session cleanup: {e}")
+
+    async def close(self):
+        if self._closed:
+            return
+
+        self._closed = True
+        logger.info("Closing scanner and releasing resources")
+
+        try:
+            await self.http_client.close()
+            await self.cve_checker.close()
+        except Exception as e:
+            logger.debug(f"Error closing HTTP/CVE clients: {e}")
+
+        gc.collect()
+        logger.debug("Scanner closed")
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self.close()
 
     def _print_stats(self):
         logger.info("="*50)
