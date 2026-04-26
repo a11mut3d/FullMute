@@ -6,3 +6,13 @@ fake-useragent
 psutil
 sqlalchemy
 requests
+fastapi
+uvicorn[standard]
+jinja2
+python-multipart
+pydantic
+python-jose[cryptography]
+passlib[bcrypt]
+apscheduler
+paramiko
+PyJWT

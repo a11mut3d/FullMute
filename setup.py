@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="fullmute",
-    version="1.0.0",
+    version="1.2.0",
     packages=find_packages(where="src"),
     package_dir={"": "src"},
     install_requires=[
@@ -14,6 +14,15 @@ setup(
         "psutil>=5.9.0",
         "sqlalchemy>=2.0.0",
         "requests>=2.31.0",
+        "fastapi>=0.104.0",
+        "uvicorn[standard]>=0.24.0",
+        "jinja2>=3.1.2",
+        "python-multipart>=0.0.6",
+        "pydantic>=2.0.0",
+        "python-jose[cryptography]>=3.3.0",
+        "passlib[bcrypt]>=1.7.4",
+        "apscheduler>=3.10.4",
+        "click>=8.0.0",
     ],
     entry_points={
         "console_scripts": [
@@ -23,9 +32,25 @@ setup(
     python_requires=">=3.8",
     include_package_data=True,
     package_data={
-        "fullmute": ["config/signatures/*.json"],
+        "fullmute": [
+            "config/signatures/*.json",
+            "web/templates/*.html",
+            "web/static/**/*",
+        ],
     },
     author="a11mut3d",
     description="Mass web scanner with technology detection and sensitive file finder",
-    keywords="security scanner web technology detection",
+    keywords="security scanner web technology detection CVE",
+    classifiers=[
+        "Development Status :: 4 - Beta",
+        "Intended Audience :: Information Technology",
+        "License :: OSI Approved :: MIT License",
+        "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
+        "Topic :: Security",
+    ],
 )

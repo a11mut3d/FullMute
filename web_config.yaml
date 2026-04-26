@@ -1,0 +1,29 @@
+# FullMute Web Configuration
+# Configuration file for the web interface
+
+server:
+  host: "0.0.0.0"
+  port: 8080
+  debug: false
+
+database:
+  path: "fullmute_web.db"
+  scanner_database: "fullmute.db"
+
+security:
+  secret_key: "change-this-secret-key-in-production"
+  token_expire_hours: 24
+
+scanner:
+  max_concurrent_scans: 5
+  scan_timeout: 300
+  max_concurrent: 10
+  timeout: 15
+  proxy_enabled: false
+  min_delay: 1.0
+  max_delay: 3.0
+
+upload:
+  max_size_mb: 10
+  allowed_extensions:
+    - txt

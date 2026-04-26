@@ -1,26 +1,51 @@
 database:
-  path: "fullmute.db"
-
-scanner:
-  max_retries: 3
-  timeout: 15
-  max_concurrent: 10
-  proxy_enabled: false
-  proxy_file: "proxies.txt"
-  min_delay: 1.0
-  max_delay: 3.0
-  rotate_user_agents: true
-  verify_ssl: false
-  bypass_cloudflare: true
-  nvd_api_key: ""  # Add your NVD API key here if you have one
-  nvd_max_retries: 3
-  nvd_initial_delay: 1.0
-
-signatures:
-  path: "./config/signatures"
-
+  path: fullmute.db
 logging:
-  level: "INFO"
-  file: "./logs/fullmute.log"
-  max_mb: 50
   backups: 5
+  file: ./logs/fullmute.log
+  level: INFO
+  max_mb: 50
+scanner:
+  bypass_cloudflare: false
+  max_concurrent: 20
+  max_delay: 3.0
+  max_retries: 3
+  min_delay: 1.0
+  nvd_api_key: '48e85b3a-7d67-A1be-8d57-9291d18218dd'
+  nvd_initial_delay: 1.0
+  nvd_max_retries: 3
+  port_scan:
+    enabled: true
+    ports:
+    - 21
+    - 22
+    - 23
+    - 25
+    - 53
+    - 80
+    - 110
+    - 139
+    - 143
+    - 443
+    - 445
+    - 993
+    - 995
+    - 1433
+    - 1521
+    - 3306
+    - 3389
+    - 5432
+    - 5900
+    - 8080
+    timeout: 5.0
+    with_cves: true
+    with_exploits: true
+  proxy_enabled: false
+  proxy_file: proxies.txt
+  rotate_user_agents: true
+  search_exploits: true
+  test_default_credentials: true
+  timeout: 5
+  verify_ssl: false
+signatures:
+  path: ./config/signatures
