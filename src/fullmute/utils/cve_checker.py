@@ -1,16 +1,41 @@
 import aiohttp
 import asyncio
 import json
+import time
 from typing import Dict, List, Optional, Tuple
+from collections import deque
 from fullmute.utils.logger import setup_logger
 
 logger = setup_logger()
 
+
+class RateLimiter:
+    def __init__(self, rate: float = 50/30, capacity: int = 10):
+        self.rate = rate  
+        self.capacity = capacity  
+        self.tokens = capacity
+        self.last_update = time.monotonic()
+        self._lock = asyncio.Lock()
+        
+    async def acquire(self):
+        async with self._lock:
+            now = time.monotonic()
+            elapsed = now - self.last_update
+            self.tokens = min(self.capacity, self.tokens + elapsed * self.rate)
+            self.last_update = now
+            
+            if self.tokens < 1:
+                wait_time = (1 - self.tokens) / self.rate
+                logger.debug(f"Rate limiter: waiting {wait_time:.2f}s")
+                await asyncio.sleep(wait_time)
+                self.tokens = 0
+            else:
+                self.tokens -= 1
+
+
 class CVEChecker:
-    """
-    Module for checking CVEs for detected technologies
-    """
-    def __init__(self, nvd_api_key: Optional[str] = None, max_retries: int = 3, initial_delay: float = 1.0):
+    def __init__(self, nvd_api_key: Optional[str] = None, max_retries: int = 3,
+                 initial_delay: float = 1.0, rate_limit: bool = True):
         self.nvd_api_key = nvd_api_key
         self.nvd_base_url = "https://services.nvd.nist.gov/rest/json/cves/2.0"
         self.headers = {
@@ -18,14 +43,26 @@ class CVEChecker:
         }
         if self.nvd_api_key:
             self.headers["apiKey"] = self.nvd_api_key
+            
+            self.rate_limiter = RateLimiter(rate=1.0, capacity=5) if rate_limit else None
+        else:
+            
+            self.rate_limiter = RateLimiter(rate=50/30, capacity=5) if rate_limit else None
 
-        # Rate limiting parameters
+        
         self.max_retries = max_retries
         self.initial_delay = initial_delay
 
-        # Vendor mapping for common technologies
+        
+        self._cache: Dict[str, dict] = {}
+        self._cache_ttl = 3600  
+        
+        
+        self._session: Optional[aiohttp.ClientSession] = None
+
+        
         self.vendor_mapping = {
-            # CMS
+            
             'wordpress': 'wordpress',
             'joomla': 'joomla',
             'drupal': 'drupal',
@@ -37,7 +74,7 @@ class CVEChecker:
             'vbulletin': 'vbulletin',
             'phpbb': 'phpbb',
 
-            # Frameworks
+            
             'laravel': 'laravel',
             'django': 'djangoproject',
             'ruby on rails': 'ruby-on-rails',
@@ -48,7 +85,7 @@ class CVEChecker:
             'codeigniter': 'codeigniter',
             'flask': 'pallets',
 
-            # Web Servers
+            
             'apache': 'apache',
             'nginx': 'nginx',
             'microsoft-iis': 'microsoft',
@@ -60,7 +97,7 @@ class CVEChecker:
             'tomcat': 'apache',
             'jetty': 'eclipse-foundation',
 
-            # Routers
+            
             'cisco': 'cisco',
             'mikrotik': 'mikrotik',
             'ubiquiti': 'ubiquiti-networks',
@@ -77,7 +114,7 @@ class CVEChecker:
             'belkin': 'belkin',
             'synology': 'synology',
 
-            # Cameras
+            
             'axis': 'axis-communications',
             'hikvision': 'hikvision',
             'dahua': 'dahuatech',
@@ -94,7 +131,7 @@ class CVEChecker:
             'canon': 'canon',
             'flir': 'flir-systems',
 
-            # JS Libraries
+            
             'jquery': 'jquery',
             'react': 'facebook',
             'vue.js': 'vuejs',
@@ -108,7 +145,7 @@ class CVEChecker:
             'three.js': 'mrdoob',
             'd3.js': 'd3',
 
-            # Databases
+            
             'mysql': 'mysql',
             'postgresql': 'postgresql',
             'mongodb': 'mongodb',
@@ -117,17 +154,17 @@ class CVEChecker:
             'oracle': 'oracle',
             'microsoft sql server': 'microsoft',
 
-            # Languages
+            
             'php': 'php',
             'python': 'python',
             'java': 'oracle',
             'node.js': 'nodejs',
             'ruby': 'ruby-lang',
             'go': 'golang',
-            'c#': 'microsoft',
+            'c
             'perl': 'perl',
 
-            # Plugins
+            
             'akismet': 'akismet',
             'wordfence': 'wordfence',
             'yoast seo': 'yoast',
@@ -189,26 +226,26 @@ class CVEChecker:
         if not version or version == "":
             return []
 
-        # Map technology name to vendor
+        
         vendor = self._map_vendor(name)
         if not vendor:
             logger.debug(f"No vendor mapping found for {name}")
             return []
 
-        # Query NVD API for CVEs
+        
         cves = await self._query_nvd_api(vendor, name, version)
 
-        # If no CVEs found for exact version, try broader search
+        
         if not cves and version != ".":
             version_parts = version.split('.')
             if len(version_parts) > 1:
-                # Try with major version only (e.g., 6.8.3 -> 6.8)
+                
                 major_version = '.'.join(version_parts[:-1])
                 if major_version:
                     logger.debug(f"Trying broader search for {name}:{major_version}")
                     cves = await self._query_nvd_api(vendor, name, major_version)
 
-                # If still no CVEs, try with major version only (e.g., 6.8 -> 6)
+                
                 if not cves and len(major_version.split('.')) > 1:
                     major_only = major_version.split('.')[0]
                     if major_only:
@@ -218,12 +255,12 @@ class CVEChecker:
         return cves
 
     async def _query_nvd_api(self, vendor: str, product: str, version: str) -> List[Dict]:
-        # Construct CPE string
+        
         cpe_match = f"cpe:2.3:a:{vendor}:{product}:{version}:*:*:*:*:*:*:*"
 
         params = {
             "virtualMatchString": cpe_match,
-            "resultsPerPage": 2000  # Maximum allowed
+            "resultsPerPage": 2000  
         }
 
         retry_count = 0
@@ -231,64 +268,67 @@ class CVEChecker:
 
         while retry_count < self.max_retries:
             try:
-                async with aiohttp.ClientSession(headers=self.headers) as session:
-                    async with session.get(self.nvd_base_url, params=params) as response:
-                        if response.status == 200:
-                            data = await response.json()
-                            cves = []
+                
+                if self._session is None or self._session.closed:
+                    self._session = aiohttp.ClientSession(headers=self.headers)
+                
+                async with self._session.get(self.nvd_base_url, params=params) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        cves = []
 
-                            for item in data.get('vulnerabilities', []):
-                                cve = item.get('cve', {})
-                                cve_id = cve.get('id')
+                        for item in data.get('vulnerabilities', []):
+                            cve = item.get('cve', {})
+                            cve_id = cve.get('id')
 
-                                # Extract description
-                                descriptions = cve.get('descriptions', [])
-                                description = next((desc['value'] for desc in descriptions if desc.get('lang') == 'en'), '')
+                            
+                            descriptions = cve.get('descriptions', [])
+                            description = next((desc['value'] for desc in descriptions if desc.get('lang') == 'en'), '')
 
-                                # Extract metrics (CVSS scores)
-                                metrics = cve.get('metrics', {})
-                                cvss_data = self._extract_cvss_data(metrics)
+                            
+                            metrics = cve.get('metrics', {})
+                            cvss_data = self._extract_cvss_data(metrics)
 
-                                # Extract published date
-                                published = cve.get('published')
+                            
+                            published = cve.get('published')
 
-                                # Extract references
-                                refs = cve.get('references', [])
-                                reference_urls = [ref.get('url') for ref in refs if ref.get('url')]
+                            
+                            refs = cve.get('references', [])
+                            reference_urls = [ref.get('url') for ref in refs if ref.get('url')]
 
-                                cves.append({
-                                    'id': cve_id,
-                                    'description': description,
-                                    'cvss': cvss_data,
-                                    'published_date': published,
-                                    'last_modified': cve.get('lastModified'),
-                                    'references': reference_urls
-                                })
+                            cves.append({
+                                'id': cve_id,
+                                'description': description,
+                                'cvss': cvss_data,
+                                'published_date': published,
+                                'last_modified': cve.get('lastModified'),
+                                'references': reference_urls
+                            })
 
-                            return cves
-                        elif response.status == 404:
-                            # 404 может означать, что для данной версии нет CVE
-                            logger.debug(f"No CVEs found for {vendor}:{product}:{version} (status 404)")
-                            return []
-                        elif response.status == 429:
-                            # Too Many Requests - нужно подождать и повторить
-                            logger.warning(f"NVD API rate limited (status 429), retrying in {delay}s...")
-                            retry_count += 1
-                            if retry_count < self.max_retries:
-                                await asyncio.sleep(delay)
-                                delay *= 2  # Exponential backoff
-                            else:
-                                logger.error(f"NVD API rate limited, max retries exceeded")
-                                return []
+                        return cves
+                    elif response.status == 404:
+                        
+                        logger.debug(f"No CVEs found for {vendor}:{product}:{version} (status 404)")
+                        return []
+                    elif response.status == 429:
+                        
+                        logger.warning(f"NVD API rate limited (status 429), retrying in {delay}s...")
+                        retry_count += 1
+                        if retry_count < self.max_retries:
+                            await asyncio.sleep(delay)
+                            delay *= 2  
                         else:
-                            logger.error(f"NVD API request failed with status {response.status}")
+                            logger.error(f"NVD API rate limited, max retries exceeded")
                             return []
+                    else:
+                        logger.error(f"NVD API request failed with status {response.status}")
+                        return []
             except Exception as e:
                 logger.error(f"Error querying NVD API: {e}")
                 retry_count += 1
                 if retry_count < self.max_retries:
                     await asyncio.sleep(delay)
-                    delay *= 2  # Exponential backoff
+                    delay *= 2  
                 else:
                     logger.error(f"NVD API request failed after {self.max_retries} retries: {e}")
                     return []
@@ -296,7 +336,7 @@ class CVEChecker:
     def _extract_cvss_data(self, metrics: Dict) -> Dict:
         cvss_data = {}
         
-        # Check for CVSS v3.1
+        
         if 'cvssMetricV31' in metrics and metrics['cvssMetricV31']:
             metric = metrics['cvssMetricV31'][0]
             cvss_data = {
@@ -305,7 +345,7 @@ class CVEChecker:
                 'severity': metric.get('cvssData', {}).get('baseSeverity'),
                 'vector': metric.get('cvssData', {}).get('vectorString')
             }
-        # Check for CVSS v3.0
+        
         elif 'cvssMetricV30' in metrics and metrics['cvssMetricV30']:
             metric = metrics['cvssMetricV30'][0]
             cvss_data = {
@@ -314,7 +354,7 @@ class CVEChecker:
                 'severity': metric.get('cvssData', {}).get('baseSeverity'),
                 'vector': metric.get('cvssData', {}).get('vectorString')
             }
-        # Check for CVSS v2
+        
         elif 'cvssMetricV2' in metrics and metrics['cvssMetricV2']:
             metric = metrics['cvssMetricV2'][0]
             cvss_data = {
@@ -329,38 +369,77 @@ class CVEChecker:
     def _map_vendor(self, technology_name: str) -> Optional[str]:
         name_lower = technology_name.lower().replace(' ', '_').replace('.', '').replace('-', '_')
         
-        # Direct match
+        
         if name_lower in self.vendor_mapping:
             return self.vendor_mapping[name_lower]
         
-        # Partial match
+        
         for key, value in self.vendor_mapping.items():
             if key in name_lower or name_lower in key:
                 return value
         
-        # If no match found, return None
+        
         return None
 
     async def check_cves_batch(self, technologies: List[Tuple[str, str]]) -> Dict[str, List[Dict]]:
         results = {}
+        
+        
+        techs_to_check = []
+        for name, version in technologies:
+            cache_key = f"{name}_{version}"
+            
+            
+            if cache_key in self._cache:
+                cached_result = self._cache[cache_key]
+                if time.time() - cached_result.get('timestamp', 0) < self._cache_ttl:
+                    if cached_result.get('cves'):
+                        results[f"{name} ({version})"] = cached_result['cves']
+                    continue
+            
+            techs_to_check.append((name, version))
+        
+        if not techs_to_check:
+            logger.debug(f"All CVE results cached, skipping API calls")
+            return results
+        
+        logger.info(f"Checking CVEs for {len(techs_to_check)} technologies (cached {len(technologies) - len(techs_to_check)})")
 
-        # Process in batches to avoid overwhelming the API
-        batch_size = 3  # Even more conservative limit due to rate limiting
+        
+        batch_size = 3  
 
-        for i in range(0, len(technologies), batch_size):
-            batch = technologies[i:i + batch_size]
+        for i in range(0, len(techs_to_check), batch_size):
+            batch = techs_to_check[i:i + batch_size]
 
-            # Process each technology in the batch
+            
             for name, version in batch:
+                
+                if self.rate_limiter:
+                    await self.rate_limiter.acquire()
+                
                 cves = await self.check_cves_for_technology(name, version)
+                
+                
+                cache_key = f"{name}_{version}"
+                self._cache[cache_key] = {
+                    'cves': cves,
+                    'timestamp': time.time()
+                }
+                
                 if cves:
                     results[f"{name} ({version})"] = cves
 
-                # Small delay between individual requests to be respectful to the API
-                await asyncio.sleep(0.5)
+                
+                await asyncio.sleep(0.3)
 
-            # Larger delay between batches to be respectful to the API
-            if i + batch_size < len(technologies):
-                await asyncio.sleep(2)
+            
+            if i + batch_size < len(techs_to_check):
+                await asyncio.sleep(1.0)
 
+        logger.info(f"CVE check completed: {len(results)} technologies with CVEs found")
         return results
+    
+    async def close(self):
+        if self._session and not self._session.closed:
+            await self._session.close()
+            logger.debug("CVE checker HTTP session closed")

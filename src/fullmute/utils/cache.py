@@ -13,7 +13,6 @@ class Cache:
         self.ttl_hours = ttl_hours
 
     def _get_connection(self):
-        """Create a direct connection to avoid circular import"""
         return sqlite3.connect(self.db_path)
 
     def get_cached_response(self, url: str):

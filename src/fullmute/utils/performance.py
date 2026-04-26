@@ -14,7 +14,7 @@ class PerformanceOptimizer:
     async def fetch(self, session: aiohttp.ClientSession, url: str) -> Tuple[str, int]:
         try:
             async with session.get(url, timeout=self.request_timeout) as response:
-                return await response.text(), response.status
+                return await response.text(errors='backslashreplace'), response.status
         except asyncio.TimeoutError:
             logger.warning(f"Timeout while fetching {url}")
             return None, None

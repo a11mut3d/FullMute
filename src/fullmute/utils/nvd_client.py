@@ -8,9 +8,6 @@ from fullmute.utils.logger import setup_logger
 logger = setup_logger()
 
 class NVDClient:
-    """
-    Client for interacting with the NVD (National Vulnerability Database) API
-    """
     BASE_URL = "https://services.nvd.nist.gov/rest/json/cves/2.0"
     
     def __init__(self, api_key: Optional[str] = None):
@@ -22,9 +19,6 @@ class NVDClient:
             self.headers["apiKey"] = api_key
     
     async def search_cve_by_product(self, vendor: str, product: str, version: str = None) -> List[Dict]:
-        """
-        Search for CVEs by vendor, product, and optionally version
-        """
         params = {
             "cpeName": f"cpe:2.3:a:{vendor}:{product}:{version or '*'}:*:*:*:*:*:*:*" if version 
                       else f"cpe:2.3:a:{vendor}:{product}:*:*:*:*:*:*:*:*"
@@ -44,9 +38,6 @@ class NVDClient:
             return []
     
     async def search_cve_by_cpe(self, cpe_string: str) -> List[Dict]:
-        """
-        Search for CVEs by CPE string
-        """
         params = {
             "cpeName": cpe_string
         }
@@ -65,9 +56,6 @@ class NVDClient:
             return []
     
     def extract_cve_info(self, cve_data: Dict) -> Dict:
-        """
-        Extract relevant information from CVE data
-        """
         cve_item = cve_data.get('cve', {})
         
         
@@ -115,9 +103,6 @@ class NVDClient:
 
 
 async def test_nvd_client():
-    """
-    Test function for NVD client
-    """
     client = NVDClient()
     
     
