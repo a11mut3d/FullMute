@@ -1,154 +1,152 @@
-# FullMute Scanner
 
-FullMute is a powerful web scanning tool that identifies CMS, frameworks, web servers, routers, cameras, JavaScript libraries, programming languages, databases, plugins, and themes with CVE vulnerability checking.
+# FullMute
+
+**Advanced Web Security Scanner** — A comprehensive security assessment tool with both CLI and web interface for detecting technologies, vulnerabilities, sensitive files, and default credentials.
+
+![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)
+![License](https://img.shields.io/badge/License-MIT-green.svg)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)
+
+---
+
+## Table of Contents
+
+* [Features](#features)
+* [Installation](#installation)
+* [Quick Start](#quick-start)
+* [CLI Usage](#cli-usage)
+* [Web Interface](#web-interface)
+* [Configuration](#configuration)
+* [License](#license)
+
+---
 
 ## Features
 
-- **Technology Detection**: Identifies CMS (WordPress, Joomla, Drupal, etc.), frameworks, web servers, routers, cameras
-- **Language & Database Detection**: PHP, Python, Java, Node.js, MySQL, PostgreSQL, MongoDB, etc.
-- **Plugin & Theme Detection**: Automatically detects installed CMS plugins and themes
-- **CVE Checking**: Automatic vulnerability checking for all detected technologies and versions
-- **Database Search**: Search command for various criteria (CVE, CMS, technologies, etc.)
-- **Database Storage**: All data stored in SQLite database
-- **Multithreading**: Supports parallel scanning of multiple domains
+* **Technology Detection**: CMS, frameworks, servers, databases, JavaScript libraries, devices.
+* **Vulnerability Discovery**: CVE lookup, exploit search.
+* **Sensitive File Detection**: Automated scanning for sensitive files.
+* **Default Credential Testing**: Default credentials testing.
+* **Port Scanning**: Port scanning and service identification.
+* **Cloudflare Bypass**: Cloudflare bypass attempts.
+* **Scheduled Scans**: Automated scan scheduling.
+
+---
 
 ## Installation
+
+### Prerequisites
+
+* Python 3.10 or higher
+* pip
+* SQLite3
+* searchsploit
+
+### Step 1: Clone the Repository
 
 ```bash
 git clone <repository-url>
 cd FullMute
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+```
+
+### Step 2: Install Dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### Step 3: Install Package (Optional)
+
+```bash
 pip install -e .
 ```
 
-## Usage
+---
 
-### Scan a single domain
+## Quick Start
+
+### CLI Mode
 
 ```bash
+# Initialize scanner database
+fullmute init
+
+# Scan domains from a file
+fullmute scan targets.txt
+
+# Scan a single domain
 fullmute scan-one example.com
+
+# Search scan results
+fullmute search
+
+# Start web interface
+fullmute web start
 ```
 
-### Scan a list of domains from file
+### Web Interface
 
 ```bash
-fullmute scan domains.txt
+# Initialize web database
+fullmute web init
+
+# Start the web server
+fullmute web start
 ```
 
-### Initialize database
+Access the web interface at: **[http://localhost:8080](http://localhost:8080)**
 
-```bash
-fullmute init fullmute.db
-```
+---
 
-### Search in database
+## CLI Usage
 
-```bash
-# Search by CVE
-fullmute search fullmute.db -t cve -q "CVE-2021"
+### Commands
 
-# Search by CMS
-fullmute search fullmute.db -t cms -q "WordPress"
+#### `fullmute init`
 
-# Search by plugins
-fullmute search fullmute.db -t plugin -q "akismet"
+Initialize the scanner database.
 
-# Search by domains
-fullmute search fullmute.db -t domain -q "example.com"
+#### `fullmute scan <file>`
 
-# Search by technologies
-fullmute search fullmute.db -t technology -q "nginx"
+Scan multiple domains from a file.
 
-# Search by web servers
-fullmute search fullmute.db -t server -q "Apache"
+#### `fullmute scan-one <domain>`
 
-# Search by databases
-fullmute search fullmute.db -t database -q "MySQL"
+Scan a single domain.
 
-# Search by programming languages
-fullmute search fullmute.db -t language -q "PHP"
-```
+#### `fullmute search`
 
-### View statistics
+Search through scan results.
 
-```bash
-fullmute stats fullmute.db
-```
+#### `fullmute web start`
 
-### Export results
+Start the web server.
 
-```bash
-fullmute export fullmute.db --format json
-```
+#### `fullmute web init`
 
-## Capabilities
+Initialize the web database with the default admin user.
 
-### CMS and Framework Detection
-- WordPress, Joomla, Drupal, Magento, Shopify and others
-- Laravel, Django, Ruby on Rails, Express.js and others
+---
 
-### Web Server Detection
-- Apache, Nginx, Microsoft-IIS, LiteSpeed, OpenResty and others
+## Web Interface
 
-### Router Detection
-- Cisco, D-Link, Netgear, Linksys, ASUS, Huawei, MikroTik, Ubiquiti and others
+Main pages:
 
-### Camera Detection
-- Axis, Hikvision, Dahua, Vivotek, Bosch and others
+* **Dashboard** — Overview of scans, statistics.
+* **Targets** — Manage target domains.
+* **Scans** — View scan history.
+* **New Scan** — Create a new scan.
+* **Reports** — Generate PDF reports.
+* **Settings** — Admin configuration.
 
-### JavaScript Library Detection
-- jQuery, React, Vue.js, Angular, Bootstrap and others
+Authentication uses JWT tokens, CSRF tokens, and rate limiting.
 
-### Programming Language Detection
-- PHP, Python, Java, Node.js, Ruby, Go, C# and others
+---
 
-### Database Detection
-- MySQL, PostgreSQL, MongoDB, Redis, SQLite, Oracle and others
+MIT License - See LICENSE file for details.
 
-### Plugin and Theme Detection
-- Automatic detection of installed CMS plugins and themes
-- Support for WordPress, Joomla, Drupal and other CMS
+---
 
-### CVE Checking
-- Automatic vulnerability checking through NVD API
-- Shows threat level and CVSS scores
-- Stores CVE information in database
+**FullMute** — Comprehensive security scanning for modern web applications.
 
-## Architecture
-
-- **CLI**: Command-line interface for user interaction
-- **Core**: Main scanning logic and orchestration
-- **Detector**: Modules for detecting various technologies
-- **Utils**: Utility functions (HTTP client, stealth functions, etc.)
-- **DB**: Database operations (schema, queries)
-
-## Configuration
-
-Configuration file `config.yaml` allows customization of scanning parameters:
-
-```yaml
-scanner:
-  max_concurrent: 10
-  timeout: 15
-  proxy_enabled: false
-  min_delay: 1.0
-  max_delay: 3.0
-
-database:
-  path: fullmute.db
-```
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/NewFeature`)
-3. Commit changes (`git commit -m 'Add New Feature'`)
-4. Push to the branch (`git push origin feature/NewFeature`)
-5. Open a Pull Request
-
-## License
-creator: https://t.me/rootlocalhostvibe
-Mute Ecosystem
-
-MIT License
+---
