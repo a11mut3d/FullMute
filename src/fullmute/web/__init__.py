@@ -1,1 +1,5 @@
-__version__ = "1.2.0"
+"""
+FullMute Web Interface
+Modern web UI for FullMute scanner
+"""
+__version__ = "1.0.0"
