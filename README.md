@@ -55,10 +55,16 @@ cd FullMute
 pip install -r requirements.txt
 ```
 
-### Step 3: Install Package (Optional)
+### Step 3: Install Package
 
 ```bash
 pip install -e .
+```
+
+### Step 4: Install searchsploit (Optional)
+
+```bash
+https://www.exploit-db.com/searchsploit
 ```
 
 ---
