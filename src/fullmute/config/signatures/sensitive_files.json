@@ -1,122 +1,102 @@
 {
   "git_config": {
-    "paths": ["/.git/HEAD", "/.git/config", "/.git/index", "/.git/description"],
+    "paths": ["/.git/HEAD", "/.git/config", "/.git/index"],
     "verification": {
       "method": "content",
       "patterns": ["ref: refs/", "\\[core\\]", "repositoryformatversion"],
-      "must_have": ["ref:", "refs/", "\\[core\\]"],
-      "must_not_have": ["<!DOCTYPE", "<html", "<body"]
+      "must_have": ["ref:", "refs/", "[core]", "repositoryformatversion"],
+      "must_not_have": ["<!DOCTYPE", "<html", "<body", "<!doctype"]
     },
     "confidence": 95
   },
   "git_exposed": {
-    "paths": ["/.git/", "/git/", "/.gitignore"],
+    "paths": ["/.git/"],
     "verification": {
       "method": "directory_listing",
-      "patterns": ["HEAD", "config", "index", "objects"],
-      "must_have": ["HEAD", "config", "index", "objects"],
-      "must_not_have": ["forbidden", "not found", "404"]
-    },
-    "confidence": 80
-  },
-  "env_files": {
-    "paths": ["/.env", "/.env.example", "/.env.local", "/.env.production", "/.env.dev", "/.env.test"],
-    "verification": {
-      "method": "content",
-      "patterns": ["API_KEY", "SECRET_KEY", "PASSWORD=", "DATABASE_URL=", "SECRET=", "TOKEN=", "KEY="],
-      "must_have": ["=", "KEY", "PASSWORD", "SECRET"],
-      "must_not_have": ["<!DOCTYPE", "<html", "<body", "Not Found"]
+      "patterns": ["HEAD", "config", "index", "objects", "refs"],
+      "must_have": ["HEAD", "config", "index", "objects", "refs"],
+      "must_not_have": ["forbidden", "not found", "404", "403"]
     },
     "confidence": 90
   },
-  "config_php": {
-    "paths": ["/config.php", "/configuration.php", "/config.inc.php", "/settings.php", "/wp-config.php"],
+  "env_files": {
+    "paths": ["/.env", "/.env.local", "/.env.production", "/.env.dev"],
     "verification": {
       "method": "content",
-      "patterns": ["define\\(", "\\$database", "\\$password", "\\$host", "DB_"],
-      "must_have": ["<?php", "define", "\\$"],
-      "must_not_have": ["<!DOCTYPE", "<html", "<body", "Page not found"]
+      "patterns": ["^[A-Z_]+=", "^DB_", "^APP_", "^SECRET_"],
+      "must_have": ["=", "KEY", "SECRET", "PASSWORD", "DB_", "APP_"],
+      "must_not_have": ["<!DOCTYPE", "<html", "<body", "Not Found", "404", "403"]
+    },
+    "confidence": 95
+  },
+  "config_php": {
+    "paths": ["/config.php", "/configuration.php", "/wp-config.php"],
+    "verification": {
+      "method": "content",
+      "patterns": ["<?php", "define\\(", "\\$database", "\\$password"],
+      "must_have": ["<?php", "define(", "$"],
+      "must_not_have": ["<!DOCTYPE", "<html", "<body", "Page not found", "404"]
+    },
+    "confidence": 90
+  },
+  "backup_files": {
+    "paths": ["/backup.sql", "/dump.sql", "/database.sql"],
+    "verification": {
+      "method": "content",
+      "patterns": ["CREATE TABLE", "INSERT INTO", "DROP TABLE", "-- MySQL dump", "-- PostgreSQL database dump"],
+      "must_have": ["CREATE", "TABLE", "INSERT", "INTO"],
+      "must_not_have": ["<!DOCTYPE", "<html", "<body", "Page not found", "404"]
+    },
+    "confidence": 90
+  },
+  "log_files": {
+    "paths": ["/error.log", "/debug.log"],
+    "verification": {
+      "method": "content",
+      "patterns": ["\\[.*\\].*ERROR", "\\[.*\\].*WARNING", "Exception", "Stack trace", "Fatal error"],
+      "must_have": ["[", "]", "ERROR", "WARNING", "Exception", "Stack"],
+      "must_not_have": ["<!DOCTYPE", "<html", "<body", "Page not found", "404"]
     },
     "confidence": 85
   },
-  "backup_files": {
-    "paths": [
-      "/backup.zip", "/backup.tar.gz", "/backup.sql", "/dump.sql",
-      "/database.sql", "/db.sql", "/backup.bak", "/backup.old",
-      "/www.zip", "/site.tar.gz", "/dump.rar"
-    ],
+  "admin_panels": {
+    "paths": ["/admin/", "/wp-admin/", "/administrator/"],
     "verification": {
-      "method": "extension",
-      "patterns": [".zip", ".tar", ".gz", ".sql", ".bak", ".old", ".rar"],
-      "must_not_have": ["<!DOCTYPE", "<html", "<body", "Page not found"]
-    },
-    "confidence": 70
-  },
-  "log_files": {
-    "paths": [
-      "/debug.log", "/error.log", "/storage/logs/laravel.log",
-      "/var/log/", "/logs/", "/app/logs/", "/tmp/logs/",
-      "/error_log", "/php_errors.log"
-    ],
-    "verification": {
-      "method": "content",
-      "patterns": ["\\[.*\\]", "ERROR", "WARNING", "INFO", "DEBUG", "Exception", "Stack trace"],
-      "must_have": ["\\[.*\\]", "ERROR", "WARNING", "INFO", "DEBUG", "Exception"],
-      "must_not_have": ["<!DOCTYPE", "<html", "<body", "Page not found"]
+      "method": "login_form",
+      "patterns": ["<form", "password", "username", "login"],
+      "must_have": ["<form", "password", "username", "login"],
+      "must_not_have": ["forbidden", "access denied", "403", "401"]
     },
     "confidence": 75
   },
-  "admin_panels": {
-    "paths": [
-      "/admin/", "/administrator/", "/wp-admin/", "/manager/",
-      "/cpanel/", "/controlpanel/", "/webadmin/", "/admincp/",
-      "/admin.php", "/administrator.php", "/login.php", "/signin.php"
-    ],
+  "htaccess": {
+    "paths": ["/.htaccess"],
     "verification": {
-      "method": "login_form",
-      "patterns": ["password", "username", "login", "sign in", "auth", "form"],
-      "must_have": ["password", "username", "login", "form"],
-      "must_not_have": ["forbidden", "access denied", "403"]
+      "method": "content",
+      "patterns": ["RewriteEngine", "RewriteRule", "RewriteCond", "Deny from", "Allow from"],
+      "must_have": ["Rewrite", "Deny", "Allow"],
+      "must_not_have": ["<!DOCTYPE", "<html", "<body", "Page not found", "404"]
     },
-    "confidence": 60
+    "confidence": 90
   },
-  "config_files": {
-    "paths": [
-      "/.htaccess", "/web.config", "/robots.txt", "/sitemap.xml",
-      "/crossdomain.xml", "/clientaccesspolicy.xml", "/security.txt"
-    ],
+  "robots_txt": {
+    "paths": ["/robots.txt"],
     "verification": {
-      "method": "config_content",
-      "patterns": ["Directory", "Rewrite", "Allow", "Deny", "xml", "txt"],
-      "must_have": ["Directory", "Rewrite", "Allow", "Deny", "User-agent", "Disallow", "Sitemap"],
-      "must_not_have": ["<!DOCTYPE", "<html", "<body", "Page not found"]
+      "method": "content",
+      "patterns": ["User-agent:", "Disallow:", "Allow:", "Sitemap:"],
+      "must_have": ["User-agent", "Disallow"],
+      "must_not_have": ["<!DOCTYPE", "<html", "<body", "Page not found", "404"]
     },
-    "confidence": 50
+    "confidence": 80
   },
-  "ide_files": {
-    "paths": [
-      "/.idea/", "/.vscode/", "/.project", "/.classpath",
-      "/.settings/", "/nbproject/", "/phpstorm.xml"
-    ],
+  "sitemap": {
+    "paths": ["/sitemap.xml"],
     "verification": {
-      "method": "directory_listing",
-      "patterns": [".idea", ".vscode", "workspace.xml", "project.xml"],
-      "must_have": [".idea", ".vscode", "workspace.xml", "project.xml", "settings.json"],
-      "must_not_have": ["forbidden", "not found", "404"]
+      "method": "content",
+      "patterns": ["<urlset", "<url>", "<loc>", "xmlns="],
+      "must_have": ["<urlset", "<url>", "<loc>"],
+      "must_not_have": ["<!DOCTYPE", "<html", "<body", "Page not found", "404"]
     },
-    "confidence": 65
-  },
-  "database_dumps": {
-    "paths": [
-      "/sql/", "/database/", "/db/", "/data/",
-      "/export/", "/import/", "/mysql/", "/postgres/"
-    ],
-    "verification": {
-      "method": "sql_content",
-      "patterns": ["CREATE TABLE", "INSERT INTO", "DROP TABLE", "ALTER TABLE"],
-      "must_have": ["CREATE", "TABLE", "INSERT", "INTO"],
-      "must_not_have": ["<!DOCTYPE", "<html", "<body", "Page not found"]
-    },
-    "confidence": 70
+    "confidence": 85
   }
 }

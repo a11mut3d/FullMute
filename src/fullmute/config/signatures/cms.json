@@ -157,5 +157,40 @@
     "cookies": ["phpbb[a-z0-9_]+", "sid"],
     "version_pattern": "phpBB ([0-9.]+)",
     "must_have": ["phpBB"]
+  },
+  "Bitrix": {
+    "headers": ["X-Powered-By:.*Bitrix", "X-Bitrix", "X-Cache-Tag"],
+    "html": [
+      "<meta name=\"generator\" content=\"Bitrix ([0-9.]+)\">|<meta name=\"generator\" content=\"Bitrix",
+      "bitrix:template",
+      "/bitrix/templates/",
+      "/bitrix/components/",
+      "/bitrix/js/",
+      "/bitrix/themes/",
+      "bitrix_main_init",
+      "BX\\.setStrictMode",
+      "BX\\.custom",
+      "window.BX",
+      "bx-core",
+      "class=\"bitrix",
+      "/bitrix/admin/",
+      "/bitrix/panel/",
+      "bitrix:main.include",
+      "CMain::Init",
+      "Bitrix\\\\Main",
+      "name=\"bitrix_"
+    ],
+    "urls": [
+      "/bitrix/admin/",
+      "/bitrix/components/",
+      "/bitrix/templates/",
+      "/bitrix/js/",
+      "/auth/",
+      "/auth/index.php"
+    ],
+    "cookies": ["BITRIX_", "BITRIX_CON", "BITRIX_SM_GUEST_ID", "BITRIX_SM_IS_MOBILE"],
+    "version_pattern": "Bitrix ([0-9.]+)",
+    "must_have": ["bitrix"],
+    "must_not_have": ["wp-content", "wordpress", "joomla", "drupal"]
   }
 }
