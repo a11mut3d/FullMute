@@ -295,17 +295,16 @@ class HttpClient:
                     f"max_concurrent={max_concurrent}, proxy={proxy_enabled}")
 
     def load_proxies(self, proxy_file: str):
-        try:
-            with open(proxy_file, 'r', encoding='utf-8') as f:
-                self.proxies = [
-                    line.strip() for line in f 
-                    if line.strip() and not line.startswith('#'):
-                        self.proxies.append(line.strip())
-                ]
-            logger.info(f"Loaded {len(self.proxies)} proxies from {proxy_file}")
-        except Exception as e:
-            logger.error(f"Failed to load proxies: {e}")
-            self.proxies = []
+    try:
+        with open(proxy_file, 'r', encoding='utf-8') as f:
+            self.proxies = [
+                line.strip() for line in f 
+                if line.strip() and not line.startswith('#')
+            ]
+        logger.info(f"Loaded {len(self.proxies)} proxies from {proxy_file}")
+    except Exception as e:
+        logger.error(f"Failed to load proxies: {e}")
+        self.proxies = []
 
     def get_random_proxy(self) -> Optional[str]:
         if self.proxies:
