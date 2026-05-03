@@ -156,3 +156,5 @@ MIT License - See LICENSE file for details.
 **FullMute** — Comprehensive security scanning for modern web applications.
 
 ---
+
+**[Mute Ecosystem](https://a11mut3d.github.io/MuteEcosystem/)** 
