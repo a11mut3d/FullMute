@@ -21,7 +21,7 @@ logger = setup_logger()
 BLOCKED_HOSTS = {
     'localhost', '127.0.0.1', '::1', '0.0.0.0',
     'internal', 'intranet', 'admin', 'administrator',
-    'metadata.google.internal', 'metadata',  
+    'metadata.google.internal', 'metadata',
 }
 
 BLOCKED_HOST_PATTERNS = [
@@ -29,8 +29,8 @@ BLOCKED_HOST_PATTERNS = [
     r'^.*\.internal$',
     r'^.*\.lan$',
     r'^.*\.private$',
-    r'^metadata\..*$',  
-    r'^169\.254\..*$',  
+    r'^metadata\..*$',
+    r'^169\.254\..*$',
     r'^.*\.consul$',
     r'^.*\.kubernetes$',
 ]
@@ -43,24 +43,24 @@ class CircuitBreaker:
         self.failure_threshold = failure_threshold
         self.recovery_timeout = recovery_timeout
         self.half_open_max_calls = half_open_max_calls
-        
-        self.failures: List[float] = []  
-        self.state = 'closed'  
+
+        self.failures: List[float] = []
+        self.state = 'closed'
         self.last_failure_time: Optional[float] = None
         self.half_open_calls = 0
         self._lock = asyncio.Lock()
-        
+
     async def call(self, func, *args, **kwargs):
         async with self._lock:
             if self.state == 'open':
-                
+
                 if time.time() - self.last_failure_time > self.recovery_timeout:
                     self.state = 'half-open'
                     self.half_open_calls = 0
                     logger.info("Circuit breaker: entering half-open state")
                 else:
                     raise Exception("Circuit breaker is OPEN")
-        
+
         try:
             result = await func(*args, **kwargs)
             async with self._lock:
@@ -75,11 +75,11 @@ class CircuitBreaker:
             async with self._lock:
                 self.failures.append(time.time())
                 self.last_failure_time = time.time()
-                
-                
+
+
                 cutoff = time.time() - self.recovery_timeout
                 self.failures = [t for t in self.failures if t > cutoff]
-                
+
                 if len(self.failures) >= self.failure_threshold:
                     self.state = 'open'
                     logger.warning(f"Circuit breaker: OPEN ({len(self.failures)} failures)")
@@ -95,9 +95,9 @@ def get_global_circuit_breaker() -> CircuitBreaker:
     global _global_circuit_breaker
     if _global_circuit_breaker is None:
         _global_circuit_breaker = CircuitBreaker(
-            failure_threshold=10,  
-            recovery_timeout=60.0,  
-            half_open_max_calls=5  
+            failure_threshold=10,
+            recovery_timeout=60.0,
+            half_open_max_calls=5
         )
     return _global_circuit_breaker
 
@@ -105,15 +105,15 @@ def get_global_circuit_breaker() -> CircuitBreaker:
 def is_private_ip(ip: str) -> bool:
     try:
         ip_obj = ipaddress.ip_address(ip)
-        
+
         return (
-            ip_obj.is_private or 
-            ip_obj.is_loopback or 
-            ip_obj.is_link_local or 
+            ip_obj.is_private or
+            ip_obj.is_loopback or
+            ip_obj.is_link_local or
             ip_obj.is_multicast or
             ip_obj.is_reserved or
             ip_obj.is_unspecified or
-            
+
             (isinstance(ip_obj, ipaddress.IPv4Address) and (
                 ip_obj in ipaddress.ip_network('10.0.0.0/8') or
                 ip_obj in ipaddress.ip_network('172.16.0.0/12') or
@@ -122,12 +122,12 @@ def is_private_ip(ip: str) -> bool:
                 ip_obj in ipaddress.ip_network('169.254.0.0/16') or
                 ip_obj in ipaddress.ip_network('224.0.0.0/4')
             )) or
-            
+
             (isinstance(ip_obj, ipaddress.IPv6Address) and (
-                ip_obj in ipaddress.ip_network('fc00::/7') or  
-                ip_obj in ipaddress.ip_network('fe80::/10') or  
-                ip_obj in ipaddress.ip_network('::1/128') or  
-                ip_obj in ipaddress.ip_network('ff00::/8')  
+                ip_obj in ipaddress.ip_network('fc00::/7') or
+                ip_obj in ipaddress.ip_network('fe80::/10') or
+                ip_obj in ipaddress.ip_network('::1/128') or
+                ip_obj in ipaddress.ip_network('ff00::/8')
             ))
         )
     except (ValueError, TypeError):
@@ -136,25 +136,25 @@ def is_private_ip(ip: str) -> bool:
 
 def is_blocked_hostname(hostname: str) -> bool:
     hostname_lower = hostname.lower()
-    
-    
+
+
     if hostname_lower in BLOCKED_HOSTS:
         return True
-    
-    
+
+
     for pattern in BLOCKED_HOST_PATTERNS:
         if re.match(pattern, hostname_lower, re.IGNORECASE):
             logger.warning(f"Hostname matches blocked pattern: {hostname}")
             return True
-    
-    
+
+
     try:
-        
+
         ip = ipaddress.ip_address(hostname)
         return is_private_ip(str(ip))
     except ValueError:
         pass
-    
+
     return False
 
 
@@ -167,50 +167,50 @@ async def check_url_safety(url: str, check_redirects: bool = True) -> bool:
             logger.warning(f"No hostname in URL: {url}")
             return False
 
-        
+
         if parsed.scheme not in ('http', 'https'):
             logger.warning(f"Blocked non-HTTP(S) URL: {url}")
             return False
 
-        
+
         if is_blocked_hostname(hostname):
             logger.warning(f"Blocked access to dangerous hostname: {hostname}")
             return False
 
-        
+
         if not parsed.netloc:
             logger.warning(f"Blocked relative URL: {url}")
             return False
 
-        
+
         try:
             ip = ipaddress.ip_address(hostname)
             if is_private_ip(str(ip)):
                 logger.warning(f"Blocked access to private IP: {ip}")
                 return False
         except ValueError:
-            
+
             pass
 
-        
+
         try:
-            
+
             addr_info = socket.getaddrinfo(
-                hostname, None, 
-                socket.AF_UNSPEC,  
+                hostname, None,
+                socket.AF_UNSPEC,
                 socket.SOCK_STREAM
             )
-            
+
             if not addr_info:
                 logger.warning(f"No DNS records for hostname: {hostname}")
                 return False
-            
+
             for info in addr_info:
                 ip = info[4][0]
                 if is_private_ip(ip):
                     logger.warning(f"Blocked access to private IP: {ip} for hostname: {hostname}")
                     return False
-                    
+
         except socket.gaierror as e:
             logger.warning(f"DNS resolution failed for {hostname}: {e}")
             return False
@@ -219,7 +219,7 @@ async def check_url_safety(url: str, check_redirects: bool = True) -> bool:
             return False
 
         return True
-        
+
     except Exception as e:
         logger.error(f"Error checking URL safety: {e}")
         return False
@@ -227,28 +227,28 @@ async def check_url_safety(url: str, check_redirects: bool = True) -> bool:
 
 async def validate_redirect_url(base_url: str, redirect_url: str) -> bool:
     try:
-        
+
         parsed_base = urlparse(base_url)
         parsed_redirect = urlparse(redirect_url)
-        
-        
+
+
         if not parsed_redirect.netloc:
             return True
-        
-        
+
+
         if parsed_redirect.scheme not in ('http', 'https'):
             logger.warning(f"Blocked redirect to non-HTTP(S) URL: {redirect_url}")
             return False
-        
-        
+
+
         return await check_url_safety(redirect_url, check_redirects=False)
-        
+
     except Exception as e:
         logger.error(f"Error validating redirect: {e}")
         return False
 
 class HttpClient:
-    
+
     _session_cache: Dict[str, ClientSession] = {}
     _session_lock = asyncio.Lock()
     _max_cached_sessions = 10
@@ -267,16 +267,16 @@ class HttpClient:
         self._session: Optional[ClientSession] = None
         self._connector: Optional[TCPConnector] = None
         self._closed = False
-        
-        
+
+
         self._host_failures: Dict[str, int] = {}
-        self._host_failure_threshold = 3  
+        self._host_failure_threshold = 3
         self._host_lock = asyncio.Lock()
 
-        
+
         self._connector_config = {
-            'limit': max_concurrent * 2,  
-            'limit_per_host': min(max_concurrent, 5),  
+            'limit': max_concurrent * 2,
+            'limit_per_host': min(max_concurrent, 5),
             'ttl_dns_cache': 300,
             'use_dns_cache': True,
             'enable_cleanup_closed': True,
@@ -284,27 +284,27 @@ class HttpClient:
             'force_close': False,
         }
 
-        
+
         if proxy_enabled and proxy_file:
             self.load_proxies(proxy_file)
 
-        
+
         self.cf_bypass = CloudflareBypass(max_retries=max_retries, timeout=timeout)
 
         logger.debug(f"HttpClient initialized: max_retries={max_retries}, timeout={timeout}s, "
                     f"max_concurrent={max_concurrent}, proxy={proxy_enabled}")
 
     def load_proxies(self, proxy_file: str):
-    try:
-        with open(proxy_file, 'r', encoding='utf-8') as f:
-            self.proxies = [
-                line.strip() for line in f 
-                if line.strip() and not line.startswith('#')
-            ]
-        logger.info(f"Loaded {len(self.proxies)} proxies from {proxy_file}")
-    except Exception as e:
-        logger.error(f"Failed to load proxies: {e}")
-        self.proxies = []
+        try:
+            with open(proxy_file, 'r', encoding='utf-8') as f:
+                self.proxies = [
+                    line.strip() for line in f
+                    if line.strip() and not line.startswith('#')
+                ]
+            logger.info(f"Loaded {len(self.proxies)} proxies from {proxy_file}")
+        except Exception as e:
+            logger.error(f"Failed to load proxies: {e}")
+            self.proxies = []
 
     def get_random_proxy(self) -> Optional[str]:
         if self.proxies:
@@ -313,15 +313,15 @@ class HttpClient:
 
     async def _get_session(self) -> ClientSession:
         if self._session is None or self._session.closed:
-            
-            
-            
-            
+
+
+
+
             timeout = ClientTimeout(
-                total=self.timeout,  
-                connect=3,  
-                sock_read=7,  
-                sock_connect=3  
+                total=self.timeout,
+                connect=3,
+                sock_read=7,
+                sock_connect=3
             )
 
             self._connector = TCPConnector(**self._connector_config)
@@ -337,23 +337,23 @@ class HttpClient:
         return self._session
 
     async def fetch(self, url: str, headers=None) -> Tuple[Optional[str], Dict, Dict, int, str]:
-        
+
         is_safe = await check_url_safety(url)
         if not is_safe:
             logger.error(f"SSRF protection: Blocked access to {url}")
             return None, {}, {}, 403, url
 
-        
+
         from urllib.parse import urlparse
         parsed = urlparse(url)
         host = parsed.hostname or ""
-        
+
         async with self._host_lock:
             if host in self._host_failures and self._host_failures[host] >= self._host_failure_threshold:
                 logger.warning(f"Host {host} has {self._host_failures[host]} failures - failing fast")
                 return None, {}, {}, 503, url
 
-        
+
         circuit_breaker = get_global_circuit_breaker()
         if circuit_breaker.state == 'open':
             logger.warning(f"Circuit breaker OPEN - failing fast for {url}")
@@ -384,7 +384,7 @@ class HttpClient:
 
                 proxy = self.get_random_proxy() if self.proxy_enabled else None
 
-                
+
                 async with session.get(
                     current_url,
                     headers=session_headers,
@@ -393,46 +393,46 @@ class HttpClient:
                     allow_redirects=False,
                     max_redirects=0
                 ) as response:
-                    
+
                     if response.status in (301, 302, 303, 307, 308):
                         redirect_url = response.headers.get('Location', '')
 
                         if redirect_url:
                             redirect_count += 1
 
-                            
+
                             if redirect_count > self.max_redirects:
                                 logger.error(f"SSRF protection: Too many redirects ({redirect_count})")
                                 return None, {}, {}, 403, url
 
-                            
+
                             if not redirect_url.startswith(('http://', 'https://')):
                                 redirect_url = urljoin(current_url, redirect_url)
 
-                            
+
                             is_redirect_safe = await validate_redirect_url(current_url, redirect_url)
                             if not is_redirect_safe:
                                 logger.error(f"SSRF protection: Blocked unsafe redirect to {redirect_url}")
                                 return None, {}, {}, 403, url
 
-                            
+
                             current_url = redirect_url
                             logger.debug(f"Following redirect to: {current_url}")
                             continue
 
-                    
+
                     html = await response.text(errors='backslashreplace')
                     headers_dict = dict(response.headers)
                     cookies_dict = {k: v.value for k, v in response.cookies.items()}
                     final_url = current_url
 
-                    
+
                     consecutive_failures = 0
                     async with self._host_lock:
                         if host in self._host_failures:
                             del self._host_failures[host]
 
-                    
+
                     if response.status == 403 or self._is_cloudflare_challenge(html):
                         if self.bypass_cloudflare:
                             logger.info(f"Detected Cloudflare protection for {url}, attempting bypass...")
@@ -450,33 +450,33 @@ class HttpClient:
 
                 logger.warning(f"Timeout fetching {url} after {elapsed:.1f}s: {e}. Retry {retries}/{self.max_retries}")
 
-                
+
                 async with self._host_lock:
                     self._host_failures[host] = self._host_failures.get(host, 0) + 1
 
-                
+
                 if consecutive_failures >= 2:
                     logger.warning(f"Multiple consecutive timeouts for {url}, failing fast")
                     break
 
-                
+
                 if retries < self.max_retries:
                     wait_time = min(2 ** (retries - 1), 1.0) + random.uniform(0, 0.2)
                     await asyncio.sleep(wait_time)
 
             except aiohttp.ClientConnectorError as e:
-                
+
                 last_error = e
                 retries += 1
                 consecutive_failures += 1
 
                 logger.warning(f"Connection error for {url}: {e}. Failing fast")
 
-                
+
                 async with self._host_lock:
                     self._host_failures[host] = self._host_failures.get(host, 0) + 1
 
-                
+
                 break
 
             except aiohttp.ClientError as e:
@@ -486,21 +486,21 @@ class HttpClient:
 
                 logger.warning(f"Client error fetching {url}: {e}. Retry {retries}/{self.max_retries}")
 
-                
+
                 async with self._host_lock:
                     self._host_failures[host] = self._host_failures.get(host, 0) + 1
 
-                
+
                 if "cloudflare" in str(e).lower() and self.bypass_cloudflare:
                     logger.info(f"Detected Cloudflare error for {url}, attempting bypass...")
                     return await self.cf_bypass.bypass_cloudflare(url, headers)
 
-                
+
                 if consecutive_failures >= 2:
                     logger.warning(f"Multiple consecutive errors for {url}, failing fast")
                     break
 
-                
+
                 if retries < self.max_retries:
                     wait_time = min(2 ** (retries - 1), 1.0) + random.uniform(0, 0.2)
                     await asyncio.sleep(wait_time)
@@ -511,11 +511,11 @@ class HttpClient:
                 retries += 1
                 consecutive_failures += 1
 
-                
+
                 async with self._host_lock:
                     self._host_failures[host] = self._host_failures.get(host, 0) + 1
 
-                
+
                 if consecutive_failures >= 2:
                     logger.warning(f"Unexpected error, failing fast for {url}")
                     break
@@ -525,7 +525,7 @@ class HttpClient:
                 else:
                     break
 
-        
+
         logger.error(f"Failed to fetch {url} after {retries} retries. Last error: {last_error}")
         return None, {}, {}, 0, url
 
@@ -533,14 +533,14 @@ class HttpClient:
         """Close HTTP session and connector to release resources"""
         if self._closed:
             return
-            
+
         self._closed = True
-        
+
         try:
             if self._session and not self._session.closed:
                 await self._session.close()
                 logger.debug("HTTP session closed")
-            
+
             if self._connector and not self._connector.closed:
                 await self._connector.close()
                 logger.debug("HTTP connector closed")
@@ -555,7 +555,7 @@ class HttpClient:
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         await self.close()
-        
+
     def __del__(self):
         if not self._closed:
             try:

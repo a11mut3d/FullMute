@@ -88,7 +88,7 @@ def extract_host_and_port(target: str) -> Tuple[str, Optional[int]]:
         target = target[8:]
     
     
-    target = target.split('/')[0].split('?')[0].split('
+    target = target.split('/')[0].split('?')[0].split('#')[0]
     
     
     if ':' in target:
@@ -225,10 +225,10 @@ def validate_target(target: str, require_ping: bool = True) -> Tuple[bool, str, 
     
     
     dangerous_patterns = [
-        '${', '
-        '<%', '%>',  
-        '__',  
-    ]
+    '${', '#',
+    '<%', '%>',
+    '__',
+]
     for pattern in dangerous_patterns:
         if pattern in target:
             logger.warning(f"Blocked target with injection pattern: {pattern}")

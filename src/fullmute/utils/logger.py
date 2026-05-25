@@ -3,12 +3,17 @@ import sys
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
+import os
+
 def setup_logger(name="fullmute", level="INFO", file_path=None, max_mb=50, backups=5):
     logger = logging.getLogger(name)
 
     logger.handlers.clear()
 
-    logger.setLevel(getattr(logging, level.upper()))
+    # Allow overriding log level with environment variable FULLMUTE_LOG_LEVEL
+    env_level = os.getenv('FULLMUTE_LOG_LEVEL')
+    resolved_level = (env_level or level or 'INFO').upper()
+    logger.setLevel(getattr(logging, resolved_level))
 
     formatter = logging.Formatter(
         "%(asctime)s [%(levelname)s] %(name)s: %(message)s",

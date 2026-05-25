@@ -161,7 +161,7 @@ class CVEChecker:
             'node.js': 'nodejs',
             'ruby': 'ruby-lang',
             'go': 'golang',
-            'c
+            'c#': 'microsoft',
             'perl': 'perl',
 
             
