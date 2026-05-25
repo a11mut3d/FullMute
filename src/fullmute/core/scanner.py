@@ -90,9 +90,12 @@ class FullMuteScanner:
         }
 
         try:
+            logger.info(f"scan_domain start: {domain}")
             url = f"http://{domain}" if not domain.startswith("http") else domain
 
+            logger.info(f"Fetching URL: {url}")
             html, headers_dict, cookies_dict, status_code, final_url = await self.http_client.fetch(url)
+            logger.info(f"Fetch completed: status={status_code}, final_url={final_url}")
             results["status_code"] = status_code
             results["final_url"] = final_url
 
@@ -103,6 +106,7 @@ class FullMuteScanner:
 
             self.stats['successful'] += 1
 
+            logger.info(f"Running TechDetector for {final_url}")
             tech_detector = TechDetector(
                 url=final_url,
                 headers=headers_dict,
@@ -113,6 +117,7 @@ class FullMuteScanner:
 
             technologies = tech_detector.detect()
             results["technologies"] = technologies
+            logger.debug(f"Tech detection result for {domain}: {list(technologies.keys())}")
 
             if any(tech_list for tech_list in technologies.values()):
                 self.stats['with_technologies'] += 1
@@ -164,14 +169,24 @@ class FullMuteScanner:
 
             
             if tech_with_versions:
-                cve_results = await self.cve_checker.check_cves_batch(tech_with_versions)
-                results["cves"] = cve_results
+                logger.info(f"Checking CVEs for {len(tech_with_versions)} techs")
+                try:
+                    cve_results = await self.cve_checker.check_cves_batch(tech_with_versions)
+                    results["cves"] = cve_results
 
-                if cve_results:
-                    self.stats['with_cves'] += 1
-                    logger.info(f"Found CVEs for {domain}: {len(cve_results)} technology(s) affected")
+                    if cve_results:
+                        self.stats['with_cves'] += 1
+                        logger.info(f"Found CVEs for {domain}: {len(cve_results)} technology(s) affected")
+                except Exception as e:
+                    logger.info(f"CVE check failed for {domain}: {e}")
 
-            sensitive_files = await self.verifier.verify(None, results.get('final_url', url))
+            logger.info(f"Running SensitiveFileVerifier for {final_url}")
+            try:
+                sensitive_files = await self.verifier.verify(None, results.get('final_url', url))
+            except Exception as e:
+                logger.info(f"Sensitive file verifier error for {domain}: {e}")
+                sensitive_files = []
+
             results["sensitive_files"] = sensitive_files
 
             if sensitive_files:
@@ -187,13 +202,14 @@ class FullMuteScanner:
                             else:
                                 detected_tech.append(tech)
 
+                    logger.info(f"Testing default credentials for {domain} (techs: {detected_tech})")
                     creds_result = await asyncio.wait_for(
                         self.creds_checker.check_url(
                             results.get('final_url', url),
                             html,
                             detected_tech
                         ),
-                        timeout=30.0
+                        timeout=max(30.0, self.config.get('timeout', 15) * 2)
                     )
 
                     if creds_result.get('successful_logins'):
@@ -213,6 +229,7 @@ class FullMuteScanner:
                 results["default_credentials"] = []
                 logger.debug(f"Default credentials test disabled for {domain}")
 
+            logger.info(f"Saving results for {domain}")
             self._save_to_db(domain, results)
 
             logger.info(
@@ -515,9 +532,20 @@ class FullMuteScanner:
 
         try:
             await self.http_client.close()
+        except Exception as e:
+            logger.debug(f"Error closing HTTP client: {e}")
+
+        try:
             await self.cve_checker.close()
         except Exception as e:
-            logger.debug(f"Error closing HTTP/CVE clients: {e}")
+            logger.debug(f"Error closing CVE checker: {e}")
+
+        try:
+            # Ensure default credentials checker sessions are closed
+            if hasattr(self, 'creds_checker') and self.creds_checker:
+                await self.creds_checker.close()
+        except Exception as e:
+            logger.debug(f"Error closing creds checker: {e}")
 
         gc.collect()
         logger.debug("Scanner closed")
