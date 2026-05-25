@@ -113,7 +113,7 @@ async def create_target(
 ):
     from fullmute.utils.target_validator import validate_target, extract_host_and_port
     
-    dangerous_patterns = ['${', '
+    dangerous_patterns = ['${', '${', '<%', '%>', '__']
     for pattern in dangerous_patterns:
         if pattern in domain:
             raise HTTPException(
@@ -349,19 +349,19 @@ async def upload_targets(
         domains = []
         blocked_hosts = ['localhost', '127.0.0.1', '::1', '0.0.0.0']
 
-        
-        injection_patterns = ['${', '
+
+        injection_patterns = ['${', '<%', '%>', '__', '\\x00']
 
         line_count = 0
         valid_count = 0
         validation_errors = []
-        
+
         logger.info(f"[BULK UPLOAD] Starting domain validation...")
 
         for line in text_content.splitlines():
             line_count += 1
 
-            
+
             if line_count > MAX_LINES * 2:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,

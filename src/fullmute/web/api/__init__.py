@@ -1,3 +1,6 @@
+"""
+API endpoints for FullMute Web
+"""
 from fastapi import APIRouter
 
 from fullmute.web.api import auth, targets, scans, reports, dashboard, settings, admin
