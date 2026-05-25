@@ -16,3 +16,5 @@ passlib[bcrypt]
 apscheduler
 paramiko
 PyJWT
+pydantic-settings
+reportlab
