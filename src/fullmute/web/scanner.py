@@ -178,6 +178,11 @@ async def run_scan(scan_id: int, user_id: int, target_ids: List[int], test_defau
         start_time = time.time()
 
         
+        # Determine per-domain timeout based on scanner config (allow longer than default web wrapper)
+        # Increase default per-domain timeout to handle slow sites (120s)
+        per_domain_timeout = max(120.0, scanner.config.get('timeout', 15) * 8)
+        logger.info(f"Per-domain scan timeout set to {per_domain_timeout}s for scan {scan_id}")
+
         semaphore = asyncio.Semaphore(max_concurrent_scans)
         consecutive_failures = 0
         max_consecutive_failures = max_concurrent_scans * 3
@@ -199,7 +204,7 @@ async def run_scan(scan_id: int, user_id: int, target_ids: List[int], test_defau
                     
                     result = await asyncio.wait_for(
                         scanner.scan_domain(domain),
-                        timeout=30.0  
+                        timeout=per_domain_timeout
                     )
                     
                     
@@ -320,6 +325,13 @@ async def run_scan(scan_id: int, user_id: int, target_ids: List[int], test_defau
                         active_scans[scan_id]['findings']['cameras'] += len(cameras)
                         active_scans[scan_id]['findings']['default_credentials'] += len(default_creds)
                         active_scans[scan_id]['findings']['open_ports'] += len(port_scan_results) if port_scan_results else 0
+
+                        # Attach exploits to individual CVE entries so UI can render them per-CVE
+                        if exploit_results and isinstance(cve_list, list):
+                            for c in cve_list:
+                                cid = c.get('cve_id') or c.get('id')
+                                if cid and cid in exploit_results and exploit_results.get(cid):
+                                    c['exploits'] = exploit_results.get(cid)
 
                         result_data = {
                             'domain': domain,

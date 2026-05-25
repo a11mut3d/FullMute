@@ -876,7 +876,10 @@ def get_scan_results(scan_id: int) -> List[Dict]:
                     row_dict['default_credentials'] = result_data.get('default_credentials', [])
                     row_dict['cameras_count'] = result_data.get('cameras_count', 0)
                     row_dict['open_ports'] = result_data.get('open_ports', [])  
-                    logger.debug(f"Loaded for {row_dict['domain']}: {len(row_dict['technologies'])} techs, {len(row_dict['cves'])} cves, {len(row_dict.get('open_ports', []))} ports")
+                    # Include exploits and counts so API/UI can display found exploits
+                    row_dict['exploits'] = result_data.get('exploits', {})
+                    row_dict['exploits_count'] = result_data.get('exploits_count', 0)
+                    logger.debug(f"Loaded for {row_dict['domain']}: {len(row_dict['technologies'])} techs, {len(row_dict['cves'])} cves, {len(row_dict.get('open_ports', []))} ports, {row_dict.get('exploits_count', 0)} exploits")
                 except Exception as e:
                     logger.error(f"Error parsing result_path: {e}")
                     row_dict['technologies'] = []

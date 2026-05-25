@@ -19,7 +19,7 @@ class SecurityMiddleware(BaseHTTPMiddleware):
         r"(\bUNION\b.*\bSELECT\b)",
         r"(\bOR\b\s+\d+\s*=\s*\d+)",
         r"(\bAND\b\s+\d+\s*=\s*\d+)",
-        r"(--|\
+        r"(--|\#)"
         r"(\bEXEC\b|\bEXECUTE\b)",
         r"(\bxp_|\bsp_)",  
         r"(\bWAITFOR\b.*\bDELAY\b)",  
@@ -48,7 +48,7 @@ class SecurityMiddleware(BaseHTTPMiddleware):
         r"<\s*meta[^>]+http-equiv\s*=\s*['\"]?refresh",
         r"expression\s*\(",
         r"url\s*\(\s*['\"]?javascript",
-        r"&
+        r"&\#)"
         r"%3C\s*script",  
         r"<\s*body[^>]+onload",
         r"<\s*form[^>]+action\s*=\s*['\"]?javascript",
