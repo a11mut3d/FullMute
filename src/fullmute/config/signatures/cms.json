@@ -24,7 +24,7 @@
       "/media/system/js/",
       "/templates/",
       "com_content",
-      "index.php?option=com_"
+      "language/en-GB/en-GB.xml"
     ],
     "urls": ["/administrator/", "/index.php?option="],
     "cookies": ["joomla_[a-z0-9_]+", "sessioncookie"],
