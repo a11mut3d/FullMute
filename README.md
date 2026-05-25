@@ -1,5 +1,6 @@
 
 # FullMute
+<img width="2880" height="1920" alt="image" src="https://github.com/user-attachments/assets/2e6454bd-791d-430e-9250-7cb319c83649" />
 
 **Advanced Web Security Scanner** — A comprehensive security assessment tool with both CLI and web interface for detecting technologies, vulnerabilities, sensitive files, and default credentials.
 
