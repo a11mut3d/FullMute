@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fullmute"
-version = "1.1.0"
-description = "Mass web scanner with technology detection"
+version = "1.2.0"
+description = "Mass web scanner with technology detection and sensitive file finder"
 readme = "README.md"
 requires-python = ">=3.8"
 dependencies = [
@@ -17,8 +17,31 @@ dependencies = [
     "psutil>=5.9.0",
     "sqlalchemy>=2.0.0",
     "click>=8.1.0",
-    "requests>=2.31.0"
+    "requests>=2.31.0",
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
+    "jinja2>=3.1.2",
+    "python-multipart>=0.0.6",
+    "pydantic>=2.0.0",
+    "python-jose[cryptography]>=3.3.0",
+    "passlib[bcrypt]>=1.7.4",
+    "apscheduler>=3.10.4",
+    "paramiko>=3.4.0",
+    "PyJWT>=2.8.0",
+    "pydantic-settings>=2.1.0",
+    "reportlab>=4.0.0",
 ]
 
 [project.scripts]
 fullmute = "fullmute.main:entrypoint"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["fullmute*"]
+
+[tool.setuptools.package-data]
+fullmute = [
+    "config/signatures/*.json",
+    "web/templates/*.html",
+    "web/static/**/*",
+]
