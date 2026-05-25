@@ -160,6 +160,22 @@
                                                         <span>Technology: <span class="text-gray-300" x-text="cve.tech_name + (cve.tech_version ? ' v' + cve.tech_version : '')"></span></span>
                                                         <span x-show="cve.published_date">Published: <span class="text-gray-300" x-text="cve.published_date?.substring(0, 10)"></span></span>
                                                     </div>
+
+                                                    <!-- CVE Exploits -->
+                                                    <div x-show="cve.exploits && cve.exploits.length > 0" class="mt-3 pt-3 border-t border-orange-800/30">
+                                                        <div class="flex items-center gap-2 mb-2">
+                                                            <i class="fas fa-bullseye text-orange-400"></i>
+                                                            <span class="text-xs font-medium text-orange-400">Exploits: <span x-text="cve.exploits.length"></span></span>
+                                                        </div>
+                                                        <div class="space-y-1 text-xs">
+                                                            <template x-for="(exp, ei) in cve.exploits" :key="'cve-exp-' + ei">
+                                                                <div>
+                                                                    <a :href="exp.edb_url || exp.path" target="_blank" class="text-sm text-orange-300 hover:underline" x-text="exp.title || (exp.exploit_id ? ('EDB-' + exp.exploit_id) : exp.path)"></a>
+                                                                    <span class="text-gray-400 ml-2" x-text="exp.exploit_id ? ('ID: ' + exp.exploit_id) : ''"></span>
+                                                                </div>
+                                                            </template>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             </template>
                                         </div>

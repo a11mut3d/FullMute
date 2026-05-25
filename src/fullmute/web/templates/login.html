@@ -5,10 +5,10 @@
 {% block body %}
 <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-dark-bg via-dark-card to-dark-bg"
      x-data="loginForm()">
-    
+
     <!-- Login Card -->
     <div class="w-full max-w-md p-8 space-y-8 bg-dark-card rounded-2xl shadow-2xl border border-dark-border card-hover">
-        
+
         <!-- Logo -->
         <div class="text-center">
             <div class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gradient-to-br from-primary-600 to-primary-800 mb-4">
@@ -17,25 +17,25 @@
             <h1 class="text-3xl font-bold text-white">FullMute Web</h1>
             <p class="mt-2 text-gray-400">Advanced Web Security Scanner</p>
         </div>
-        
+
         <!-- Login Form -->
         <form @submit.prevent="submitLogin" class="mt-8 space-y-6">
-            
+
             <!-- API Key Input -->
             <div>
                 <label for="api_key" class="block text-sm font-medium text-gray-300 mb-2">
                     <i class="fas fa-key mr-2 text-primary-400"></i>API Key
                 </label>
                 <div class="relative">
-                    <input 
-                        type="password" 
-                        id="api_key" 
+                    <input
+                        type="password"
+                        id="api_key"
                         x-model="apiKey"
                         required
                         class="w-full px-4 py-3 bg-dark-bg border border-dark-border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-white placeholder-gray-500 transition-all"
                         placeholder="Enter your API key"
                     >
-                    <button 
+                    <button
                         type="button"
                         @click="toggleKeyVisibility"
                         class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white"
@@ -44,7 +44,7 @@
                     </button>
                 </div>
             </div>
-            
+
             <!-- Error Message -->
             <div x-show="error" x-cloak class="p-4 bg-red-900/30 border border-red-700 rounded-lg">
                 <div class="flex items-center">
@@ -52,9 +52,9 @@
                     <span class="text-red-300 text-sm" x-text="error"></span>
                 </div>
             </div>
-            
+
             <!-- Submit Button -->
-            <button 
+            <button
                 type="submit"
                 :disabled="loading"
                 class="w-full py-3 px-4 bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-500 hover:to-primary-600 text-white font-semibold rounded-lg shadow-lg transition-all transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
@@ -67,7 +67,7 @@
                 </span>
             </button>
         </form>
-        
+
         <!-- Footer -->
         <div class="text-center text-gray-500 text-sm">
             <p>Mute Ecosystem © 2026</p>
@@ -94,7 +94,7 @@ function loginForm() {
         async submitLogin() {
             this.loading = true;
             this.error = '';
-            
+
             console.log('[Login] Starting login process...');
             console.log('[Login] API key length:', this.apiKey ? this.apiKey.length : 0);
 
@@ -132,10 +132,10 @@ function loginForm() {
                     }
 
                     console.log('[Login] Token stored, redirecting to dashboard...');
-                    
+
                     // SECURITY: Also set cookie (will work on HTTP if secure=false)
                     document.cookie = `access_token=${data.access_token}; path=/; max-age=${24*60*60}; samesite=lax`;
-                    
+
                     // Small delay to ensure cookie is set
                     setTimeout(() => {
                         window.location.href = '/dashboard';
