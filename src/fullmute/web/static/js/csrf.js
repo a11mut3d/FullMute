@@ -1,5 +1,6 @@
 
 (function() {
+    // Сохраняем оригинальный fetch
     const originalFetch = window.fetch;
 
     if (!originalFetch) {
@@ -7,7 +8,9 @@
         return;
     }
 
+    // CSRF Token Manager
     const CSRF = {
+        // Получить токен из meta tag
         getToken() {
             const metaTag = document.querySelector('meta[name="csrf-token"]');
             if (metaTag) {
@@ -17,12 +20,15 @@
                     return content;
                 }
             }
+            // Fallback: получить из cookie
             const cookieToken = this.getCookie('csrf_token');
             if (cookieToken) {
                 console.log('[CSRF] Token found in cookie:', cookieToken.substring(0, 20) + '...');
             }
             return cookieToken;
         },
+
+        // Получить JWT токен из localStorage
         getAuthToken() {
             try {
                 const token = localStorage.getItem('token');
@@ -35,6 +41,8 @@
             }
             return null;
         },
+
+        // Получить cookie по имени
         getCookie(name) {
             try {
                 const value = `; ${document.cookie}`;
@@ -48,10 +56,12 @@
             return null;
         },
 
+        // Добавить CSRF заголовок к fetch запросам
         async fetchWithCSRF(url, options = {}) {
             const token = this.getToken();
             const authToken = this.getAuthToken();
 
+            // Добавляем заголовки
             const headers = {
                 ...(options.headers || {}),
             };
