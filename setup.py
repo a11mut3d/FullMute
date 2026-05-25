@@ -22,7 +22,11 @@ setup(
         "python-jose[cryptography]>=3.3.0",
         "passlib[bcrypt]>=1.7.4",
         "apscheduler>=3.10.4",
-        "click>=8.0.0",
+        "click>=8.1.0",
+        "paramiko>=3.4.0",
+        "PyJWT>=2.8.0",
+        "pydantic-settings>=2.1.0",
+        "reportlab>=4.0.0",
     ],
     entry_points={
         "console_scripts": [
