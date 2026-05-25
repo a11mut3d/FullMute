@@ -42,6 +42,16 @@ class BaseDetector(ABC):
                     return True
         return False
 
+    def search_in_paths(self, patterns: List[str]) -> bool:
+        if not self.html:
+            return False
+        resource_patterns = re.findall(r'(?:href|src)=["\'](.*?)["\']', self.html, re.IGNORECASE)
+        for pattern in patterns:
+            for res in resource_patterns:
+                if re.search(pattern, res, re.IGNORECASE):
+                    return True
+        return False
+
     def search_in_cookies(self, patterns: List[str]) -> bool:
         for cookie_name in self.cookies.keys():
             for pattern in patterns:
@@ -60,7 +70,7 @@ class BaseDetector(ABC):
             return True
 
         for pattern in must_have_patterns:
-            if not self.search_in_html([pattern]) and not self.search_in_headers([pattern]):
+            if not (self.search_in_html([pattern]) or self.search_in_headers([pattern]) or self.search_in_urls([pattern]) or self.search_in_paths([pattern])):
                 return False
         return True
 
@@ -74,7 +84,6 @@ class BaseDetector(ABC):
         return True
 
     def extract_version(self, content: str, version_pattern: str) -> str:
-        """Extract version from content using the provided pattern"""
         if not version_pattern:
             return ""
 
@@ -84,7 +93,6 @@ class BaseDetector(ABC):
         return ""
 
     def extract_version_from_headers(self, version_pattern: str) -> str:
-        """Extract version from headers"""
         for header_name, header_value in self.headers.items():
             header_string = f"{header_name}: {header_value}"
             version = self.extract_version(header_string, version_pattern)
@@ -93,17 +101,34 @@ class BaseDetector(ABC):
         return ""
 
     def extract_version_from_html(self, version_pattern: str) -> str:
-        """Extract version from HTML"""
         if not self.html:
             return ""
         return self.extract_version(self.html, version_pattern)
 
     def extract_version_from_urls(self, version_pattern: str) -> str:
-        """Extract version from URL"""
         return self.extract_version(self.url, version_pattern)
 
+    def extract_version_from_paths(self, version_pattern: str) -> str:
+        if not self.html:
+            return ""
+        resource_patterns = re.findall(r'(?:href|src)=["\'](.*?)["\']', self.html, re.IGNORECASE)
+        for res in resource_patterns:
+            version = self.extract_version(res, version_pattern)
+            if version:
+                return version
+        return ""
+
+    def extract_version_from_meta(self, version_pattern: str) -> str:
+        if not self.html:
+            return ""
+        meta_matches = re.findall(r'<meta[^>]+name=["\']generator["\'][^>]*content=["\'](.*?)["\']', self.html, re.IGNORECASE)
+        for m in meta_matches:
+            version = self.extract_version(m, version_pattern)
+            if version:
+                return version
+        return ""
+
     def extract_version_from_cookies(self, version_pattern: str) -> str:
-        """Extract version from cookies"""
         for cookie_name in self.cookies.keys():
             version = self.extract_version(cookie_name, version_pattern)
             if version:

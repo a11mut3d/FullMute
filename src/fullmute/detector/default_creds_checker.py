@@ -467,14 +467,33 @@ class DefaultCredentialsChecker:
             test_url = urljoin(base, path)
             
             try:
-                
+                # Prefer HEAD to be lighter, but fall back to GET when HEAD is not allowed
                 async with session.head(test_url, ssl=False, allow_redirects=True) as resp:
                     if resp.status == 200:
                         found_paths.append(test_url)
-            except:
-                continue
+                    elif resp.status in (405, 501):
+                        # Try GET if server does not support HEAD
+                        try:
+                            async with session.get(test_url, ssl=False, allow_redirects=True) as gresp:
+                                if gresp.status == 200:
+                                    found_paths.append(test_url)
+                        except Exception:
+                            pass
+            except Exception:
+                # Try GET as a last resort (some servers reject HEAD with network errors)
+                try:
+                    async with session.get(test_url, ssl=False, allow_redirects=True) as gresp:
+                        if gresp.status == 200:
+                            found_paths.append(test_url)
+                except Exception:
+                    continue
         
         return found_paths
+
+    async def test_credentials(self, form: LoginForm,
+                              credentials: List[CredentialPair],
+                              original_html: str = "") -> List[Dict[str, Any]]:
+        results = []
     
     def _get_relevant_credentials(self, detected_tech: List[str]) -> List[CredentialPair]:
         credentials = []
@@ -828,9 +847,16 @@ class DefaultCredentialsChecker:
                 start_time = asyncio.get_event_loop().time()
 
                 if form.method == "GET":
+                    # Build params dict from form fields (FormData not suitable for params)
+                    params = {}
+                    params[form.username_field] = cred.username
+                    params[form.password_field] = cred.password
+                    for name, value in form.additional_fields.items():
+                        params[name] = value
+
                     async with session.get(
                         form.action_url,
-                        params=form_data,
+                        params=params,
                         ssl=False,
                         allow_redirects=True
                     ) as resp:

@@ -28,12 +28,18 @@ class LanguageDetector(BaseDetector):
             (self.search_in_headers, patterns.get("headers", []), 2),
             (self.search_in_html, patterns.get("html", []), 1),
             (self.search_in_urls, patterns.get("urls", []), 1),
+            (self.search_in_paths, patterns.get("urls", []), 1),
             (self.search_in_cookies, patterns.get("cookies", []), 2),
         ]
 
         for method, pattern_list, weight in methods:
             if pattern_list and method(pattern_list):
                 score += weight
+
+        url_patterns = patterns.get("urls", [])
+        if url_patterns and (self.search_in_urls(url_patterns) or self.search_in_paths(url_patterns)):
+            score += 1
+
         required_score = 1 if must_have else 2
 
         return score >= required_score

@@ -120,8 +120,20 @@ class TechDetector:
 
                 if cms_type == 'wordpress':
                     results["wp_plugins"] = [f"{name} ({version})" if version else name for name, version in items]
+
+                # If plugin detector found CMS-specific artifacts, mark CMS if absent
+                detected_cms_names = [c.lower().split(' (')[0] for c in results.get('cms', [])]
+                if cms_type == 'wordpress' and 'wordpress' not in detected_cms_names:
+                    results.setdefault('cms', []).append('WordPress')
+                if cms_type == 'joomla' and 'joomla' not in detected_cms_names:
+                    results.setdefault('cms', []).append('Joomla')
+                if cms_type == 'drupal' and 'drupal' not in detected_cms_names:
+                    results.setdefault('cms', []).append('Drupal')
             elif cms_type == 'bitrix':
                 results["bitrix_components"] = [f"{name} ({version})" if version else name for name, version in items]
+                detected_cms_names = [c.lower().split(' (')[0] for c in results.get('cms', [])]
+                if 'bitrix' not in detected_cms_names:
+                    results.setdefault('cms', []).append('Bitrix')
 
         filtered_results = {}
         for category, items in results.items():

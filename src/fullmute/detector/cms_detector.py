@@ -40,10 +40,21 @@ class CMSDetector(BaseDetector):
 
     def _extract_version(self, cms_name: str, patterns: Dict[str, Any]) -> str:
         version_pattern = patterns.get("version_pattern", "")
+        # First, try meta generator tag as a generic fallback
+        try:
+            if self.html:
+                m = re.search(r'<meta[^>]*name=["\']generator["\'][^>]*content=["\']([^"\']+)["\']', self.html, re.IGNORECASE)
+                if m:
+                    gen = m.group(1)
+                    ver_match = re.search(r'([0-9]+(?:\.[0-9]+)+)', gen)
+                    if ver_match:
+                        return ver_match.group(1)
+        except Exception:
+            pass
+
         if not version_pattern:
             return ""
 
-        
         version = self.extract_version_from_headers(version_pattern)
         if version:
             return version
@@ -59,5 +70,15 @@ class CMSDetector(BaseDetector):
         version = self.extract_version_from_cookies(version_pattern)
         if version:
             return version
+
+        # Try extracting a generic version token around the CMS name
+        try:
+            if self.html:
+                fallback_pattern = rf'{re.escape(cms_name)}[^0-9A-Za-z\-\_]*v?([0-9]+(?:\.[0-9]+)+)'
+                fm = re.search(fallback_pattern, self.html, re.IGNORECASE)
+                if fm:
+                    return fm.group(1)
+        except Exception:
+            pass
 
         return ""
