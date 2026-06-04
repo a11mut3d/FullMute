@@ -604,10 +604,14 @@ class PortScanner:
             nvd_api_key=nvd_api_key,
             rate_limit=True
         )
+        try:
+            cve_results = await cve_checker.check_cves_batch(services_to_check)
+        finally:
+            try:
+                await cve_checker.close()
+            except Exception:
+                pass
 
-        cve_results = await cve_checker.check_cves_batch(services_to_check)
-
-        
         for result in results:
             service_key = f"{result.product} ({result.version})"
             if not service_key.startswith(' ('):
