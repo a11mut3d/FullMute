@@ -18,7 +18,7 @@
       "mysqli_.*\\(",
       "mysql_.*\\("
     ],
-    "urls": [".php$", ".php3$", ".php4$", ".php5$", ".phtml$"],
+    "urls": [".php", ".php3$", ".php4$", ".php5$", ".phtml$"],
     "cookies": ["PHPSESSID", "phpsessid", "PHP"],
     "version_pattern": "PHP/([0-9.]+)",
     "must_have": ["X-Powered-By: PHP", "<?php", "PHPSESSID", "require_once"],

@@ -23,10 +23,9 @@
       "/media/jui/js/",
       "/media/system/js/",
       "/templates/",
-      "com_content",
-      "language/en-GB/en-GB.xml"
+      "com_content"
     ],
-    "urls": ["/administrator/", "/index.php?option="],
+    "urls": ["/administrator/", "/index.php?option=","/language/en-GB/en-GB.xml/"],
     "cookies": ["joomla_[a-z0-9_]+", "sessioncookie"],
     "version_pattern": "(?:Joomla!|Joomla) ([0-9.]+)",
     "must_not_have": ["wp-content", "wordpress"]
@@ -36,15 +35,11 @@
     "html": [
       "<meta name=\"Generator\" content=\"Drupal ([0-9.]+)\"|<meta name=\"Generator\" content=\"Drupal",
       "drupal.js",
-      "/sites/default/",
-      "/sites/all/",
-      "/modules/",
-      "/themes/",
       "/profiles/",
       "id=\"block-system-main\"",
       "class=\"region region-"
     ],
-    "urls": ["/user/login", "/node/", "/admin/", "/sites/"],
+    "urls": ["/user/login", "/admin/", "/sites/"],
     "cookies": ["SESS[a-z0-9]+", "has_js", "Drupal.visitor"],
     "version_pattern": "Drupal ([0-9.]+)",
     "must_not_have": ["wp-content", "joomla"]
