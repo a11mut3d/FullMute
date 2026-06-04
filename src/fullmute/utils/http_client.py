@@ -433,12 +433,44 @@ class HttpClient:
                             del self._host_failures[host]
 
 
+                    # Cloudflare check (existing)
                     if response.status == 403 or self._is_cloudflare_challenge(html):
                         if self.bypass_cloudflare:
                             logger.info(f"Detected Cloudflare protection for {url}, attempting bypass...")
                             return await self.cf_bypass.bypass_cloudflare(url, headers)
                         else:
                             logger.warning(f"Received 403/Cloudflare for {url} but bypass is disabled")
+
+                    # Simple JS anti-bot challenge handling: some hosts return JS that sets a cookie and reloads
+                    try:
+                        if html and 'document.cookie' in html and 'location.reload' in html:
+                            # try to extract cookie name and value assigned in JS: document.cookie='name=value' or similar
+                            m = re.search(r"document\.cookie\s*=\s*['\"]?([^=;\s]+)=([^'\";\s]+)", html)
+                            if m:
+                                cookie_name = m.group(1)
+                                cookie_value = m.group(2)
+                                logger.info(f"Detected JS cookie challenge, setting cookie {cookie_name} and retrying")
+                                # perform follow-up request with the cookie
+                                try:
+                                    async with session.get(
+                                        current_url,
+                                        headers=session_headers,
+                                        proxy=proxy,
+                                        ssl=False,
+                                        allow_redirects=False,
+                                        cookies={cookie_name: cookie_value}
+                                    ) as resp2:
+                                        html2 = await resp2.text(errors='backslashreplace')
+                                        headers_dict = dict(resp2.headers)
+                                        cookies_dict = {k: v.value for k, v in resp2.cookies.items()}
+                                        final_url = current_url
+                                        return html2, headers_dict, cookies_dict, resp2.status, final_url
+                                except Exception:
+                                    logger.debug("Retry with JS cookie failed", exc_info=True)
+                    except Exception:
+                        pass
+
+                    pass
 
                     return html, headers_dict, cookies_dict, response.status, final_url
 
@@ -530,7 +562,6 @@ class HttpClient:
         return None, {}, {}, 0, url
 
     async def close(self):
-        """Close HTTP session and connector to release resources"""
         if self._closed:
             return
 
