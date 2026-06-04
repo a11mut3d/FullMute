@@ -1,3 +1,4 @@
+import re
 from fullmute.detector.base import BaseDetector
 from typing import Dict, List, Any, Tuple
 
@@ -39,6 +40,19 @@ class LanguageDetector(BaseDetector):
         url_patterns = patterns.get("urls", [])
         if url_patterns and (self.search_in_urls(url_patterns) or self.search_in_paths(url_patterns)):
             score += 1
+
+        # If URL patterns include common file extensions (php, aspx, jsp, etc.),
+        # look for those filenames mentioned anywhere in the HTML (index.php, .aspx, .jsp)
+        try:
+            if self.html and url_patterns:
+                for up in url_patterns:
+                    low = str(up).lower()
+                    if any(ext in low for ext in ['.php', '.aspx', '.jsp', '.jspx', '.asp']):
+                        if re.search(r'(index\.php|\.php\b|\.aspx\b|\.jsp\b|\.jspx\b|\.asp\b)', self.html, re.IGNORECASE):
+                            score += 1
+                            break
+        except Exception:
+            pass
 
         required_score = 1 if must_have else 2
 

@@ -1,3 +1,4 @@
+import re
 from fullmute.detector.base import BaseDetector
 from typing import Dict, List, Any, Tuple
 
@@ -24,6 +25,16 @@ class CMSDetector(BaseDetector):
             return False
 
         score = 0
+
+        # Strong signal: if meta generator explicitly names this CMS, boost score by 2
+        try:
+            if self.html:
+                m = re.search(r'<meta[^>]*name=["\']generator["\'][^>]*content=["\']([^"\']+)["\']', self.html, re.IGNORECASE)
+                if m and re.search(re.escape(cms_name), m.group(1), re.IGNORECASE):
+                    score += 2
+        except Exception:
+            pass
+
         methods = [
             (self.search_in_headers, patterns.get("headers", []), 2),
             (self.search_in_html, patterns.get("html", []), 1),
