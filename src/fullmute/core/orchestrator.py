@@ -52,14 +52,19 @@ class ScanOrchestrator:
         logger.info(f"Loaded {len(domains)} domains from {domains_file}")
 
         self.initialize()
+        try:
+            max_concurrent = self.config.get('scanner', {}).get('max_concurrent', 10)
+            results = await self.scanner.scan(domains, max_concurrent)
 
-        max_concurrent = self.config.get('scanner', {}).get('max_concurrent', 10)
-        results = await self.scanner.scan(domains, max_concurrent)
+            if output_file:
+                self._save_results(results, output_file)
 
-        if output_file:
-            self._save_results(results, output_file)
-
-        return results
+            return results
+        finally:
+            try:
+                await self.scanner.close()
+            except Exception:
+                pass
 
     def _save_results(self, results, output_file: str):
         output_path = Path(output_file)
@@ -81,4 +86,10 @@ class ScanOrchestrator:
 
     async def scan_single(self, domain: str):
         self.initialize()
-        return await self.scanner.scan_domain(domain)
+        try:
+            return await self.scanner.scan_domain(domain)
+        finally:
+            try:
+                await self.scanner.close()
+            except Exception:
+                pass
