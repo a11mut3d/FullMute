@@ -80,30 +80,41 @@ def is_blocked_hostname(hostname: str) -> bool:
 
 
 def extract_host_and_port(target: str) -> Tuple[str, Optional[int]]:
-    
+    """Extract host and optional port from a target string.
+
+    Handles:
+    - http(s)://
+    - IPv6 in brackets: [::1]:8080 or [::1]
+    - IPv6 without brackets (no port) - treated as host with no port
+    - host:port and ip:port for IPv4
+    """
     target = target.strip()
     if target.startswith('http://'):
         target = target[7:]
     elif target.startswith('https://'):
         target = target[8:]
-    
-    
+
     target = target.split('/')[0].split('?')[0].split('#')[0]
-    
-    
+
+    # If this looks like a bare IPv6 (multiple colons) and not bracketed, treat as host only
+    if ':' in target and not target.startswith('[') and target.count(':') > 1:
+        host = target
+        port = None
+        return host, port
+
     if ':' in target:
-        
         if target.startswith('['):
-            
             parts = target.rsplit(']:', 1)
             if len(parts) == 2:
-                host = parts[0][1:]  
-                port = int(parts[1])
+                host = parts[0][1:]
+                try:
+                    port = int(parts[1])
+                except ValueError:
+                    port = None
             else:
-                host = target[1:-1]  
+                host = target[1:-1]
                 port = None
         else:
-            
             parts = target.rsplit(':', 1)
             if len(parts) == 2 and parts[1].isdigit():
                 host = parts[0]
@@ -114,7 +125,7 @@ def extract_host_and_port(target: str) -> Tuple[str, Optional[int]]:
     else:
         host = target
         port = None
-    
+
     return host, port
 
 

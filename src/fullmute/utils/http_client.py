@@ -17,7 +17,6 @@ from fullmute.utils.cloudflare_bypass import CloudflareBypass
 logger = setup_logger()
 
 
-
 BLOCKED_HOSTS = {
     'localhost', '127.0.0.1', '::1', '0.0.0.0',
     'internal', 'intranet', 'admin', 'administrator',
@@ -36,7 +35,6 @@ BLOCKED_HOST_PATTERNS = [
 ]
 
 
-
 class CircuitBreaker:
     def __init__(self, failure_threshold: int = 5, recovery_timeout: float = 30.0,
                  half_open_max_calls: int = 3):
@@ -53,7 +51,6 @@ class CircuitBreaker:
     async def call(self, func, *args, **kwargs):
         async with self._lock:
             if self.state == 'open':
-
                 if time.time() - self.last_failure_time > self.recovery_timeout:
                     self.state = 'half-open'
                     self.half_open_calls = 0
@@ -75,23 +72,18 @@ class CircuitBreaker:
             async with self._lock:
                 self.failures.append(time.time())
                 self.last_failure_time = time.time()
-
-
                 cutoff = time.time() - self.recovery_timeout
                 self.failures = [t for t in self.failures if t > cutoff]
-
                 if len(self.failures) >= self.failure_threshold:
                     self.state = 'open'
                     logger.warning(f"Circuit breaker: OPEN ({len(self.failures)} failures)")
             raise
 
 
-
 _global_circuit_breaker: Optional[CircuitBreaker] = None
 
 
 def get_global_circuit_breaker() -> CircuitBreaker:
-    """Get or create global circuit breaker"""
     global _global_circuit_breaker
     if _global_circuit_breaker is None:
         _global_circuit_breaker = CircuitBreaker(
@@ -105,7 +97,6 @@ def get_global_circuit_breaker() -> CircuitBreaker:
 def is_private_ip(ip: str) -> bool:
     try:
         ip_obj = ipaddress.ip_address(ip)
-
         return (
             ip_obj.is_private or
             ip_obj.is_loopback or
@@ -113,7 +104,6 @@ def is_private_ip(ip: str) -> bool:
             ip_obj.is_multicast or
             ip_obj.is_reserved or
             ip_obj.is_unspecified or
-
             (isinstance(ip_obj, ipaddress.IPv4Address) and (
                 ip_obj in ipaddress.ip_network('10.0.0.0/8') or
                 ip_obj in ipaddress.ip_network('172.16.0.0/12') or
@@ -122,7 +112,6 @@ def is_private_ip(ip: str) -> bool:
                 ip_obj in ipaddress.ip_network('169.254.0.0/16') or
                 ip_obj in ipaddress.ip_network('224.0.0.0/4')
             )) or
-
             (isinstance(ip_obj, ipaddress.IPv6Address) and (
                 ip_obj in ipaddress.ip_network('fc00::/7') or
                 ip_obj in ipaddress.ip_network('fe80::/10') or
@@ -136,25 +125,17 @@ def is_private_ip(ip: str) -> bool:
 
 def is_blocked_hostname(hostname: str) -> bool:
     hostname_lower = hostname.lower()
-
-
     if hostname_lower in BLOCKED_HOSTS:
         return True
-
-
     for pattern in BLOCKED_HOST_PATTERNS:
         if re.match(pattern, hostname_lower, re.IGNORECASE):
             logger.warning(f"Hostname matches blocked pattern: {hostname}")
             return True
-
-
     try:
-
         ip = ipaddress.ip_address(hostname)
         return is_private_ip(str(ip))
     except ValueError:
         pass
-
     return False
 
 
@@ -162,64 +143,46 @@ async def check_url_safety(url: str, check_redirects: bool = True) -> bool:
     try:
         parsed = urlparse(url)
         hostname = parsed.hostname
-
         if not hostname:
             logger.warning(f"No hostname in URL: {url}")
             return False
-
-
         if parsed.scheme not in ('http', 'https'):
             logger.warning(f"Blocked non-HTTP(S) URL: {url}")
             return False
-
-
         if is_blocked_hostname(hostname):
             logger.warning(f"Blocked access to dangerous hostname: {hostname}")
             return False
-
-
         if not parsed.netloc:
             logger.warning(f"Blocked relative URL: {url}")
             return False
-
-
         try:
             ip = ipaddress.ip_address(hostname)
             if is_private_ip(str(ip)):
                 logger.warning(f"Blocked access to private IP: {ip}")
                 return False
         except ValueError:
-
             pass
-
-
         try:
-
             addr_info = socket.getaddrinfo(
                 hostname, None,
                 socket.AF_UNSPEC,
                 socket.SOCK_STREAM
             )
-
             if not addr_info:
                 logger.warning(f"No DNS records for hostname: {hostname}")
                 return False
-
             for info in addr_info:
                 ip = info[4][0]
                 if is_private_ip(ip):
                     logger.warning(f"Blocked access to private IP: {ip} for hostname: {hostname}")
                     return False
-
         except socket.gaierror as e:
             logger.warning(f"DNS resolution failed for {hostname}: {e}")
             return False
         except Exception as e:
             logger.error(f"Error during DNS check: {e}")
             return False
-
         return True
-
     except Exception as e:
         logger.error(f"Error checking URL safety: {e}")
         return False
@@ -227,28 +190,20 @@ async def check_url_safety(url: str, check_redirects: bool = True) -> bool:
 
 async def validate_redirect_url(base_url: str, redirect_url: str) -> bool:
     try:
-
         parsed_base = urlparse(base_url)
         parsed_redirect = urlparse(redirect_url)
-
-
         if not parsed_redirect.netloc:
             return True
-
-
         if parsed_redirect.scheme not in ('http', 'https'):
             logger.warning(f"Blocked redirect to non-HTTP(S) URL: {redirect_url}")
             return False
-
-
         return await check_url_safety(redirect_url, check_redirects=False)
-
     except Exception as e:
         logger.error(f"Error validating redirect: {e}")
         return False
 
-class HttpClient:
 
+class HttpClient:
     _session_cache: Dict[str, ClientSession] = {}
     _session_lock = asyncio.Lock()
     _max_cached_sessions = 10
@@ -268,11 +223,9 @@ class HttpClient:
         self._connector: Optional[TCPConnector] = None
         self._closed = False
 
-
         self._host_failures: Dict[str, int] = {}
         self._host_failure_threshold = 3
         self._host_lock = asyncio.Lock()
-
 
         self._connector_config = {
             'limit': max_concurrent * 2,
@@ -284,15 +237,13 @@ class HttpClient:
             'force_close': False,
         }
 
-
         if proxy_enabled and proxy_file:
             self.load_proxies(proxy_file)
 
-
-        self.cf_bypass = CloudflareBypass(max_retries=max_retries, timeout=timeout)
+        self.cf_bypass = CloudflareBypass(max_retries=max_retries, use_playwright=True, timeout=timeout)
 
         logger.debug(f"HttpClient initialized: max_retries={max_retries}, timeout={timeout}s, "
-                    f"max_concurrent={max_concurrent}, proxy={proxy_enabled}")
+                     f"max_concurrent={max_concurrent}, proxy={proxy_enabled}")
 
     def load_proxies(self, proxy_file: str):
         try:
@@ -313,19 +264,13 @@ class HttpClient:
 
     async def _get_session(self) -> ClientSession:
         if self._session is None or self._session.closed:
-
-
-
-
             timeout = ClientTimeout(
                 total=self.timeout,
                 connect=3,
                 sock_read=7,
                 sock_connect=3
             )
-
             self._connector = TCPConnector(**self._connector_config)
-
             self._session = ClientSession(
                 connector=self._connector,
                 timeout=timeout,
@@ -333,18 +278,55 @@ class HttpClient:
                 raise_for_status=False
             )
             logger.debug("Created new HTTP session")
-
         return self._session
 
-    async def fetch(self, url: str, headers=None) -> Tuple[Optional[str], Dict, Dict, int, str]:
+    async def _get_client_redirect_url(self, html: str, base_url: str) -> Optional[str]:
+        """
+        Извлекает URL клиентского редиректа, но игнорирует редиректы на "notSupported"/"unsupported".
+        """
+        if not html:
+            return None
 
+        # 1. Meta refresh
+        meta_pattern = r'<meta\s+http-equiv=["\']refresh["\']\s+content=["\']\d+;\s*url=([^"\']+)["\']'
+        match = re.search(meta_pattern, html, re.IGNORECASE)
+        if match:
+            redirect_url = match.group(1)
+            full_url = urljoin(base_url, redirect_url)
+            if re.search(r'not[sS]upported|unsupported', full_url, re.IGNORECASE):
+                logger.debug(f"Ignoring meta refresh to unsupported page: {full_url}")
+                return None
+            return full_url
+
+        # 2. JavaScript redirects (наиболее частые варианты)
+        js_patterns = [
+            r'window\.location\.(?:href|replace)\s*=\s*["\']([^"\']+)["\']',
+            r'window\.location\.pathname\s*=\s*["\']([^"\']+)["\']',
+            r'location\.href\s*=\s*["\']([^"\']+)["\']',
+            r'location\.replace\(["\']([^"\']+)["\']\)',
+            r'document\.location\s*=\s*["\']([^"\']+)["\']',
+            r'self\.location\s*=\s*["\']([^"\']+)["\']',
+            r'top\.location\s*=\s*["\']([^"\']+)["\']',
+        ]
+        for pattern in js_patterns:
+            match = re.search(pattern, html, re.IGNORECASE)
+            if match:
+                redirect_url = match.group(1)
+                if not redirect_url.startswith(('http://', 'https://')):
+                    redirect_url = urljoin(base_url, redirect_url)
+                if re.search(r'not[sS]upported|unsupported', redirect_url, re.IGNORECASE):
+                    logger.debug(f"Ignoring JS redirect to unsupported page: {redirect_url}")
+                    return None
+                return redirect_url
+
+        return None
+
+    async def fetch(self, url: str, headers=None) -> Tuple[Optional[str], Dict, Dict, int, str]:
         is_safe = await check_url_safety(url)
         if not is_safe:
             logger.error(f"SSRF protection: Blocked access to {url}")
             return None, {}, {}, 403, url
 
-
-        from urllib.parse import urlparse
         parsed = urlparse(url)
         host = parsed.hostname or ""
 
@@ -352,7 +334,6 @@ class HttpClient:
             if host in self._host_failures and self._host_failures[host] >= self._host_failure_threshold:
                 logger.warning(f"Host {host} has {self._host_failures[host]} failures - failing fast")
                 return None, {}, {}, 503, url
-
 
         circuit_breaker = get_global_circuit_breaker()
         if circuit_breaker.state == 'open':
@@ -374,16 +355,21 @@ class HttpClient:
                 session = await self._get_session()
                 session_headers = {
                     "User-Agent": random.choice(USER_AGENTS),
-                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                    "Accept-Language": "en-US,en;q=0.5",
-                    "Connection": "keep-alive"
+                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+                    "Accept-Language": "ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7",
+                    "Accept-Encoding": "gzip, deflate, br",
+                    "Connection": "keep-alive",
+                    "Upgrade-Insecure-Requests": "1",
+                    "Sec-Fetch-Dest": "document",
+                    "Sec-Fetch-Mode": "navigate",
+                    "Sec-Fetch-Site": "none",
+                    "Sec-Fetch-User": "?1",
+                    "Cache-Control": "max-age=0",
                 }
-
                 if headers:
                     session_headers.update(headers)
 
                 proxy = self.get_random_proxy() if self.proxy_enabled else None
-
 
                 async with session.get(
                     current_url,
@@ -393,47 +379,49 @@ class HttpClient:
                     allow_redirects=False,
                     max_redirects=0
                 ) as response:
-
+                    # ----- HTTP-редиректы (301, 302, 303, 307, 308) -----
                     if response.status in (301, 302, 303, 307, 308):
                         redirect_url = response.headers.get('Location', '')
-
                         if redirect_url:
                             redirect_count += 1
-
-
                             if redirect_count > self.max_redirects:
-                                logger.error(f"SSRF protection: Too many redirects ({redirect_count})")
+                                logger.error(f"Too many redirects ({redirect_count})")
                                 return None, {}, {}, 403, url
-
 
                             if not redirect_url.startswith(('http://', 'https://')):
                                 redirect_url = urljoin(current_url, redirect_url)
 
-
-                            is_redirect_safe = await validate_redirect_url(current_url, redirect_url)
-                            if not is_redirect_safe:
+                            if not await validate_redirect_url(current_url, redirect_url):
                                 logger.error(f"SSRF protection: Blocked unsafe redirect to {redirect_url}")
                                 return None, {}, {}, 403, url
 
-
                             current_url = redirect_url
-                            logger.debug(f"Following redirect to: {current_url}")
-                            continue
+                            logger.debug(f"Following HTTP redirect to: {current_url}")
+                            continue  # новый запрос
 
-
+                    # ----- Получен ответ (не HTTP-редирект) -----
                     html = await response.text(errors='backslashreplace')
                     headers_dict = dict(response.headers)
                     cookies_dict = {k: v.value for k, v in response.cookies.items()}
                     final_url = current_url
 
+                    # ----- Клиентские редиректы (meta refresh, JS), игнорируем notSupported -----
+                    client_redirect_url = await self._get_client_redirect_url(html, final_url)
+                    if client_redirect_url:
+                        redirect_count += 1
+                        if redirect_count > self.max_redirects:
+                            logger.error(f"Too many client redirects ({redirect_count})")
+                            return None, {}, {}, 403, url
 
-                    consecutive_failures = 0
-                    async with self._host_lock:
-                        if host in self._host_failures:
-                            del self._host_failures[host]
+                        if not await validate_redirect_url(final_url, client_redirect_url):
+                            logger.error(f"SSRF protection: Blocked unsafe client redirect to {client_redirect_url}")
+                            return None, {}, {}, 403, url
 
+                        current_url = client_redirect_url
+                        logger.debug(f"Following client redirect to: {current_url}")
+                        continue  # новый запрос
 
-                    # Cloudflare check (existing)
+                    # ----- Cloudflare / JS cookie challenges -----
                     if response.status == 403 or self._is_cloudflare_challenge(html):
                         if self.bypass_cloudflare:
                             logger.info(f"Detected Cloudflare protection for {url}, attempting bypass...")
@@ -441,16 +429,14 @@ class HttpClient:
                         else:
                             logger.warning(f"Received 403/Cloudflare for {url} but bypass is disabled")
 
-                    # Simple JS anti-bot challenge handling: some hosts return JS that sets a cookie and reloads
+                    # Простая обработка JS cookie challenge
                     try:
                         if html and 'document.cookie' in html and 'location.reload' in html:
-                            # try to extract cookie name and value assigned in JS: document.cookie='name=value' or similar
                             m = re.search(r"document\.cookie\s*=\s*['\"]?([^=;\s]+)=([^'\";\s]+)", html)
                             if m:
                                 cookie_name = m.group(1)
                                 cookie_value = m.group(2)
                                 logger.info(f"Detected JS cookie challenge, setting cookie {cookie_name} and retrying")
-                                # perform follow-up request with the cookie
                                 try:
                                     async with session.get(
                                         current_url,
@@ -470,7 +456,11 @@ class HttpClient:
                     except Exception:
                         pass
 
-                    pass
+                    # Успешный ответ – сброс счётчиков ошибок
+                    consecutive_failures = 0
+                    async with self._host_lock:
+                        if host in self._host_failures:
+                            del self._host_failures[host]
 
                     return html, headers_dict, cookies_dict, response.status, final_url
 
@@ -478,85 +468,44 @@ class HttpClient:
                 last_error = e
                 retries += 1
                 consecutive_failures += 1
-                elapsed = time.time() - start_time
-
-                logger.warning(f"Timeout fetching {url} after {elapsed:.1f}s: {e}. Retry {retries}/{self.max_retries}")
-
-
+                logger.warning(f"Timeout fetching {current_url}: {e}. Retry {retries}/{self.max_retries}")
                 async with self._host_lock:
                     self._host_failures[host] = self._host_failures.get(host, 0) + 1
-
-
                 if consecutive_failures >= 2:
-                    logger.warning(f"Multiple consecutive timeouts for {url}, failing fast")
+                    logger.warning(f"Multiple consecutive timeouts for {current_url}, failing fast")
                     break
-
-
                 if retries < self.max_retries:
                     wait_time = min(2 ** (retries - 1), 1.0) + random.uniform(0, 0.2)
                     await asyncio.sleep(wait_time)
 
-            except aiohttp.ClientConnectorError as e:
-
+            except (aiohttp.ClientConnectorError, aiohttp.ClientError) as e:
                 last_error = e
                 retries += 1
                 consecutive_failures += 1
-
-                logger.warning(f"Connection error for {url}: {e}. Failing fast")
-
-
+                logger.warning(f"Client error fetching {current_url}: {e}. Retry {retries}/{self.max_retries}")
                 async with self._host_lock:
                     self._host_failures[host] = self._host_failures.get(host, 0) + 1
-
-
-                break
-
-            except aiohttp.ClientError as e:
-                last_error = e
-                retries += 1
-                consecutive_failures += 1
-
-                logger.warning(f"Client error fetching {url}: {e}. Retry {retries}/{self.max_retries}")
-
-
-                async with self._host_lock:
-                    self._host_failures[host] = self._host_failures.get(host, 0) + 1
-
-
-                if "cloudflare" in str(e).lower() and self.bypass_cloudflare:
-                    logger.info(f"Detected Cloudflare error for {url}, attempting bypass...")
-                    return await self.cf_bypass.bypass_cloudflare(url, headers)
-
-
                 if consecutive_failures >= 2:
-                    logger.warning(f"Multiple consecutive errors for {url}, failing fast")
+                    logger.warning(f"Multiple consecutive errors for {current_url}, failing fast")
                     break
-
-
                 if retries < self.max_retries:
                     wait_time = min(2 ** (retries - 1), 1.0) + random.uniform(0, 0.2)
                     await asyncio.sleep(wait_time)
 
             except Exception as e:
                 last_error = e
-                logger.error(f"Unexpected error fetching {url}: {e}")
+                logger.error(f"Unexpected error fetching {current_url}: {e}")
                 retries += 1
                 consecutive_failures += 1
-
-
                 async with self._host_lock:
                     self._host_failures[host] = self._host_failures.get(host, 0) + 1
-
-
                 if consecutive_failures >= 2:
-                    logger.warning(f"Unexpected error, failing fast for {url}")
+                    logger.warning(f"Unexpected error, failing fast for {current_url}")
                     break
-
                 if retries < self.max_retries:
                     await asyncio.sleep(min(2 ** (retries - 1), 1.0))
                 else:
                     break
-
 
         logger.error(f"Failed to fetch {url} after {retries} retries. Last error: {last_error}")
         return None, {}, {}, 0, url
@@ -610,6 +559,5 @@ class HttpClient:
             "Cloudflare",
             "Ray ID:"
         ]
-
         html_lower = html.lower()
         return any(indicator.lower() in html_lower for indicator in cloudflare_indicators)
