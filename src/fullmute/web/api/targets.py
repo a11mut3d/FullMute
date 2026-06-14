@@ -131,13 +131,13 @@ async def create_target(
     
     
     _, port = extract_host_and_port(domain)
-    
-    
-    domain_clean = host
-    
-    
-    
-    
+
+    # Preserve port if provided (e.g. 1.2.3.4:8080) so targets with explicit ports are stored
+    if port:
+        domain_clean = f"{host}:{port}"
+    else:
+        domain_clean = host
+
 
     with get_db_connection() as conn:
         cursor = conn.cursor()
