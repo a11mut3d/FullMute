@@ -10,7 +10,6 @@
 
     // CSRF Token Manager
     const CSRF = {
-        // Получить токен из meta tag
         getToken() {
             const metaTag = document.querySelector('meta[name="csrf-token"]');
             if (metaTag) {
@@ -56,12 +55,10 @@
             return null;
         },
 
-        // Добавить CSRF заголовок к fetch запросам
         async fetchWithCSRF(url, options = {}) {
             const token = this.getToken();
             const authToken = this.getAuthToken();
 
-            // Добавляем заголовки
             const headers = {
                 ...(options.headers || {}),
             };
