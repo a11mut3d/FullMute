@@ -131,6 +131,7 @@
                                     <input type="checkbox" @change="toggleAllTargets($event.target.checked)" class="rounded">
                                 </th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Domain</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Port</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Group</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Last Scan</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Status</th>
@@ -148,9 +149,10 @@
                                             <div class="w-8 h-8 rounded-full bg-primary-600/20 flex items-center justify-center mr-3">
                                                 <i class="fas fa-globe text-primary-400"></i>
                                             </div>
-                                            <span class="font-medium" x-text="target.domain"></span>
+                                            <span class="font-medium" x-text="parseHost(target.domain)"></span>
                                         </div>
                                     </td>
+                                    <td class="px-6 py-4 text-sm text-gray-400" x-text="parsePort(target.domain)">-</td>
                                     <td class="px-6 py-4 text-sm text-gray-400" x-text="target.group_name || '-'"></td>
                                     <td class="px-6 py-4 text-sm text-gray-400" x-text="formatDate(target.last_scan_date)"></td>
                                     <td class="px-6 py-4">
@@ -193,9 +195,13 @@
             <h3 class="text-xl font-semibold mb-4">Add New Target</h3>
             <form @submit.prevent="addTarget">
                 <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-300 mb-2">Domain / IP</label>
-                    <input type="text" x-model="newTarget.domain" required placeholder="example.com or 192.168.1.1:8080" class="w-full px-4 py-2 bg-dark-bg border border-dark-border rounded-lg focus:ring-2 focus:ring-primary-500">
-                    <p class="text-xs text-gray-500 mt-1">Supports domains, IPs, and custom ports (e.g., example.com:8080)</p>
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Host / IP</label>
+                    <input type="text" x-model="newTarget.host" required placeholder="example.com or 192.168.1.1" class="w-full px-4 py-2 bg-dark-bg border border-dark-border rounded-lg focus:ring-2 focus:ring-primary-500">
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Port (optional)</label>
+                    <input type="number" x-model="newTarget.port" min="1" max="65535" placeholder="e.g., 8080" class="w-full px-4 py-2 bg-dark-bg border border-dark-border rounded-lg focus:ring-2 focus:ring-primary-500">
+                    <p class="text-xs text-gray-500 mt-1">If provided, the port will be saved and displayed separately.</p>
                 </div>
                 <div class="mb-6">
                     <label class="block text-sm font-medium text-gray-300 mb-2">Group (optional)</label>
@@ -352,7 +358,7 @@ function targetsApp() {
         showMoveModal: false,
         showDeleteGroupModal: false,
         loading: false,
-        newTarget: { domain: '', group_id: '' },
+        newTarget: { host: '', port: '', group_id: '' },
         newGroup: { name: '', description: '' },
         moveToGroupId: '',
         uploadGroupId: '',
@@ -383,6 +389,45 @@ function targetsApp() {
                 this.selectedTargets = this.targets.map(t => t.id);
             } else {
                 this.selectedTargets = [];
+            }
+        },
+
+        // Parse host part of stored domain string, safely handling IPv6 and ports
+        parseHost(domain) {
+            if (!domain) return '-';
+            try {
+                // [ipv6]:port or [ipv6]
+                if (domain.startsWith('[')) {
+                    const m = domain.match(/^\[([^\]]+)\](?::(\d+))?$/);
+                    if (m) return m[1];
+                }
+                const parts = domain.split(':');
+                if (parts.length === 1) return domain;
+                const last = parts[parts.length - 1];
+                if (/^\d+$/.test(last)) {
+                    return parts.slice(0, parts.length - 1).join(':');
+                }
+                return domain;
+            } catch (e) {
+                return domain;
+            }
+        },
+
+        // Parse port part if present, otherwise return '-'
+        parsePort(domain) {
+            if (!domain) return '-';
+            try {
+                if (domain.startsWith('[')) {
+                    const m = domain.match(/^\[[^\]]+\](?::(\d+))?$/);
+                    return (m && m[1]) ? m[1] : '-';
+                }
+                const parts = domain.split(':');
+                if (parts.length === 1) return '-';
+                const last = parts[parts.length - 1];
+                if (/^\d+$/.test(last)) return last;
+                return '-';
+            } catch (e) {
+                return '-';
             }
         },
 
@@ -422,7 +467,10 @@ function targetsApp() {
             this.loading = true;
             const token = localStorage.getItem('token');
             const formData = new FormData();
-            formData.append('domain', this.newTarget.domain);
+            // Combine host and optional port before sending
+            let domainVal = this.newTarget.host ? this.newTarget.host.trim() : '';
+            if (this.newTarget.port) domainVal = domainVal + ':' + String(this.newTarget.port).trim();
+            formData.append('domain', domainVal);
             if (this.newTarget.group_id) formData.append('group_id', this.newTarget.group_id);
             try {
                 const response = await fetch('/api/targets', {
@@ -438,7 +486,7 @@ function targetsApp() {
                         showSuccess('Target added successfully: ' + data.domain);
                     }
                     this.showAddModal = false;
-                    this.newTarget = { domain: '', group_id: '' };
+                    this.newTarget = { host: '', port: '', group_id: '' };
                     // Сбрасываем фильтры и загружаем заново
                     this.selectedGroup = '';
                     this.search = '';
