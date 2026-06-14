@@ -6,8 +6,8 @@ from fullmute.utils.logger import setup_logger
 logger = setup_logger()
 
 class CameraDetector(BaseDetector):
-    def __init__(self, url: str, html: str, headers: Dict[str, str], cookies: Dict[str, str], signatures: Dict[str, Any]):
-        
+    def __init__(self, url: str, headers: Dict[str, str], html: str, cookies: Dict[str, str], signatures: Dict[str, Any]):
+
         super().__init__(url, headers, html, cookies, signatures)
 
     def detect(self) -> List[Tuple[str, str]]:
