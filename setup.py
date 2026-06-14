@@ -27,6 +27,7 @@ setup(
         "PyJWT>=2.8.0",
         "pydantic-settings>=2.1.0",
         "reportlab>=4.0.0",
+        "playwright"
     ],
     entry_points={
         "console_scripts": [
