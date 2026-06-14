@@ -18,3 +18,4 @@ paramiko
 PyJWT
 pydantic-settings
 reportlab
+playwright
