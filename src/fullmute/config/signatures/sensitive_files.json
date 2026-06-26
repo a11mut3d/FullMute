@@ -1,11 +1,41 @@
 {
-  "git_config": {
-    "paths": ["/.git/HEAD", "/.git/config", "/.git/index"],
+  "git_head": {
+    "paths": ["/.git/HEAD"],
     "verification": {
       "method": "content",
-      "patterns": ["ref: refs/", "\\[core\\]", "repositoryformatversion"],
-      "must_have": ["ref:", "refs/", "[core]", "repositoryformatversion"],
-      "must_not_have": ["<!DOCTYPE", "<html", "<body", "<!doctype"]
+      "patterns": ["ref: refs/"],
+      "must_have": ["ref:"],
+      "must_not_have": [
+        "<!DOCTYPE",
+        "<html",
+        "<body",
+        "404 Not Found",
+        "The requested URL was not found",
+        "Apache/2.4.",
+        "nginx",
+        "Not Found",
+        "403 Forbidden"
+      ]
+    },
+    "confidence": 95
+  },
+  "git_config": {
+    "paths": ["/.git/config"],
+    "verification": {
+      "method": "content",
+      "patterns": ["\\[core\\]", "repositoryformatversion"],
+      "must_have": ["[core]", "repositoryformatversion"],
+      "must_not_have": [
+        "<!DOCTYPE",
+        "<html",
+        "<body",
+        "404 Not Found",
+        "The requested URL was not found",
+        "Apache/2.4.",
+        "nginx",
+        "Not Found",
+        "403 Forbidden"
+      ]
     },
     "confidence": 95
   },
@@ -14,8 +44,16 @@
     "verification": {
       "method": "directory_listing",
       "patterns": ["HEAD", "config", "index", "objects", "refs"],
-      "must_have": ["HEAD", "config", "index", "objects", "refs"],
-      "must_not_have": ["forbidden", "not found", "404", "403"]
+      "must_have": [],
+      "must_not_have": [
+        "forbidden",
+        "not found",
+        "404",
+        "403",
+        "denied",
+        "Apache/2.4.",
+        "nginx"
+      ]
     },
     "confidence": 90
   },
@@ -24,8 +62,18 @@
     "verification": {
       "method": "content",
       "patterns": ["^[A-Z_]+=", "^DB_", "^APP_", "^SECRET_"],
-      "must_have": ["=", "KEY", "SECRET", "PASSWORD", "DB_", "APP_"],
-      "must_not_have": ["<!DOCTYPE", "<html", "<body", "Not Found", "404", "403"]
+      "must_have": [],
+      "must_not_have": [
+        "<!DOCTYPE",
+        "<html",
+        "<body",
+        "404 Not Found",
+        "The requested URL was not found",
+        "Apache/2.4.",
+        "nginx",
+        "Not Found",
+        "403 Forbidden"
+      ]
     },
     "confidence": 95
   },
@@ -34,8 +82,18 @@
     "verification": {
       "method": "content",
       "patterns": ["<?php", "define\\(", "\\$database", "\\$password"],
-      "must_have": ["<?php", "define(", "$"],
-      "must_not_have": ["<!DOCTYPE", "<html", "<body", "Page not found", "404"]
+      "must_have": ["<?php"],
+      "must_not_have": [
+        "<!DOCTYPE",
+        "<html",
+        "<body",
+        "404 Not Found",
+        "The requested URL was not found",
+        "Apache/2.4.",
+        "nginx",
+        "Not Found",
+        "403 Forbidden"
+      ]
     },
     "confidence": 90
   },
@@ -44,8 +102,18 @@
     "verification": {
       "method": "content",
       "patterns": ["CREATE TABLE", "INSERT INTO", "DROP TABLE", "-- MySQL dump", "-- PostgreSQL database dump"],
-      "must_have": ["CREATE", "TABLE", "INSERT", "INTO"],
-      "must_not_have": ["<!DOCTYPE", "<html", "<body", "Page not found", "404"]
+      "must_have": [],
+      "must_not_have": [
+        "<!DOCTYPE",
+        "<html",
+        "<body",
+        "404 Not Found",
+        "The requested URL was not found",
+        "Apache/2.4.",
+        "nginx",
+        "Not Found",
+        "403 Forbidden"
+      ]
     },
     "confidence": 90
   },
@@ -54,8 +122,18 @@
     "verification": {
       "method": "content",
       "patterns": ["\\[.*\\].*ERROR", "\\[.*\\].*WARNING", "Exception", "Stack trace", "Fatal error"],
-      "must_have": ["[", "]", "ERROR", "WARNING", "Exception", "Stack"],
-      "must_not_have": ["<!DOCTYPE", "<html", "<body", "Page not found", "404"]
+      "must_have": [],
+      "must_not_have": [
+        "<!DOCTYPE",
+        "<html",
+        "<body",
+        "404 Not Found",
+        "The requested URL was not found",
+        "Apache/2.4.",
+        "nginx",
+        "Not Found",
+        "403 Forbidden"
+      ]
     },
     "confidence": 85
   },
@@ -64,8 +142,17 @@
     "verification": {
       "method": "login_form",
       "patterns": ["<form", "password", "username", "login"],
-      "must_have": ["<form", "password", "username", "login"],
-      "must_not_have": ["forbidden", "access denied", "403", "401"]
+      "must_have": [],
+      "must_not_have": [
+        "forbidden",
+        "access denied",
+        "403",
+        "401",
+        "404 Not Found",
+        "The requested URL was not found",
+        "Apache/2.4.",
+        "nginx"
+      ]
     },
     "confidence": 75
   },
@@ -74,8 +161,18 @@
     "verification": {
       "method": "content",
       "patterns": ["RewriteEngine", "RewriteRule", "RewriteCond", "Deny from", "Allow from"],
-      "must_have": ["Rewrite", "Deny", "Allow"],
-      "must_not_have": ["<!DOCTYPE", "<html", "<body", "Page not found", "404"]
+      "must_have": [],
+      "must_not_have": [
+        "<!DOCTYPE",
+        "<html",
+        "<body",
+        "404 Not Found",
+        "The requested URL was not found",
+        "Apache/2.4.",
+        "nginx",
+        "Not Found",
+        "403 Forbidden"
+      ]
     },
     "confidence": 90
   },
@@ -84,8 +181,18 @@
     "verification": {
       "method": "content",
       "patterns": ["User-agent:", "Disallow:", "Allow:", "Sitemap:"],
-      "must_have": ["User-agent", "Disallow"],
-      "must_not_have": ["<!DOCTYPE", "<html", "<body", "Page not found", "404"]
+      "must_have": [],
+      "must_not_have": [
+        "<!DOCTYPE",
+        "<html",
+        "<body",
+        "404 Not Found",
+        "The requested URL was not found",
+        "Apache/2.4.",
+        "nginx",
+        "Not Found",
+        "403 Forbidden"
+      ]
     },
     "confidence": 80
   },
@@ -94,8 +201,18 @@
     "verification": {
       "method": "content",
       "patterns": ["<urlset", "<url>", "<loc>", "xmlns="],
-      "must_have": ["<urlset", "<url>", "<loc>"],
-      "must_not_have": ["<!DOCTYPE", "<html", "<body", "Page not found", "404"]
+      "must_have": [],
+      "must_not_have": [
+        "<!DOCTYPE",
+        "<html",
+        "<body",
+        "404 Not Found",
+        "The requested URL was not found",
+        "Apache/2.4.",
+        "nginx",
+        "Not Found",
+        "403 Forbidden"
+      ]
     },
     "confidence": 85
   }
