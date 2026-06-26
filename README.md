@@ -76,7 +76,7 @@ https://www.exploit-db.com/searchsploit
 
 ```bash
 # Initialize scanner database
-fullmute init
+fullmute init /fullmute.db
 
 # Scan domains from a file
 fullmute scan targets.txt
