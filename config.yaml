@@ -45,7 +45,7 @@ scanner:
   rotate_user_agents: true
   search_exploits: true
   test_default_credentials: true
-  timeout: 5
+  timeout: 15
   verify_ssl: false
 signatures:
   path: ./config/signatures
