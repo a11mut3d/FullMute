@@ -15,10 +15,10 @@ security:
   token_expire_hours: 24
 
 scanner:
-  max_concurrent_scans: 5
-  scan_timeout: 300
-  max_concurrent: 10
-  timeout: 15
+  max_concurrent_scans: 3
+  scan_timeout: 600
+  max_concurrent: 5
+  timeout: 20
   proxy_enabled: false
   min_delay: 1.0
   max_delay: 3.0
