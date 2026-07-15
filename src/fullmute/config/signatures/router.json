@@ -1,122 +1,152 @@
 {
   "TP-Link": {
-    "headers": ["TP-LINK", "Server: TP-LINK"],
-    "html": ["TP-Link", "tplogin", "tplinklogin"],
+    "weight": 85,
+    "headers": ["TP-LINK"],
+    "html_strong": ["tplogin", "tplinklogin", "TP-Link Wireless"],
+    "html_weak": ["TP-Link"],
+    "urls": ["/login", "/userRpm", "/cgi-bin/tplink"],
     "titles": ["TP-Link"],
-    "urls": ["/login", "/userRpm"],
-    "version_pattern": "Firmware Version ([0-9.]+)",
-    "must_have": ["TP-Link"]
+    "version_pattern": "Firmware Version\\s+([0-9.]+)",
+    "exclude": ["canonical", "wordpress", "theme", "template"]
   },
   "D-Link": {
-    "headers": ["D-Link", "Server: D-Link"],
-    "html": ["D-Link", "mydlink", "dlink"],
+    "weight": 85,
+    "headers": ["D-Link"],
+    "html_strong": ["mydlink", "session_key.cgi", "D-Link Router"],
+    "html_weak": ["D-Link", "dlink"],
+    "urls": ["/login", "/session_key.cgi", "/cgi-bin/dlink"],
     "titles": ["D-Link"],
-    "urls": ["/login", "/session_key.cgi"],
-    "version_pattern": "Firmware: ([0-9.]+)",
-    "must_have": ["D-Link"]
+    "version_pattern": "Firmware:\\s+([0-9.]+)",
+    "exclude": ["canonical", "wordpress", "theme", "template", "dlink.com"]
   },
   "Netgear": {
-    "headers": ["NETGEAR", "Server: NETGEAR"],
-    "html": ["NETGEAR", "ReadySHARE", "genie"],
+    "weight": 85,
+    "headers": ["NETGEAR"],
+    "html_strong": ["ReadySHARE", "genie", "NETGEAR Router"],
+    "html_weak": ["NETGEAR", "netgear"],
+    "urls": ["/login", "/genie", "/cgi-bin/netgear"],
     "titles": ["NETGEAR"],
-    "urls": ["/login", "/genie"],
-    "version_pattern": "Firmware version ([0-9.]+)",
-    "must_have": ["NETGEAR"]
+    "version_pattern": "Firmware version\\s+([0-9.]+)",
+    "exclude": ["canonical", "wordpress", "theme", "template", "netgear.com"]
   },
   "Linksys": {
-    "headers": ["Linksys", "Server: Linksys"],
-    "html": ["Linksys", "Smart WiFi"],
+    "weight": 85,
+    "headers": ["Linksys"],
+    "html_strong": ["Smart WiFi", "apply.cgi", "Linksys Router"],
+    "html_weak": ["Linksys", "linksys"],
+    "urls": ["/login", "/apply.cgi", "/cgi-bin/linksys"],
     "titles": ["Linksys"],
-    "urls": ["/login", "/apply.cgi"],
-    "version_pattern": "Version ([0-9.]+)",
-    "must_have": ["Linksys"]
+    "version_pattern": "Version\\s+([0-9.]+)",
+    "exclude": ["canonical", "wordpress", "theme", "template", "linksys.com"]
   },
   "ASUS": {
-    "headers": ["ASUS", "Server: ASUS"],
-    "html": ["ASUS", "ASUSWRT", "AiCloud"],
+    "weight": 85,
+    "headers": ["ASUS"],
+    "html_strong": ["ASUSWRT", "AiCloud", "Main_Login.asp"],
+    "html_weak": ["ASUS", "asus"],
+    "urls": ["/Main_Login.asp", "/index.asp", "/cgi-bin/asus"],
     "titles": ["ASUS"],
-    "urls": ["/Main_Login.asp", "/index.asp"],
-    "version_pattern": "ASUSWRT ([0-9.]+)",
-    "must_have": ["ASUS"]
+    "version_pattern": "ASUSWRT\\s+([0-9.]+)",
+    "exclude": ["canonical", "wordpress", "theme", "template", "asus.com"]
   },
   "Cisco": {
-    "headers": ["Cisco", "Server: Cisco"],
-    "html": ["Cisco", "IOS", "RV"],
+    "weight": 85,
+    "headers": ["Cisco"],
+    "html_strong": ["IOS", "RV", "Cisco Router"],
+    "html_weak": ["Cisco", "cisco"],
+    "urls": ["/login.html", "/exec", "/cgi-bin/cisco"],
     "titles": ["Cisco"],
-    "urls": ["/login.html", "/exec"],
-    "version_pattern": "IOS ([0-9.]+)",
-    "must_have": ["Cisco"]
+    "version_pattern": "IOS\\s+([0-9.]+)",
+    "exclude": ["canonical", "wordpress", "theme", "template", "cisco.com"]
   },
   "Huawei": {
-    "headers": ["Huawei", "Server: Huawei"],
-    "html": ["Huawei", "Home Gateway", "HiLink"],
+    "weight": 80,
+    "headers": ["Huawei"],
+    "html_strong": ["Home Gateway", "HiLink", "Huawei Router"],
+    "html_weak": ["Huawei", "huawei"],
+    "urls": ["/login.html", "/html/index.html", "/cgi-bin/huawei"],
     "titles": ["Huawei"],
-    "urls": ["/login.html", "/html/index.html"],
-    "version_pattern": "Software Version ([0-9.]+)",
-    "must_have": ["Huawei"]
+    "version_pattern": "Software Version\\s+([0-9.]+)",
+    "exclude": ["canonical", "wordpress", "theme", "template", "huawei.com"]
   },
   "Tenda": {
-    "headers": ["Tenda", "Server: Tenda"],
-    "html": ["Tenda", "tendawifi"],
+    "weight": 80,
+    "headers": ["Tenda"],
+    "html_strong": ["tendawifi", "goform", "Tenda Router"],
+    "html_weak": ["Tenda", "tenda"],
+    "urls": ["/login.html", "/goform", "/cgi-bin/tenda"],
     "titles": ["Tenda"],
-    "urls": ["/login.html", "/goform"],
-    "version_pattern": "Version ([0-9.]+)",
-    "must_have": ["Tenda"]
+    "version_pattern": "Version\\s+([0-9.]+)",
+    "exclude": ["canonical", "wordpress", "theme", "template"]
   },
   "MikroTik": {
+    "weight": 90,
     "headers": ["MikroTik", "RouterOS"],
-    "html": ["RouterOS", "mikrotik", "winbox"],
-    "titles": ["RouterOS"],
-    "urls": ["/winbox", "/webfig"],
-    "version_pattern": "RouterOS ([0-9.]+)",
-    "must_have": ["RouterOS"]
+    "html_strong": ["RouterOS", "winbox", "webfig"],
+    "html_weak": ["mikrotik", "MikroTik"],
+    "urls": ["/winbox", "/webfig", "/cgi-bin/mikrotik"],
+    "titles": ["RouterOS", "MikroTik"],
+    "version_pattern": "RouterOS\\s+([0-9.]+)",
+    "exclude": ["canonical", "wordpress", "theme", "template", "mikrotik.com"]
   },
-  "Ubiquiti": {
+  "Ubiquiti-Router": {
+    "weight": 85,
     "headers": ["UniFi", "UBNT"],
-    "html": ["UniFi", "ubnt", "EdgeMAX"],
-    "titles": ["UniFi"],
-    "urls": ["/login", "/manage"],
-    "version_pattern": "UniFi ([0-9.]+)",
-    "must_have": ["UniFi"]
+    "html_strong": ["EdgeMAX", "ubnt", "UniFi Controller"],
+    "html_weak": ["UniFi", "Ubiquiti"],
+    "urls": ["/login", "/manage", "/cgi-bin/ubnt"],
+    "titles": ["UniFi", "Ubiquiti"],
+    "version_pattern": "UniFi\\s+([0-9.]+)",
+    "exclude": ["canonical", "wordpress", "theme", "template", "ui.com"]
   },
   "Zyxel": {
-    "headers": ["ZyXEL", "Server: ZyXEL"],
-    "html": ["ZyXEL", "ZyWALL", "USG"],
+    "weight": 80,
+    "headers": ["ZyXEL"],
+    "html_strong": ["ZyWALL", "USG", "ZyXEL Router"],
+    "html_weak": ["ZyXEL", "zyxel"],
+    "urls": ["/cgi-bin", "/weblogin.html", "/cgi-bin/zyxel"],
     "titles": ["ZyXEL"],
-    "urls": ["/cgi-bin", "/weblogin.html"],
-    "version_pattern": "Firmware Version ([0-9.]+)",
-    "must_have": ["ZyXEL"]
+    "version_pattern": "Firmware Version\\s+([0-9.]+)",
+    "exclude": ["canonical", "wordpress", "theme", "template", "zyxel.com"]
   },
-  "MOTOROLA": {
-    "headers": ["Motorola", "SERVER: Motorola"],
-    "html": ["Motorola", "SB", "MG"],
+  "Motorola": {
+    "weight": 80,
+    "headers": ["Motorola"],
+    "html_strong": ["SB", "MG", "Motorola Router"],
+    "html_weak": ["Motorola", "motorola"],
+    "urls": ["/cmn/", "/adv.asp", "/cgi-bin/motorola"],
     "titles": ["Motorola"],
-    "urls": ["/cmn/", "/adv.asp"],
-    "version_pattern": "Firmware ([0-9.]+)",
-    "must_have": ["Motorola"]
+    "version_pattern": "Firmware\\s+([0-9.]+)",
+    "exclude": ["canonical", "wordpress", "theme", "template", "motorola.com"]
   },
-  "BUFFALO": {
-    "headers": ["Buffalo", "SERVER: Buffalo"],
-    "html": ["Buffalo", "AirStation"],
+  "Buffalo": {
+    "weight": 80,
+    "headers": ["Buffalo"],
+    "html_strong": ["AirStation", "Buffalo Router"],
+    "html_weak": ["Buffalo", "buffalo"],
+    "urls": ["/login.cgi", "/setting/", "/cgi-bin/buffalo"],
     "titles": ["Buffalo"],
-    "urls": ["/login.cgi", "/setting/"],
     "version_pattern": "AirStation Ver.([0-9.]+)",
-    "must_have": ["Buffalo"]
+    "exclude": ["canonical", "wordpress", "theme", "template", "buffalo.com"]
   },
   "Belkin": {
-    "headers": ["Belkin", "SERVER: Belkin"],
-    "html": ["Belkin", "Router"],
+    "weight": 75,
+    "headers": ["Belkin"],
+    "html_strong": ["Belkin Router", "status.htm"],
+    "html_weak": ["Belkin", "belkin"],
+    "urls": ["/login.htm", "/status.htm", "/cgi-bin/belkin"],
     "titles": ["Belkin"],
-    "urls": ["/login.htm", "/status.htm"],
-    "version_pattern": "Firmware ([0-9.]+)",
-    "must_have": ["Belkin"]
+    "version_pattern": "Firmware\\s+([0-9.]+)",
+    "exclude": ["canonical", "wordpress", "theme", "template", "belkin.com"]
   },
   "Synology": {
-    "headers": ["Server: Synology", "DSM"],
-    "html": ["Synology", "DiskStation"],
-    "titles": ["DiskStation"],
-    "urls": ["/webman/", "/login.html"],
-    "version_pattern": "DSM ([0-9.]+)",
-    "must_have": ["Synology"]
+    "weight": 85,
+    "headers": ["Synology", "DSM"],
+    "html_strong": ["DiskStation", "DSM", "Synology Router"],
+    "html_weak": ["Synology", "synology"],
+    "urls": ["/webman/", "/login.html", "/cgi-bin/synology"],
+    "titles": ["DiskStation", "Synology"],
+    "version_pattern": "DSM\\s+([0-9.]+)",
+    "exclude": ["canonical", "wordpress", "theme", "template", "synology.com"]
   }
 }
