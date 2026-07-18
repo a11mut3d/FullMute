@@ -103,7 +103,7 @@ class TechDetector:
             language_results = language_detector.detect()
             results["language"] = [f"{name} ({version})" if version else name for name, version in language_results]
 
-        
+
         plugin_detector = PluginDetector(
             url=self.url,
             headers=self.headers,
