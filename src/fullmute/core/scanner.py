@@ -1,5 +1,4 @@
 import asyncio
-import aiohttp
 import gc
 import time
 from typing import List, Dict, Any, Optional
@@ -20,11 +19,12 @@ class FullMuteScanner:
     def __init__(self, db_path: str, config: Dict[str, Any] = None):
         self.db_path = db_path
         self.config = config or {}
-        
+
         self._closed = False
         self._scan_count = 0
-        self._max_scans_before_cleanup = self.config.get('max_scans_before_cleanup', 50)
-        
+        # Увеличил порог очистки, чтобы она реже срабатывала (опционально)
+        self._max_scans_before_cleanup = self.config.get('max_scans_before_cleanup', 200)
+
         self.db = DBQueries(db_path)
         self.signature_loader = SignatureLoader()
         self.signatures = self.signature_loader.load_all()
@@ -72,7 +72,7 @@ class FullMuteScanner:
             'with_cves': 0,
             'with_default_creds': 0
         }
-        
+
         logger.info(f"FullMuteScanner initialized: db={db_path}, max_concurrent={max_concurrent}")
 
     async def scan_domain(self, domain: str):
@@ -136,26 +136,26 @@ class FullMuteScanner:
             if js_libs:
                 self.stats['with_technologies'] += 1
 
-            
+
             tech_with_versions = []
             for tech_type, tech_list in technologies.items():
                 for tech in tech_list:
-                    
+
                     if ' (' in tech and tech.endswith(')'):
                         parts = tech.rsplit(' (', 1)
                         if len(parts) == 2:
                             name = parts[0]
-                            version = parts[1][:-1]  
+                            version = parts[1][:-1]
                             tech_with_versions.append((name, version))
 
-            
+
             if 'plugins' in technologies:
                 for plugin in technologies['plugins']:
                     if ' (' in plugin and plugin.endswith(')'):
                         parts = plugin.rsplit(' (', 1)
                         if len(parts) == 2:
                             name = parts[0]
-                            version = parts[1][:-1]  
+                            version = parts[1][:-1]
                             tech_with_versions.append((name, version))
 
             if 'themes' in technologies:
@@ -164,10 +164,10 @@ class FullMuteScanner:
                         parts = theme.rsplit(' (', 1)
                         if len(parts) == 2:
                             name = parts[0]
-                            version = parts[1][:-1]  
+                            version = parts[1][:-1]
                             tech_with_versions.append((name, version))
 
-            
+
             if tech_with_versions:
                 logger.info(f"Checking CVEs for {len(tech_with_versions)} techs")
                 try:
@@ -285,21 +285,21 @@ class FullMuteScanner:
                         if tech_id:
                             technology_ids[f"{name}_{version}"] = tech_id
 
-                
+
                 plugins = results.get('technologies', {}).get('plugins', [])
                 themes = results.get('technologies', {}).get('themes', [])
 
                 plugin_ids = {}
 
-                
+
                 for plugin in plugins:
                     if ' (' in plugin and plugin.endswith(')'):
                         parts = plugin.rsplit(' (', 1)
                         if len(parts) == 2:
                             name = parts[0]
-                            version = parts[1][:-1]  
+                            version = parts[1][:-1]
 
-                            
+
                             cms_type = 'unknown'
                             if any(word in name.lower() for word in ['wp-', 'wordpress']):
                                 cms_type = 'wordpress'
@@ -308,7 +308,7 @@ class FullMuteScanner:
                             elif any(word in name.lower() for word in ['drupal']):
                                 cms_type = 'drupal'
                             else:
-                                
+
                                 cms_type = 'wordpress'
 
                             plugin_data = {
@@ -322,15 +322,15 @@ class FullMuteScanner:
                             if plugin_id:
                                 plugin_ids[f"{name}_{version}"] = plugin_id
 
-                
+
                 for theme in themes:
                     if ' (' in theme and theme.endswith(')'):
                         parts = theme.rsplit(' (', 1)
                         if len(parts) == 2:
                             name = parts[0]
-                            version = parts[1][:-1]  
+                            version = parts[1][:-1]
 
-                            
+
                             cms_type = 'wordpress_theme'
                             if 'joomla' in name.lower():
                                 cms_type = 'joomla_template'
@@ -348,17 +348,17 @@ class FullMuteScanner:
                             if plugin_id:
                                 plugin_ids[f"{name}_{version}"] = plugin_id
 
-                
+
                 cve_results = results.get('cves', {})
                 for tech_identifier, cves in cve_results.items():
-                    
+
                     if ' (' in tech_identifier and tech_identifier.endswith(')'):
                         parts = tech_identifier.rsplit(' (', 1)
                         if len(parts) == 2:
                             name = parts[0]
-                            version = parts[1][:-1]  
+                            version = parts[1][:-1]
 
-                            
+
                             tech_id_key = f"{name}_{version}"
                             tech_id = technology_ids.get(tech_id_key)
                             plugin_id = plugin_ids.get(tech_id_key)
@@ -425,7 +425,7 @@ class FullMuteScanner:
         logger.info(f"Starting scan of {len(domains)} domains with {max_concurrent} concurrent requests")
 
         semaphore = asyncio.Semaphore(max_concurrent)
-        
+
         consecutive_failures = 0
         max_consecutive_failures = max_concurrent * 2
 
@@ -437,21 +437,21 @@ class FullMuteScanner:
                         self.scan_domain(domain),
                         timeout=self.config.get('timeout', 15) * 2
                     )
-                    
+
                     if result.get('error') is None:
                         consecutive_failures = 0
                     else:
                         consecutive_failures += 1
-                    
+
                     return result
                 except asyncio.TimeoutError:
                     consecutive_failures += 1
                     logger.warning(f"Timeout scanning domain {domain} (failures: {consecutive_failures})")
-                    
+
                     if consecutive_failures >= max_consecutive_failures:
                         logger.error(f"Too many consecutive failures ({consecutive_failures}), "
                                    f"consider reducing concurrent scans or checking network")
-                    
+
                     return {
                         "domain": domain,
                         "technologies": {},
@@ -498,7 +498,7 @@ class FullMuteScanner:
             processed = i + len(batch)
             logger.info(f"Progress: {processed}/{len(domains)} domains processed "
                        f"(consecutive failures: {consecutive_failures})")
-            
+
             if processed % 20 == 0:
                 await self._periodic_cleanup()
 
@@ -510,18 +510,11 @@ class FullMuteScanner:
 
     async def _periodic_cleanup(self):
         self._scan_count += 1
-        
+
         if self._scan_count >= self._max_scans_before_cleanup:
             logger.debug("Running periodic garbage collection")
             self._scan_count = 0
-            
             gc.collect()
-            
-            try:
-                await self.http_client.close()
-                logger.debug("HTTP session recycled")
-            except Exception as e:
-                logger.debug(f"Error during HTTP session cleanup: {e}")
 
     async def close(self):
         if self._closed:
