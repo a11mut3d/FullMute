@@ -7,12 +7,12 @@ logging:
   max_mb: 50
 scanner:
   bypass_cloudflare: false
-  max_concurrent: 5
-  max_delay: 2.0
+  max_concurrent: 20
+  max_delay: 0.6
   max_retries: 3
-  min_delay: 0.5
+  min_delay: 0.2
   nvd_api_key: ''
-  nvd_initial_delay: 1.0
+  nvd_initial_delay: 0.7
   nvd_max_retries: 3
   port_scan:
     enabled: true
@@ -37,7 +37,7 @@ scanner:
     - 5432
     - 5900
     - 8080
-    timeout: 5.0
+    timeout: 3.0
     with_cves: true
     with_exploits: true
   proxy_enabled: false
