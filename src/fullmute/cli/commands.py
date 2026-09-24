@@ -462,8 +462,9 @@ def search(db_path, search_type, query):
 @click.option('--proxy', is_flag=True, help='Use proxies')
 @click.option('--delay-min', default=1.0, help='Minimum delay between requests')
 @click.option('--delay-max', default=3.0, help='Maximum delay between requests')
+@click.option('--full', is_flag=True, help='Run web, CVE, Nuclei, Exploit-DB and port scans')
 @click.pass_context
-def scan(ctx, domains_file, output, max_concurrent, timeout, proxy, delay_min, delay_max):
+def scan(ctx, domains_file, output, max_concurrent, timeout, proxy, delay_min, delay_max, full):
     import os
 
     domains_file = Path(domains_file).resolve()
@@ -499,15 +500,19 @@ def scan(ctx, domains_file, output, max_concurrent, timeout, proxy, delay_min, d
         orchestrator = ScanOrchestrator(ctx.obj['config'])
 
         config = orchestrator.config
-        config['scanner']['max_concurrent'] = max_concurrent
-        config['scanner']['timeout'] = timeout
-        config['scanner']['proxy_enabled'] = proxy
-        config['scanner']['min_delay'] = delay_min
-        config['scanner']['max_delay'] = delay_max
+        scanner_config = config.setdefault('scanner', {})
+        scanner_config['max_concurrent'] = max_concurrent
+        scanner_config['timeout'] = timeout
+        scanner_config['proxy_enabled'] = proxy
+        scanner_config['min_delay'] = delay_min
+        scanner_config['max_delay'] = delay_max
+        if full:
+            click.echo("Full mode: web, CVE, Nuclei, Exploit-DB and port scanning enabled")
 
         results = asyncio.run(orchestrator.scan_from_file(
             str(domains_file),
-            output_file=output
+            output_file=output,
+            full=full,
         ))
 
         click.echo(f"Scan completed! Results saved to: {output}")
