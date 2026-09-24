@@ -81,6 +81,9 @@ fullmute init /fullmute.db
 # Scan domains from a file
 fullmute scan targets.txt
 
+# Run all checks and save one combined JSON report
+fullmute scan targets.txt --full -o full_scan_results.json
+
 # Scan a single domain
 fullmute scan-one example.com
 
@@ -159,3 +162,11 @@ MIT License - See LICENSE file for details.
 ---
 
 **[Mute Ecosystem](https://a11mut3d.github.io/MuteEcosystem/)** 
+# Nuclei CVE verification
+
+FullMute can optionally verify detected CVEs with matching local Nuclei templates. Put the
+official templates in `./nuclei-templates` (or set `FULLMUTE_NUCLEI_TEMPLATES_PATH`), and
+make the `nuclei` executable available in `PATH` (or set `FULLMUTE_NUCLEI_BINARY`). Enable
+**Run Nuclei CVE Templates** in **My Settings**. FullMute then maps `CVE-2026-0137` to a
+matching YAML template automatically. Results are stored with the scan in the web database.
+The scan details page provides download and edit actions for templates that were executed.
