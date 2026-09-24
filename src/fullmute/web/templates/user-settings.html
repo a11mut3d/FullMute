@@ -158,12 +158,27 @@
                                             <i class="fas fa-door-open text-blue-400 mr-2"></i>
                                             <span class="font-medium">Port Scanning</span>
                                         </div>
+
                                         <p class="text-xs text-gray-400">Scan top 20 ports for open services</p>
                                     </div>
                                     <label class="relative inline-flex items-center cursor-pointer">
                                         <input type="checkbox" x-model="settings.port_scan_enabled" class="sr-only peer">
                                         <div class="w-11 h-6 bg-dark-bg peer-focus:ring-2 peer-focus:ring-primary-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
                                     </label>
+                                </div>
+
+                                <div class="flex items-center justify-between mb-4 p-3 bg-dark-bg/50 rounded-lg border border-cyan-800/30">
+                                    <div class="flex-1">
+                                        <div class="flex items-center mb-1"><i class="fas fa-crosshairs text-cyan-400 mr-2"></i><span class="font-medium">Run Nuclei CVE Templates</span></div>
+                                        <p class="text-xs text-gray-400">Find the matching system template automatically when a CVE is detected.</p>
+                                    </div>
+                                    <input type="checkbox" x-model="settings.nuclei_enabled" class="rounded">
+                                </div>
+                                <div x-show="settings.nuclei_enabled" class="ml-4 mb-4 p-3 bg-dark-bg rounded-lg text-xs text-gray-400">
+                                    <div>Binary: <span class="font-mono text-gray-300" x-text="settings.nuclei_binary"></span></div>
+                                    <div>Templates: <span class="font-mono text-gray-300" x-text="settings.nuclei_templates_path"></span></div>
+                                    <div>Timeout: <span class="text-gray-300" x-text="settings.nuclei_timeout + ' seconds'"></span></div>
+                                    <p class="mt-2 text-cyan-400">These values are managed by the FullMute administrator.</p>
                                 </div>
 
                                 <!-- Port Scan with CVEs -->
@@ -316,7 +331,9 @@ function userSettingsApp() {
             port_scan_with_cves: false,
             port_scan_with_exploits: false,
             test_default_credentials: false,
-            search_exploits: false
+            search_exploits: false,
+            nuclei_enabled: false, nuclei_binary: 'nuclei',
+            nuclei_templates_path: './nuclei-templates', nuclei_timeout: 120
         },
         showNvdKey: false,
 
@@ -349,7 +366,11 @@ function userSettingsApp() {
                     port_scan_with_cves: data.port_scan_with_cves || false,
                     port_scan_with_exploits: data.port_scan_with_exploits || false,
                     test_default_credentials: data.test_default_credentials || false,
-                    search_exploits: data.search_exploits || false
+                    search_exploits: data.search_exploits || false,
+                    nuclei_enabled: data.nuclei_enabled || false,
+                    nuclei_binary: data.nuclei_binary || 'nuclei',
+                    nuclei_templates_path: data.nuclei_templates_path || './nuclei-templates',
+                    nuclei_timeout: data.nuclei_timeout || 120
                 };
             }
         },
@@ -360,6 +381,7 @@ function userSettingsApp() {
             formData.append('nvd_api_key', this.settings.nvd_api_key || '');
             formData.append('proxy_enabled', this.settings.proxy_enabled);
             formData.append('proxy_list', this.settings.proxy_list || '');
+            formData.append('nuclei_enabled', this.settings.nuclei_enabled);
             formData.append('port_scan_enabled', this.settings.port_scan_enabled);
             formData.append('port_scan_with_cves', this.settings.port_scan_with_cves);
             formData.append('port_scan_with_exploits', this.settings.port_scan_with_exploits);

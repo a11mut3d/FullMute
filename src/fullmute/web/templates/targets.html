@@ -84,7 +84,7 @@
                             <input 
                                 type="text" 
                                 x-model="search"
-                                @input="loadTargets()"
+                                @input="scheduleTargetLoad()"
                                 placeholder="Search domains..."
                                 class="pl-10 pr-4 py-2 bg-dark-card border border-dark-border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                             >
@@ -358,6 +358,7 @@ function targetsApp() {
         showMoveModal: false,
         showDeleteGroupModal: false,
         loading: false,
+        searchTimer: null,
         newTarget: { host: '', port: '', group_id: '' },
         newGroup: { name: '', description: '' },
         moveToGroupId: '',
@@ -433,7 +434,7 @@ function targetsApp() {
 
         async loadTargets() {
             const token = localStorage.getItem('token');
-            let url = '/api/targets?';
+            let url = '/api/targets?limit=200&offset=0&';
             if (this.selectedGroup) url += `group_id=${this.selectedGroup}&`;
             if (this.search) url += `search=${this.search}&`;
             try {
@@ -451,6 +452,11 @@ function targetsApp() {
                 console.error('Error loading targets:', err);
                 this.targets = [];
             }
+        },
+
+        scheduleTargetLoad() {
+            clearTimeout(this.searchTimer);
+            this.searchTimer = setTimeout(() => this.loadTargets(), 250);
         },
 
         async loadGroups() {

@@ -144,7 +144,8 @@
                                 </div>
                                 
                                 <!-- Individual Target Selection -->
-                                <div class="border border-dark-border rounded-lg max-h-64 overflow-y-auto">
+                                <div class="border border-dark-border rounded-lg max-h-64 overflow-y-auto"
+                                     @scroll="loadMoreTargets($event)">
                                     <table class="w-full">
                                         <thead class="bg-dark-bg sticky top-0">
                                             <tr>
@@ -175,6 +176,7 @@
                                 </div>
                                 <p class="text-sm text-gray-400 mt-2">
                                     <span x-text="selectedTargets.length"></span> targets selected
+                                    <span x-show="targetsLoading" class="ml-2 text-primary-400">Loading...</span>
                                 </p>
                             </div>
 
@@ -241,6 +243,13 @@
                                         </span>
                                     </label>
                                 </div>
+                                <div class="flex items-start mt-4">
+                                    <input type="checkbox" id="runNuclei" x-model="runNuclei" class="mt-1 rounded">
+                                    <label for="runNuclei" class="ml-3 cursor-pointer">
+                                        <span class="block text-sm font-medium text-gray-300"><i class="fas fa-crosshairs text-cyan-400 mr-2"></i>Run matching Nuclei CVE templates</span>
+                                        <span class="block text-xs text-gray-400">Uses the Nuclei configuration from My Settings.</span>
+                                    </label>
+                                </div>
                             </div>
                             
                             <div class="flex items-center justify-between pt-6 border-t border-dark-border">
@@ -287,6 +296,10 @@ function newScanApp() {
     return {
         user: null,
         targets: [],
+        targetOffset: 0,
+        targetPageSize: 100,
+        targetsLoading: false,
+        targetHasMore: true,
         targetGroups: [],
         selectedTargets: [],
         selectedGroupIds: [],
@@ -296,6 +309,7 @@ function newScanApp() {
         testNetwork: false,
         testDefaultCredentials: false,
         searchExploits: false,
+        runNuclei: false,
         loading: false,
 
         async init() {
@@ -308,20 +322,46 @@ function newScanApp() {
             }
             await this.loadTargets();
             await this.loadTargetGroups();
+            const response = await fetch('/api/settings', {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+            });
+            if (response.ok) {
+                this.runNuclei = (await response.json()).nuclei_enabled || false;
+            }
         },
 
-        async loadTargets() {
+        async loadTargets(reset = true) {
             try {
+                if (this.targetsLoading) return;
+                if (reset) {
+                    this.targets = [];
+                    this.targetOffset = 0;
+                    this.targetHasMore = true;
+                }
+                if (!this.targetHasMore) return;
+                this.targetsLoading = true;
                 const token = localStorage.getItem('token');
-                const response = await fetch('/api/targets', {
+                const response = await fetch(`/api/targets?limit=${this.targetPageSize}&offset=${this.targetOffset}`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 if (response.ok) {
-                    this.targets = await response.json() || [];
+                    const page = await response.json() || [];
+                    this.targets.push(...page);
+                    this.targetOffset += page.length;
+                    this.targetHasMore = page.length === this.targetPageSize;
                 }
             } catch (err) {
                 console.error('Failed to load targets:', err);
                 this.targets = [];
+            } finally {
+                this.targetsLoading = false;
+            }
+        },
+
+        async loadMoreTargets(event) {
+            const element = event.target;
+            if (element.scrollTop + element.clientHeight >= element.scrollHeight - 40) {
+                await this.loadTargets(false);
             }
         },
 
@@ -362,9 +402,14 @@ function newScanApp() {
             }
         },
 
-        toggleAllTargets(checked) {
+        async toggleAllTargets(checked) {
             if (checked) {
-                this.selectedTargets = this.targets.map(t => t.id);
+                const response = await fetch('/api/targets/ids', {
+                    headers: { 'Authorization': `****** }
+                });
+                if (response.ok) {
+                    this.selectedTargets = (await response.json()).ids || [];
+                }
             } else {
                 this.selectedTargets = [];
             }
@@ -391,6 +436,7 @@ function newScanApp() {
             formData.append('test_network', this.testNetwork);
             formData.append('test_default_credentials', this.testDefaultCredentials);
             formData.append('search_exploits', this.searchExploits);
+            formData.append('run_nuclei', this.runNuclei);
 
             try {
                 this.loading = true;

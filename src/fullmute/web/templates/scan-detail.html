@@ -181,6 +181,29 @@
                                         </div>
                                     </div>
 
+                                    <div class="mb-3" x-show="result.nuclei && result.nuclei.length > 0">
+                                        <h5 class="text-sm font-medium text-cyan-400 mb-2"><i class="fas fa-crosshairs mr-2"></i>Nuclei CVE Template Results</h5>
+                                        <div class="space-y-1">
+                                            <template x-for="(item, index) in result.nuclei" :key="'nuclei-' + index">
+                                                <div class="p-2 bg-cyan-900/20 rounded border border-cyan-800/30 text-xs">
+                                                    <span class="font-mono text-cyan-300" x-text="item.cve_id"></span>
+                                                    <span class="ml-2 text-gray-300" x-text="item.status"></span>
+                                                    <span x-show="item.template_name" class="block text-gray-500 truncate" x-text="item.template_name"></span>
+                                                    <div x-show="item.template_name" class="flex gap-2 mt-2">
+                                                        <a :href="`/api/scans/${scanId}/nuclei-template?template=${encodeURIComponent(item.template_name)}`"
+                                                           class="px-2 py-1 rounded bg-cyan-600/20 text-cyan-300 hover:bg-cyan-600/40">
+                                                            <i class="fas fa-download mr-1"></i>Download
+                                                        </a>
+                                                        <button @click="openTemplate(item)" class="px-2 py-1 rounded bg-white/10 text-gray-200 hover:bg-white/20">
+                                                            <i class="fas fa-pen mr-1"></i>Edit
+                                                        </button>
+                                                    </div>
+                                                    <pre x-show="item.findings && item.findings.length" class="mt-1 text-gray-300 whitespace-pre-wrap" x-text="JSON.stringify(item.findings, null, 2)"></pre>
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </div>
+
                                     <!-- Open Ports (Port Scanning) -->
                                     <div class="mb-3" x-show="result.open_ports && result.open_ports.length > 0">
                                         <h5 class="text-sm font-medium text-blue-400 mb-2">
@@ -376,6 +399,23 @@
     </div>
 </div>
 
+<div x-show="editor.open" x-cloak class="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-6">
+    <div class="bg-dark-card border border-dark-border rounded-xl w-full max-w-5xl max-h-full p-6" @click.away="closeEditor">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold">Edit Nuclei Template</h3>
+            <button @click="closeEditor" class="text-gray-400 hover:text-white"><i class="fas fa-times"></i></button>
+        </div>
+        <p class="text-xs text-gray-400 mb-2 font-mono" x-text="editor.template"></p>
+        <textarea x-model="editor.content" class="w-full h-[60vh] bg-dark-bg border border-dark-border rounded-lg p-4 font-mono text-sm text-gray-200"></textarea>
+        <div class="flex justify-end gap-3 mt-4">
+            <button @click="closeEditor" class="px-4 py-2 bg-dark-bg border border-dark-border rounded-lg">Cancel</button>
+            <button @click="saveTemplate" :disabled="editor.saving" class="px-4 py-2 bg-primary-600 hover:bg-primary-500 rounded-lg disabled:opacity-50">
+                <i class="fas fa-save mr-1"></i><span x-text="editor.saving ? 'Saving...' : 'Save Template'"></span>
+            </button>
+        </div>
+    </div>
+</div>
+
 <script>
 function scanDetailApp(scanId) {
     return {
@@ -385,6 +425,7 @@ function scanDetailApp(scanId) {
         refreshInterval: null,
         lastStatus: null,
         lastProgress: null,
+        editor: { open: false, template: '', content: '', saving: false },
 
         async init() {
             await this.loadScan();
@@ -438,6 +479,48 @@ function scanDetailApp(scanId) {
                 
                 // Default credentials are now included in the scan results
                 // No separate API call needed
+            }
+        },
+
+        async openTemplate(item) {
+            if (!item.template_name) return;
+            const response = await fetch(`/api/scans/${this.scanId}/nuclei-template?template=${encodeURIComponent(item.template_name)}`, {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+            });
+            if (!response.ok) {
+                alert('Could not load template');
+                return;
+            }
+            this.editor.template = item.template_name;
+            this.editor.content = await response.text();
+            this.editor.open = true;
+        },
+
+        closeEditor() {
+            if (!this.editor.saving) this.editor.open = false;
+        },
+
+        async saveTemplate() {
+            this.editor.saving = true;
+            try {
+                const response = await fetch(`/api/scans/${this.scanId}/nuclei-template?template=${encodeURIComponent(this.editor.template)}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                        'Content-Type': 'text/plain'
+                    },
+                    body: this.editor.content
+                });
+                if (!response.ok) {
+                    const error = await response.json().catch(() => ({}));
+                    throw new Error(error.detail || 'Could not save template');
+                }
+                alert('Template saved');
+                this.editor.open = false;
+            } catch (error) {
+                alert(error.message);
+            } finally {
+                this.editor.saving = false;
             }
         },
         
