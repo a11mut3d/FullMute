@@ -137,7 +137,14 @@ Start the web server.
 Initialize the web database with the default admin user.
 
 ---
+## Nuclei CVE verification
 
+FullMute can optionally verify detected CVEs with matching local Nuclei templates. Put the
+official templates in `./nuclei-templates` (or set `FULLMUTE_NUCLEI_TEMPLATES_PATH`), and
+make the `nuclei` executable available in `PATH` (or set `FULLMUTE_NUCLEI_BINARY`). Enable
+**Run Nuclei CVE Templates** in **My Settings**. FullMute then maps `CVE-2026-0137` to a
+matching YAML template automatically. Results are stored with the scan in the web database.
+The scan details page provides download and edit actions for templates that were executed.
 ## Web Interface
 
 Main pages:
@@ -162,11 +169,3 @@ MIT License - See LICENSE file for details.
 ---
 
 **[Mute Ecosystem](https://a11mut3d.github.io/MuteEcosystem/)** 
-# Nuclei CVE verification
-
-FullMute can optionally verify detected CVEs with matching local Nuclei templates. Put the
-official templates in `./nuclei-templates` (or set `FULLMUTE_NUCLEI_TEMPLATES_PATH`), and
-make the `nuclei` executable available in `PATH` (or set `FULLMUTE_NUCLEI_BINARY`). Enable
-**Run Nuclei CVE Templates** in **My Settings**. FullMute then maps `CVE-2026-0137` to a
-matching YAML template automatically. Results are stored with the scan in the web database.
-The scan details page provides download and edit actions for templates that were executed.
