@@ -456,6 +456,59 @@ class PortScanner:
         banner_bytes: bytes
     ) -> Dict[str, str]:
         result = {'service': service, 'version': '', 'product': ''}
+        banner_text = banner_bytes.decode('utf-8', errors='ignore')
+
+        if service == 'ssh':
+            match = re.search(r'SSH-\d+\.\d+-([^\s\r\n]+)', banner_text, re.IGNORECASE)
+            if match:
+                server = match.group(1)
+                version_match = re.search(r'openssh[_/-]?([\d.]+)', server, re.IGNORECASE)
+                if version_match:
+                    result['product'] = 'openssh'
+                    result['version'] = version_match.group(1)
+                else:
+                    result['product'] = 'ssh'
+                    result['version'] = server
+                return result
+
+        if service in {'http', 'https', 'http-proxy'}:
+            header_match = re.search(
+                r'(?:^|\n)(?:server|x-powered-by):\s*([^\r\n]+)',
+                banner_text,
+                re.IGNORECASE,
+            )
+            server_text = header_match.group(1).strip() if header_match else banner_text
+            product_match = re.search(
+                r'(nginx|apache(?:\s+httpd)?|openresty|microsoft[- ]iis|litespeed|caddy)'
+                r'[/\s_-]*v?([\d][\w.-]*)',
+                server_text,
+                re.IGNORECASE,
+            )
+            if product_match:
+                product = product_match.group(1).lower().replace(' ', '-')
+                if product == 'apache-httpd':
+                    product = 'apache'
+                elif product == 'microsoft-iis':
+                    product = 'microsoft-iis'
+                result['product'] = product
+                result['version'] = product_match.group(2)
+                return result
+            php_match = re.search(r'php[/\s_-]*([\d][\w.-]*)', server_text, re.IGNORECASE)
+            if php_match:
+                result['product'] = 'php'
+                result['version'] = php_match.group(1)
+                return result
+
+        if service == 'ftp':
+            product_match = re.search(
+                r'\b(vsftpd|proftpd)[/\s_-]*([\d][\w.-]*)',
+                banner_text,
+                re.IGNORECASE,
+            )
+            if product_match:
+                result['product'] = product_match.group(1).lower()
+                result['version'] = product_match.group(2)
+                return result
         
         patterns = SERVICE_PATTERNS.get(service, [])
         
@@ -533,11 +586,9 @@ class PortScanner:
 
             if isinstance(result, PortScanResult):
                 
-                if result.state == 'open' and result.banner and result.banner.strip():
+                if result.state == 'open':
                     open_ports.append(result)
-                    logger.debug(f"Port {result.port}/{result.service} is OPEN with banner")
-                elif result.state == 'open' and not result.banner:
-                    logger.debug(f"Port {result.port} is OPEN but no banner (filtered)")
+                    logger.debug(f"Port {result.port}/{result.service} is OPEN")
                 else:
                     logger.debug(f"Port {result.port} is {result.state} (closed/filtered)")
 
@@ -569,10 +620,9 @@ class PortScanner:
         
         services_to_check = []
         for result in results:
-            if result.product and result.version:
-                services_to_check.append((result.product, result.version))
-            elif result.service and result.version:
-                services_to_check.append((result.service, result.version))
+            identity = result.product or result.service
+            if identity and result.version:
+                services_to_check.append((identity, result.version))
 
         if not services_to_check:
             
@@ -613,15 +663,22 @@ class PortScanner:
                 pass
 
         for result in results:
-            service_key = f"{result.product} ({result.version})"
-            if not service_key.startswith(' ('):
-                result.cves = cve_results.get(service_key, [])
+            identity = result.product or result.service
+            service_key = f"{identity} ({result.version})"
+            result.cves = cve_results.get(service_key, []) if result.version else []
 
             
             if search_exploits and result.cves:
-                cve_ids = [cve.get('id') for cve in result.cves if cve.get('id')]
+                cve_ids = [
+                    cve.get('cve_id') or cve.get('id')
+                    for cve in result.cves
+                    if cve.get('cve_id') or cve.get('id')
+                ]
                 if cve_ids:
-                    exploit_results = search_sploit_batch(cve_ids)
+                    loop = asyncio.get_running_loop()
+                    exploit_results = await loop.run_in_executor(
+                        None, search_sploit_batch, cve_ids
+                    )
                     result.exploits = [
                         {'cve_id': cve_id, 'exploits': exps}
                         for cve_id, exps in exploit_results.items()

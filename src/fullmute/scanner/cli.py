@@ -229,10 +229,6 @@ def save(ctx, db_path, target, with_cves, with_exploits, nvd_api_key):
         saved_count = 0
         for port_result in results:
             
-            if not port_result.banner or not port_result.banner.strip():
-                logger.debug(f"Skipping port {port_result.port}: no banner")
-                continue
-
             from dataclasses import asdict
             port_dict = asdict(port_result)
             port_dict['port_scan_id'] = port_scan_id
@@ -249,13 +245,16 @@ def save(ctx, db_path, target, with_cves, with_exploits, nvd_api_key):
                 for cve in port_result.cves:
                     cve_data = {
                         'open_port_id': open_port_id,
-                        **cve
+                        **cve,
+                        'cve_id': cve.get('cve_id') or cve.get('id'),
                     }
                     port_cve_id = db.add_port_cve(cve_data)
                     
                     
-                    if with_exploits and port_result.exploits:
+                    if port_cve_id and with_exploits and port_result.exploits:
                         for exploit in port_result.exploits:
+                            if exploit.get('cve_id') != cve_data['cve_id']:
+                                continue
                             for expl in exploit.get('exploits', []):
                                 exploit_data = {
                                     'port_cve_id': port_cve_id,
@@ -269,9 +268,11 @@ def save(ctx, db_path, target, with_cves, with_exploits, nvd_api_key):
                                 db.add_port_exploit(exploit_data)
         
         click.echo(f"Scan saved successfully!")
-        click.echo(f"  Open ports with banners: {saved_count}")
+        click.echo(f"  Open ports: {saved_count}")
         click.echo(f"  Total CVEs: {sum(len(r.cves) for r in results)}")
-        click.echo(f"  Total Exploits: {sum(len(r.exploits) for r in results)}\n")
+        click.echo(
+            f"  Total Exploits: {sum(sum(len(item.get('exploits', [])) for item in r.exploits) for r in results)}\n"
+        )
         
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
