@@ -237,6 +237,17 @@ COMMON_LOGIN_PATHS = [
     "/mysql", "/sqladmin",
 ]
 
+LOGIN_CONTEXT_WORDS = {
+    "login", "log-in", "signin", "sign-in", "auth", "authenticate",
+    "authentication", "admin", "administrator", "dashboard", "panel",
+    "console", "backend", "control", "manage", "wp-login", "wp-admin",
+}
+NON_LOGIN_CONTEXT_WORDS = {
+    "contact", "feedback", "support", "comment", "comments", "review",
+    "newsletter", "subscribe", "subscription", "register", "signup",
+    "sign-up", "checkout", "search", "forgot-password", "reset-password",
+}
+
 
 class DefaultCredentialsChecker:
     def __init__(self, timeout: int = 10, max_attempts: int = 5,
@@ -288,6 +299,48 @@ class DefaultCredentialsChecker:
         change_ratio = 1.0 - similarity
         return change_ratio > self.content_change_threshold
 
+    def _is_login_context(
+        self, url: str, page_html: str = "", form_html: str = "", action_url: str = ""
+    ) -> bool:
+        """Allow credential submission only for an explicit login/admin context."""
+        path_text = " ".join(
+            urlparse(value).path.lower()
+            for value in (url, action_url)
+            if value
+        )
+        if any(word in path_text for word in NON_LOGIN_CONTEXT_WORDS):
+            return False
+
+        form_context = form_html or page_html
+        if any(
+            re.search(rf"\b{re.escape(word)}\b", form_html, re.IGNORECASE)
+            for word in NON_LOGIN_CONTEXT_WORDS
+        ):
+            return False
+
+        page_context = " ".join(
+            re.findall(r"<(?:title|h1|h2|h3)[^>]*>(.*?)</(?:title|h1|h2|h3)>", page_html,
+                       re.IGNORECASE | re.DOTALL)
+        )
+        context_source = form_html if form_html else page_context
+        context_text = " ".join((url, action_url, context_source)).lower()
+        form_login_markers = (
+            r"\b(login|log-in|signin|sign-in|authenticate|authentication)\b",
+            r"\b(admin|administrator|dashboard|control\s*panel|backoffice|backend)\b",
+        )
+        has_context_marker = any(
+            re.search(pattern, form_context, re.IGNORECASE) for pattern in form_login_markers
+        )
+        has_context_marker = has_context_marker or any(
+            re.search(rf"\b{re.escape(word)}\b", context_text, re.IGNORECASE)
+            for word in LOGIN_CONTEXT_WORDS
+        )
+        has_credentials_fields = bool(
+            re.search(r"\b(username|user[\s_-]*name|login|email)\b", form_context, re.IGNORECASE)
+            and re.search(r"\b(password|passwd|pwd)\b", form_context, re.IGNORECASE)
+        )
+        return has_credentials_fields and has_context_marker
+
     async def detect_login_forms(self, url: str, html: str) -> List[LoginForm]:
         """Detect traditional <form> login forms and simple JS-based login endpoints.
 
@@ -309,6 +362,9 @@ class DefaultCredentialsChecker:
             action_match = re.search(r'action=["\']([^"\']*)["\']', form_html, re.IGNORECASE)
             action = action_match.group(1) if action_match else ""
             action_url = urljoin(url, action) if action else url
+            if not self._is_login_context(url, html, form_html, action_url):
+                logger.debug("Skipping non-login password form: %s", action_url)
+                continue
 
             method_match = re.search(r'method=["\']([^"\']*)["\']', form_html, re.IGNORECASE)
             method = (method_match.group(1) if method_match else "POST").upper()
@@ -432,6 +488,8 @@ class DefaultCredentialsChecker:
 
             # If we found endpoints, create synthetic LoginForm entries
             for ep in normalized:
+                if not self._is_login_context(url, html, "", ep):
+                    continue
                 user_field = next(iter(possible_user_fields), 'username')
                 pass_field = next(iter(possible_pass_fields), 'password')
                 forms.append(LoginForm(
@@ -719,7 +777,6 @@ class DefaultCredentialsChecker:
         if is_blocked_domain(form.action_url):
             logger.debug(f"Skipping credential test on blocked domain: {form.action_url}")
             return results
-
         session = await self._get_session()
 
         if not original_html:
@@ -729,6 +786,9 @@ class DefaultCredentialsChecker:
             except Exception as e:
                 logger.debug(f"Failed to fetch original page: {e}")
                 original_html = ""
+        if not self._is_login_context(form.url, original_html, "", form.action_url):
+            logger.debug("Skipping credential submission outside login/admin context: %s", form.action_url)
+            return results
 
         for i, cred in enumerate(credentials):
             if i > 0:
@@ -872,6 +932,8 @@ class DefaultCredentialsChecker:
             result["credentials_to_test"] = len(credentials)
 
             for form in forms:
+                if not self._is_login_context(form.url, html, "", form.action_url):
+                    continue
                 login_results = await self.test_credentials(form, credentials, html)
                 result["credentials_tested"] += len(credentials)
                 if login_results:
@@ -897,6 +959,8 @@ class DefaultCredentialsChecker:
                                             detected_type="basic_auth"
                                         ))
                                 for path_form in path_forms:
+                                    if not self._is_login_context(path_form.url, path_html, "", path_form.action_url):
+                                        continue
                                     path_results = await self.test_credentials(path_form, credentials, path_html)
                                     result["credentials_tested"] += len(credentials)
                                     if path_results:
