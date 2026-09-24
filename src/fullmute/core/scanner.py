@@ -1,5 +1,6 @@
 import asyncio
 import gc
+import multiprocessing
 import time
 from typing import List, Dict, Any, Optional
 from fullmute.detector.signature_loader import SignatureLoader
@@ -13,6 +14,23 @@ from fullmute.utils.cve_checker import CVEChecker
 from fullmute.detector.default_creds_checker import DefaultCredentialsChecker
 
 logger = setup_logger()
+
+
+def _detect_technologies_worker(connection, url, headers, html, cookies, signatures):
+    """Run regex-heavy detection in a killable process."""
+    try:
+        result = TechDetector(
+            url=url,
+            headers=headers,
+            html=html,
+            cookies=cookies,
+            signatures=signatures
+        ).detect()
+        connection.send(("ok", result))
+    except Exception as e:
+        connection.send(("error", str(e)))
+    finally:
+        connection.close()
 
 
 class FullMuteScanner:
@@ -107,15 +125,23 @@ class FullMuteScanner:
             self.stats['successful'] += 1
 
             logger.info(f"Running TechDetector for {final_url}")
+            detection_limit = max(
+                100_000,
+                int(self.config.get('tech_detection_max_html', 2_000_000))
+            )
+            detection_html = html[:detection_limit]
             tech_detector = TechDetector(
                 url=final_url,
                 headers=headers_dict,
-                html=html,
+                html=detection_html,
                 cookies=cookies_dict,
                 signatures=self.signatures
             )
 
-            technologies = tech_detector.detect()
+            technologies = await self._detect_technologies_with_timeout(
+                tech_detector,
+                timeout=max(1.0, float(self.config.get('tech_detection_timeout', 15)))
+            )
             results["technologies"] = technologies
             logger.debug(f"Tech detection result for {domain}: {list(technologies.keys())}")
 
@@ -177,6 +203,19 @@ class FullMuteScanner:
                     if cve_results:
                         self.stats['with_cves'] += 1
                         logger.info(f"Found CVEs for {domain}: {len(cve_results)} technology(s) affected")
+                        if self.config.get('nuclei_enabled'):
+                            from fullmute.utils.nuclei import NucleiRunner
+                            cve_ids = [
+                                cve.get('id')
+                                for items in cve_results.values()
+                                for cve in items
+                                if cve.get('id')
+                            ]
+                            results["nuclei"] = await NucleiRunner(
+                                binary=self.config.get('nuclei_binary', 'nuclei'),
+                                templates_path=self.config.get('nuclei_templates_path', ''),
+                                timeout=self.config.get('nuclei_timeout', 120),
+                            ).run_for_cves(final_url, cve_ids)
                 except Exception as e:
                     logger.info(f"CVE check failed for {domain}: {e}")
 
@@ -244,6 +283,50 @@ class FullMuteScanner:
             self.stats['failed'] += 1
 
         return results
+
+    async def _detect_technologies_with_timeout(self, detector: TechDetector,
+                                                timeout: float) -> Dict[str, List[str]]:
+        """Run detection outside the event loop and terminate pathological regex work."""
+        context = multiprocessing.get_context("spawn")
+        parent_connection, child_connection = context.Pipe(duplex=False)
+        process = context.Process(
+            target=_detect_technologies_worker,
+            args=(
+                child_connection,
+                detector.url,
+                detector.headers,
+                detector.html,
+                detector.cookies,
+                detector.signatures,
+            ),
+            daemon=True,
+        )
+        process.start()
+        child_connection.close()
+
+        try:
+            deadline = asyncio.get_running_loop().time() + timeout
+            while not parent_connection.poll():
+                if asyncio.get_running_loop().time() >= deadline:
+                    logger.warning("TechDetector timed out; terminating worker process")
+                    process.terminate()
+                    await asyncio.to_thread(process.join, 2)
+                    if process.is_alive():
+                        process.kill()
+                        await asyncio.to_thread(process.join, 1)
+                    return {}
+                await asyncio.sleep(0.05)
+
+            status, payload = parent_connection.recv()
+            if status == "error":
+                logger.warning(f"TechDetector failed: {payload}")
+                return {}
+            return payload if isinstance(payload, dict) else {}
+        finally:
+            parent_connection.close()
+            if process.is_alive():
+                process.terminate()
+            await asyncio.to_thread(process.join, 1)
 
     def _save_to_db(self, domain: str, results: Dict[str, Any]):
         try:
@@ -508,13 +591,24 @@ class FullMuteScanner:
 
         return results
 
+    # ======================= ИСПРАВЛЕННЫЙ МЕТОД =======================
     async def _periodic_cleanup(self):
         self._scan_count += 1
 
         if self._scan_count >= self._max_scans_before_cleanup:
             logger.debug("Running periodic garbage collection")
             self._scan_count = 0
+
+            # Сборка мусора – безопасна и не влияет на активные запросы
             gc.collect()
+
+            # УДАЛЁН ВЫЗОВ await self.http_client.close()
+            # Раньше он закрывал сеанс, что приводило к сбою всех текущих запросов
+            # с ошибкой "Last error: None". Теперь этого не происходит.
+            #
+            # При необходимости пересоздавать сеанс не нужно – HttpClient управляет
+            # своим соединением самостоятельно.
+    # =================================================================
 
     async def close(self):
         if self._closed:
