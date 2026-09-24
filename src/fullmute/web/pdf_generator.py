@@ -7,6 +7,7 @@ from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 from reportlab.pdfgen import canvas
 from datetime import datetime
 import io
+from xml.sax.saxutils import escape
 
 
 class PDFReportGenerator:
@@ -245,7 +246,11 @@ class PDFReportGenerator:
             elements.append(Paragraph("<i>No technical data available. Ensure scans have been completed.</i>", self.styles['NormalSmall']))
             return elements
 
-        domains_table = Table(domains_data, colWidths=[2.2*inch, 0.9*inch, 0.9*inch, 0.9*inch, 1.8*inch])
+        domains_table = Table(
+            domains_data,
+            colWidths=[1.55*inch, 0.75*inch, 0.55*inch, 0.85*inch, 0.85*inch, 1.2*inch],
+            repeatRows=1,
+        )
         domains_table.setStyle(TableStyle([
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
@@ -258,6 +263,93 @@ class PDFReportGenerator:
         ]))
 
         elements.append(domains_table)
+        elements.append(Spacer(1, 0.3*inch))
+
+        details_header = Paragraph("SITES AND CVE DETAILS", self.styles['SubSectionHeader'])
+        elements.append(details_header)
+        for domain_info in report_data.get('domains', []):
+            domain = escape(str(domain_info.get('domain', 'Unknown')))
+            elements.append(Paragraph(domain, self.styles['SubSectionHeader']))
+
+            cves = domain_info.get('cves', [])
+            if isinstance(cves, dict):
+                cves = [
+                    dict(cve, technology=technology)
+                    for technology, items in cves.items()
+                    for cve in (items if isinstance(items, list) else [])
+                    if isinstance(cve, dict)
+                ]
+            if cves:
+                cve_rows = [['CVE', 'Severity', 'CVSS', 'Technology', 'Description']]
+                for cve in cves if isinstance(cves, list) else []:
+                    if not isinstance(cve, dict):
+                        continue
+                    cvss = cve.get('cvss', {}) if isinstance(cve.get('cvss'), dict) else {}
+                    cve_rows.append([
+                        escape(str(cve.get('cve_id') or cve.get('id') or 'Unknown')),
+                        escape(str(cve.get('severity') or cvss.get('severity') or 'N/A')),
+                        escape(str(cve.get('cvss_score') or cvss.get('score') or 'N/A')),
+                        escape(str(cve.get('tech_name') or cve.get('technology') or 'N/A')),
+                        escape(str(cve.get('description') or ''))[:500],
+                    ])
+                cve_table = Table(
+                    [[Paragraph(str(cell), self.styles['NormalSmall']) for cell in row] for row in cve_rows],
+                    colWidths=[1.0*inch, 0.75*inch, 0.55*inch, 1.15*inch, 3.0*inch],
+                    repeatRows=1,
+                )
+                cve_table.setStyle(TableStyle([
+                    ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#dc2626')),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                    ('FONTSIZE', (0, 0), (-1, -1), 8),
+                ]))
+                elements.append(cve_table)
+            else:
+                elements.append(Paragraph("No CVEs found.", self.styles['NormalSmall']))
+
+            open_ports = domain_info.get('open_ports', [])
+            if open_ports:
+                elements.append(Paragraph("OPEN PORTS AND SERVICE VULNERABILITIES", self.styles['Normal']))
+                port_rows = [['Port', 'Service / Version', 'CVEs', 'Exploits']]
+                for port in open_ports:
+                    if not isinstance(port, dict):
+                        continue
+                    service = port.get('service') or port.get('product') or 'unknown'
+                    version = port.get('version') or 'N/A'
+                    port_cves = port.get('cves', [])
+                    cve_ids = []
+                    for port_cve in port_cves if isinstance(port_cves, list) else []:
+                        if isinstance(port_cve, dict):
+                            cve_ids.append(str(port_cve.get('cve_id') or port_cve.get('id') or 'Unknown'))
+                    port_exploits = port.get('exploits', [])
+                    exploit_count = sum(
+                        len(item.get('exploits', []))
+                        for item in port_exploits
+                        if isinstance(item, dict) and isinstance(item.get('exploits'), list)
+                    )
+                    port_rows.append([
+                        escape(str(port.get('port', 'N/A'))),
+                        escape(f"{service} {version}"),
+                        escape(', '.join(cve_ids) or 'None'),
+                        escape(str(exploit_count)),
+                    ])
+                ports_table = Table(
+                    [[Paragraph(str(cell), self.styles['NormalSmall']) for cell in row] for row in port_rows],
+                    colWidths=[0.55*inch, 2.2*inch, 3.0*inch, 0.7*inch],
+                    repeatRows=1,
+                )
+                ports_table.setStyle(TableStyle([
+                    ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#7c3aed')),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                    ('FONTSIZE', (0, 0), (-1, -1), 8),
+                ]))
+                elements.append(ports_table)
+            elements.append(Spacer(1, 0.15*inch))
 
         return elements
 

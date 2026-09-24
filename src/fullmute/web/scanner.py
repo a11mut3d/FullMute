@@ -16,6 +16,7 @@ from fullmute.web.database import (
 from fullmute.core.scanner import FullMuteScanner
 from fullmute.web.scan_queue import get_scan_queue_manager, ScanStatus
 from fullmute.utils.logger import setup_logger
+from fullmute.web.config import config
 
 logger = setup_logger()
 
@@ -78,7 +79,7 @@ def get_domain_findings(domain: str) -> Dict[str, Any]:
         return {'technologies': [], 'cves': [], 'sensitive_files': []}
 
 
-async def run_scan(scan_id: int, user_id: int, target_ids: List[int], test_default_credentials: bool = True, search_exploits: bool = False, port_scan_enabled: bool = False, port_scan_with_cves: bool = False, port_scan_with_exploits: bool = False):
+async def run_scan(scan_id: int, user_id: int, target_ids: List[int], test_default_credentials: bool = True, search_exploits: bool = False, run_nuclei: Optional[bool] = None, port_scan_enabled: bool = False, port_scan_with_cves: bool = False, port_scan_with_exploits: bool = False):
 
     scanner = None
     port_scanner = None
@@ -89,7 +90,13 @@ async def run_scan(scan_id: int, user_id: int, target_ids: List[int], test_defau
         nvd_api_key = user_settings.get('nvd_api_key', '')
         proxy_enabled = user_settings.get('proxy_enabled', False)
         proxy_list = user_settings.get('proxy_list', '')
-        max_concurrent_scans = user_settings.get('max_concurrent_scans', 3)
+        try:
+            max_concurrent_scans = max(1, int(user_settings.get('max_concurrent_scans', 3)))
+        except (TypeError, ValueError):
+            logger.warning("Invalid max_concurrent_scans setting; using 3")
+            max_concurrent_scans = 3
+        if run_nuclei is None:
+            run_nuclei = bool(user_settings.get('nuclei_enabled', False))
         
         
         if port_scan_enabled is False:
@@ -136,7 +143,7 @@ async def run_scan(scan_id: int, user_id: int, target_ids: List[int], test_defau
                     active_scans[scan_id]['status'] = 'completed'
             
             queue_manager = get_scan_queue_manager()
-            await queue_manager.complete_scan(scan_id, user_id, ScanStatus.COMPLETED)
+            queue_manager.complete_scan(scan_id, user_id, ScanStatus.COMPLETED)
             return
 
         
@@ -158,6 +165,8 @@ async def run_scan(scan_id: int, user_id: int, target_ids: List[int], test_defau
         scanner_config = {
             'max_concurrent': max_concurrent_scans,  
             'timeout': 15,
+            'tech_detection_timeout': 15,
+            'tech_detection_max_html': 2_000_000,
             'proxy_enabled': proxy_enabled and len(proxies) > 0,
             'proxy_file': None,  
             'proxies': proxies,  
@@ -269,10 +278,23 @@ async def run_scan(scan_id: int, user_id: int, target_ids: List[int], test_defau
                         cve_ids = [cve['cve_id'] for cve in cve_list if cve.get('cve_id')]
                         if cve_ids:
                             logger.info(f"Searching exploits for {len(cve_ids)} CVEs...")
-                            exploit_results = search_sploit_batch(cve_ids)
+                            loop = asyncio.get_running_loop()
+                            exploit_results = await loop.run_in_executor(
+                                None, search_sploit_batch, cve_ids
+                            )
                             total_exploits = sum(len(exps) for exps in exploit_results.values())
                             if total_exploits > 0:
                                 logger.info(f"Found {total_exploits} exploits for {domain}")
+
+                    nuclei_results = []
+                    if run_nuclei and cve_list:
+                        from fullmute.utils.nuclei import NucleiRunner
+                        cve_ids = [c['cve_id'] for c in cve_list if c.get('cve_id')]
+                        nuclei_results = await NucleiRunner(
+                            binary=config.nuclei_binary,
+                            templates_path=config.nuclei_templates_path,
+                            timeout=config.nuclei_timeout,
+                        ).run_for_cves(result.get('final_url', domain), cve_ids)
 
                     
                     port_scan_results = []
@@ -348,6 +370,7 @@ async def run_scan(scan_id: int, user_id: int, target_ids: List[int], test_defau
                             'sensitive_files': files,
                             'default_credentials': default_creds,
                             'exploits': exploit_results,
+                            'nuclei': nuclei_results,
                             'open_ports': port_scan_results
                         }
 
@@ -454,7 +477,7 @@ async def run_scan(scan_id: int, user_id: int, target_ids: List[int], test_defau
             logger.debug(f"Error during cleanup: {e}")
 
 
-def run_scan_sync(scan_id: int, user_id: int, target_ids: List[int], test_default_credentials: bool = True, search_exploits: bool = False, port_scan_enabled: bool = False, port_scan_with_cves: bool = False, port_scan_with_exploits: bool = False):
+def run_scan_sync(scan_id: int, user_id: int, target_ids: List[int], test_default_credentials: bool = True, search_exploits: bool = False, run_nuclei: Optional[bool] = None, port_scan_enabled: bool = False, port_scan_with_cves: bool = False, port_scan_with_exploits: bool = False):
     try:
         asyncio.run(run_scan(
             scan_id, 
@@ -462,6 +485,7 @@ def run_scan_sync(scan_id: int, user_id: int, target_ids: List[int], test_defaul
             target_ids, 
             test_default_credentials, 
             search_exploits,
+            run_nuclei,
             port_scan_enabled,
             port_scan_with_cves,
             port_scan_with_exploits

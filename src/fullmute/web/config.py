@@ -46,6 +46,10 @@ class WebConfig(BaseSettings):
     scan_timeout: int = 300
     creds_max_attempts: int = 5  
     creds_timeout: int = 10  
+    nuclei_enabled: bool = False
+    nuclei_binary: str = "nuclei"
+    nuclei_templates_path: str = "./nuclei-templates"
+    nuclei_timeout: int = 120
 
     
     max_upload_size: int = 10 * 1024 * 1024  

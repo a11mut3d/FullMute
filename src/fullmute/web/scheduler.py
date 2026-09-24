@@ -5,7 +5,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
-from fullmute.web.database import get_scan_configs, create_scan, get_targets, update_scan_status
+from fullmute.web.database import get_scan_configs, create_scan, get_targets
 from fullmute.web.config import config
 from fullmute.utils.logger import setup_logger
 
@@ -19,12 +19,14 @@ class ScanScheduler:
         self._job_map: Dict[int, str] = {}  
     
     def start(self):
-        self.scheduler.start()
-        logger.info("Scan scheduler started")
+        if not self.scheduler.running:
+            self.scheduler.start()
+            logger.info("Scan scheduler started")
     
     def shutdown(self):
-        self.scheduler.shutdown()
-        logger.info("Scan scheduler stopped")
+        if self.scheduler.running:
+            self.scheduler.shutdown()
+            logger.info("Scan scheduler stopped")
     
     def add_scheduled_scan(self, config_id: int, schedule_type: str, schedule_value: str):
         trigger = self._create_trigger(schedule_type, schedule_value)
@@ -36,7 +38,9 @@ class ScanScheduler:
                 args=[config_id],
                 id=f"scan_{config_id}",
                 replace_existing=True,
-                misfire_grace_time=3600  
+                misfire_grace_time=3600,
+                coalesce=True,
+                max_instances=1
             )
             self._job_map[config_id] = job.id
             logger.info(f"Added scheduled scan for config {config_id} ({schedule_type}: {schedule_value})")
@@ -52,25 +56,29 @@ class ScanScheduler:
             logger.warning(f"Failed to remove scheduled scan: {e}")
     
     def _create_trigger(self, schedule_type: str, schedule_value: str):
-        if schedule_type == "daily":
-            hour = int(schedule_value) if schedule_value.isdigit() else 0
-            return CronTrigger(hour=hour, minute=0)
-        
-        elif schedule_type == "weekly":
-            
-            parts = schedule_value.split(',')
-            if len(parts) == 2:
-                day_of_week = int(parts[0])  
-                hour = int(parts[1])
-                return CronTrigger(day_of_week=day_of_week, hour=hour, minute=0)
-        
-        elif schedule_type == "monthly":
-            
-            parts = schedule_value.split(',')
-            if len(parts) == 2:
-                day = int(parts[0])
-                hour = int(parts[1])
-                return CronTrigger(day=day, hour=hour, minute=0)
+        try:
+            if schedule_type == "daily":
+                hour = int(schedule_value)
+                if 0 <= hour <= 23:
+                    return CronTrigger(hour=hour, minute=0)
+
+            elif schedule_type == "weekly":
+                parts = schedule_value.split(',')
+                if len(parts) == 2:
+                    day_of_week = int(parts[0])
+                    hour = int(parts[1])
+                    if 0 <= day_of_week <= 6 and 0 <= hour <= 23:
+                        return CronTrigger(day_of_week=day_of_week, hour=hour, minute=0)
+
+            elif schedule_type == "monthly":
+                parts = schedule_value.split(',')
+                if len(parts) == 2:
+                    day = int(parts[0])
+                    hour = int(parts[1])
+                    if 1 <= day <= 31 and 0 <= hour <= 23:
+                        return CronTrigger(day=day, hour=hour, minute=0)
+        except (AttributeError, TypeError, ValueError):
+            pass
         
         logger.warning(f"Unknown schedule type: {schedule_type}")
         return None
@@ -88,10 +96,16 @@ class ScanScheduler:
                 return
             
             
+            user_id = config_item.get('created_by')
+            if not user_id:
+                logger.error(f"Scheduled scan config {config_id} has no owner")
+                return
+
             target_ids = []
             for group_id in config_item['target_group_ids']:
                 targets = get_targets(group_id=group_id)
                 target_ids.extend([t['id'] for t in targets])
+            target_ids = list(dict.fromkeys(target_ids))
             
             if not target_ids:
                 logger.warning(f"No targets for scheduled scan {config_id}")
@@ -101,7 +115,14 @@ class ScanScheduler:
             scan_id = create_scan(
                 config_id=config_id,
                 target_ids=target_ids,
-                user_id=config_item.get('created_by')
+                user_id=user_id,
+                organization_id=config_item.get('organization_id') or 1,
+            )
+            from fullmute.web.scan_queue import get_scan_queue_manager
+            get_scan_queue_manager().add_scan(
+                scan_id=scan_id,
+                user_id=user_id,
+                target_ids=target_ids,
             )
             
             logger.info(f"Scheduled scan {scan_id} created for config {config_id}")

@@ -345,12 +345,26 @@ def init_web_db():
                 port_scan_with_exploits BOOLEAN DEFAULT 0,
                 test_default_credentials BOOLEAN DEFAULT 1,
                 search_exploits BOOLEAN DEFAULT 0,
+                nuclei_enabled BOOLEAN DEFAULT 0,
+                nuclei_binary TEXT DEFAULT 'nuclei',
+                nuclei_templates_path TEXT DEFAULT '',
+                nuclei_timeout INTEGER DEFAULT 120,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (user_id) REFERENCES users (id)
             );
 
             CREATE INDEX IF NOT EXISTS idx_user_settings_user ON user_settings(user_id);
         """)
+        cursor.execute("PRAGMA table_info(user_settings)")
+        columns = [col[1] for col in cursor.fetchall()]
+        for name, definition in (
+            ("nuclei_enabled", "BOOLEAN DEFAULT 0"),
+            ("nuclei_binary", "TEXT DEFAULT 'nuclei'"),
+            ("nuclei_templates_path", "TEXT DEFAULT ''"),
+            ("nuclei_timeout", "INTEGER DEFAULT 120"),
+        ):
+            if name not in columns:
+                cursor.execute(f"ALTER TABLE user_settings ADD COLUMN {name} {definition}")
 
         
         cursor.execute("PRAGMA table_info(targets)")
@@ -628,7 +642,8 @@ def add_targets_batch(domains: List[str], group_id: Optional[int] = None, create
     return added
 
 
-def get_targets(group_id: Optional[int] = None, search: str = None, organization_id: int = None, created_by: int = None) -> List[Dict[str, Any]]:
+def get_targets(group_id: Optional[int] = None, search: str = None, organization_id: int = None,
+                created_by: int = None, limit: int = None, offset: int = 0) -> List[Dict[str, Any]]:
     with get_db_connection() as conn:
         cursor = conn.cursor()
         
@@ -675,9 +690,37 @@ def get_targets(group_id: Optional[int] = None, search: str = None, organization
             params.append(f"%{search}%")
 
         query += " ORDER BY t.created_at DESC"
+        if limit is not None:
+            query += " LIMIT ? OFFSET ?"
+            params.extend([max(1, min(int(limit), 500)), max(0, int(offset))])
 
         cursor.execute(query, params)
         return [dict(row) for row in cursor.fetchall()]
+
+
+def get_target_ids(group_id: Optional[int] = None, search: str = None,
+                   organization_id: int = None, created_by: int = None) -> List[int]:
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        conditions = ["t.is_active = 1"]
+        params = []
+        if created_by is not None:
+            conditions.append("t.created_by = ?")
+            params.append(created_by)
+        elif organization_id is not None:
+            conditions.append("t.organization_id = ?")
+            params.append(organization_id)
+        if group_id:
+            conditions.append("t.group_id = ?")
+            params.append(group_id)
+        if search:
+            conditions.append("t.domain LIKE ?")
+            params.append(f"%{search}%")
+        cursor.execute(
+            f"SELECT t.id FROM targets t WHERE {' AND '.join(conditions)} ORDER BY t.created_at DESC",
+            params,
+        )
+        return [row[0] for row in cursor.fetchall()]
 
 
 def delete_target(target_id: int) -> bool:
@@ -820,6 +863,7 @@ def update_scan_results(scan_id: int, results: List[Dict]):
             sensitive_files = result.get('sensitive_files', [])
             default_credentials = result.get('default_credentials', [])
             exploits = result.get('exploits', {})
+            nuclei = result.get('nuclei', [])
             open_ports = result.get('open_ports', [])  
 
             
@@ -831,6 +875,7 @@ def update_scan_results(scan_id: int, results: List[Dict]):
                 'sensitive_files': sensitive_files,
                 'default_credentials': default_credentials,
                 'exploits': exploits,
+                'nuclei': nuclei,
                 'status': result.get('status', 'completed'),
                 'cameras_count': result.get('cameras_count', 0),
                 'exploits_count': result.get('exploits_count', 0),
@@ -879,6 +924,7 @@ def get_scan_results(scan_id: int) -> List[Dict]:
                     # Include exploits and counts so API/UI can display found exploits
                     row_dict['exploits'] = result_data.get('exploits', {})
                     row_dict['exploits_count'] = result_data.get('exploits_count', 0)
+                    row_dict['nuclei'] = result_data.get('nuclei', [])
                     logger.debug(f"Loaded for {row_dict['domain']}: {len(row_dict['technologies'])} techs, {len(row_dict['cves'])} cves, {len(row_dict.get('open_ports', []))} ports, {row_dict.get('exploits_count', 0)} exploits")
                 except Exception as e:
                     logger.error(f"Error parsing result_path: {e}")
@@ -887,6 +933,7 @@ def get_scan_results(scan_id: int) -> List[Dict]:
                     row_dict['sensitive_files'] = []
                     row_dict['default_credentials'] = []
                     row_dict['open_ports'] = []
+                    row_dict['nuclei'] = []
             else:
                 logger.debug(f"No result_path for scan {scan_id}, target {row_dict.get('domain')}")
                 row_dict['technologies'] = []
@@ -1099,7 +1146,8 @@ def get_user_settings(user_id: int) -> Optional[Dict[str, Any]]:
         cursor.execute("""
             SELECT user_id, nvd_api_key, proxy_enabled, proxy_list, max_concurrent_scans,
                    port_scan_enabled, port_scan_with_cves, port_scan_with_exploits,
-                   test_default_credentials, search_exploits, updated_at
+                   test_default_credentials, search_exploits, nuclei_enabled,
+                   nuclei_binary, nuclei_templates_path, nuclei_timeout, updated_at
             FROM user_settings WHERE user_id = ?
         """, (user_id,))
         row = cursor.fetchone()
@@ -1112,18 +1160,22 @@ def create_user_settings(user_id: int, nvd_api_key: str = None, proxy_enabled: b
                          proxy_list: str = None, max_concurrent_scans: int = 3,
                          port_scan_enabled: bool = False, port_scan_with_cves: bool = False,
                          port_scan_with_exploits: bool = False, test_default_credentials: bool = True,
-                         search_exploits: bool = False) -> bool:
+                         search_exploits: bool = False, nuclei_enabled: bool = False,
+                         nuclei_binary: str = "nuclei", nuclei_templates_path: str = "",
+                         nuclei_timeout: int = 120) -> bool:
     with get_db_connection() as conn:
         cursor = conn.cursor()
         try:
             cursor.execute("""
                 INSERT INTO user_settings (user_id, nvd_api_key, proxy_enabled, proxy_list, max_concurrent_scans,
                                           port_scan_enabled, port_scan_with_cves, port_scan_with_exploits,
-                                          test_default_credentials, search_exploits)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                          test_default_credentials, search_exploits,
+                                          nuclei_enabled, nuclei_binary, nuclei_templates_path, nuclei_timeout)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (user_id, nvd_api_key, proxy_enabled, proxy_list, max_concurrent_scans,
                   port_scan_enabled, port_scan_with_cves, port_scan_with_exploits,
-                  test_default_credentials, search_exploits))
+                  test_default_credentials, search_exploits, nuclei_enabled, nuclei_binary,
+                  nuclei_templates_path, nuclei_timeout))
             conn.commit()
             return True
         except sqlite3.IntegrityError:
@@ -1134,7 +1186,9 @@ def update_user_settings(user_id: int, nvd_api_key: str = None, proxy_enabled: b
                          proxy_list: str = None, max_concurrent_scans: int = None,
                          port_scan_enabled: bool = None, port_scan_with_cves: bool = None,
                          port_scan_with_exploits: bool = None, test_default_credentials: bool = None,
-                         search_exploits: bool = None) -> bool:
+                         search_exploits: bool = None, nuclei_enabled: bool = None,
+                         nuclei_binary: str = None, nuclei_templates_path: str = None,
+                         nuclei_timeout: int = None) -> bool:
     with get_db_connection() as conn:
         cursor = conn.cursor()
         
@@ -1148,7 +1202,18 @@ def update_user_settings(user_id: int, nvd_api_key: str = None, proxy_enabled: b
                 nvd_api_key=nvd_api_key or "",
                 proxy_enabled=proxy_enabled or False,
                 proxy_list=proxy_list or "",
-                max_concurrent_scans=max_concurrent_scans or 3
+                max_concurrent_scans=max_concurrent_scans or 3,
+                port_scan_enabled=port_scan_enabled or False,
+                port_scan_with_cves=port_scan_with_cves or False,
+                port_scan_with_exploits=port_scan_with_exploits or False,
+                test_default_credentials=(
+                    test_default_credentials if test_default_credentials is not None else True
+                ),
+                search_exploits=search_exploits or False,
+                nuclei_enabled=nuclei_enabled or False,
+                nuclei_binary=nuclei_binary or "nuclei",
+                nuclei_templates_path=nuclei_templates_path or "",
+                nuclei_timeout=nuclei_timeout or 120
             )
         
         
@@ -1170,6 +1235,21 @@ def update_user_settings(user_id: int, nvd_api_key: str = None, proxy_enabled: b
         if max_concurrent_scans is not None:
             updates.append("max_concurrent_scans = ?")
             params.append(max_concurrent_scans)
+
+        for field, value in (
+            ("port_scan_enabled", port_scan_enabled),
+            ("port_scan_with_cves", port_scan_with_cves),
+            ("port_scan_with_exploits", port_scan_with_exploits),
+            ("test_default_credentials", test_default_credentials),
+            ("search_exploits", search_exploits),
+            ("nuclei_enabled", nuclei_enabled),
+            ("nuclei_binary", nuclei_binary),
+            ("nuclei_templates_path", nuclei_templates_path),
+            ("nuclei_timeout", nuclei_timeout),
+        ):
+            if value is not None:
+                updates.append(f"{field} = ?")
+                params.append(value)
         
         if updates:
             updates.append("updated_at = CURRENT_TIMESTAMP")

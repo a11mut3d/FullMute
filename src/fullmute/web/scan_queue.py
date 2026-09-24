@@ -26,6 +26,7 @@ class ScanStatus(Enum):
 class ScanQueueItem:
     def __init__(self, scan_id: int, user_id: int, target_ids: List[int],
                  test_default_credentials: bool = True, search_exploits: bool = False,
+                 run_nuclei: Optional[bool] = None,
                  port_scan_enabled: bool = False, port_scan_with_cves: bool = False,
                  port_scan_with_exploits: bool = False, max_duration_hours: int = 24):
         self.scan_id = scan_id
@@ -33,6 +34,7 @@ class ScanQueueItem:
         self.target_ids = target_ids
         self.test_default_credentials = test_default_credentials
         self.search_exploits = search_exploits
+        self.run_nuclei = run_nuclei
         self.port_scan_enabled = port_scan_enabled
         self.port_scan_with_cves = port_scan_with_cves
         self.port_scan_with_exploits = port_scan_with_exploits
@@ -69,13 +71,14 @@ class UserScanQueue:
         self._cleanup_interval = 300  
 
     def add_scan(self, scan_id: int, target_ids: List[int], test_default_credentials: bool = True, 
-                 search_exploits: bool = False, port_scan_enabled: bool = False, 
+                 search_exploits: bool = False, run_nuclei: Optional[bool] = None, port_scan_enabled: bool = False,
                  port_scan_with_cves: bool = False, port_scan_with_exploits: bool = False) -> ScanQueueItem:
         with self.lock:
             item = ScanQueueItem(
                 scan_id, self.user_id, target_ids, 
                 test_default_credentials, 
                 search_exploits,
+                run_nuclei,
                 port_scan_enabled,
                 port_scan_with_cves,
                 port_scan_with_exploits
@@ -155,6 +158,7 @@ class UserScanQueue:
                     item.target_ids, 
                     item.test_default_credentials,
                     item.search_exploits,
+                    item.run_nuclei,
                     item.port_scan_enabled,
                     item.port_scan_with_cves,
                     item.port_scan_with_exploits
@@ -277,6 +281,11 @@ class ScanQueueManager:
                 except Exception as e:
                     logger.warning(f"Could not load max_concurrent from config: {e}")
 
+                try:
+                    max_concurrent = max(1, int(max_concurrent))
+                except (TypeError, ValueError):
+                    logger.warning("Invalid scanner.max_concurrent; using 3")
+                    max_concurrent = 3
                 self.user_queues[user_id] = UserScanQueue(user_id, max_concurrent)
                 logger.info(f"Created new queue for user {user_id} with max_concurrent={max_concurrent} (from global config)")
 
@@ -284,6 +293,7 @@ class ScanQueueManager:
 
     def add_scan(self, scan_id: int, user_id: int, target_ids: List[int], 
                  test_default_credentials: bool = True, search_exploits: bool = False,
+                 run_nuclei: Optional[bool] = None,
                  port_scan_enabled: bool = False, port_scan_with_cves: bool = False,
                  port_scan_with_exploits: bool = False) -> ScanQueueItem:
         """Add a scan to user's queue"""
@@ -293,6 +303,7 @@ class ScanQueueManager:
             target_ids, 
             test_default_credentials, 
             search_exploits,
+            run_nuclei,
             port_scan_enabled,
             port_scan_with_cves,
             port_scan_with_exploits
