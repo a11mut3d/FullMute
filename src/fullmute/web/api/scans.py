@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Form, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, status, Form, BackgroundTasks, Query, Body
+from fastapi.responses import PlainTextResponse
 from fastapi import Request
 from typing import Optional, List
 from datetime import datetime
@@ -17,10 +18,78 @@ from fullmute.web.scanner import run_scan_sync, get_scan_progress
 from fullmute.web.scan_queue import get_scan_queue_manager
 from fullmute.db.queries import DBQueries
 from fullmute.utils.logger import setup_logger
+from fullmute.web.config import config
+from pathlib import Path
 
 logger = setup_logger()
 
 router = APIRouter()
+
+
+def _template_file(template_name: str) -> Path:
+    root = Path(config.nuclei_templates_path).expanduser().resolve()
+    candidate = (root / template_name).resolve()
+    try:
+        candidate.relative_to(root)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid template path")
+    if candidate.suffix.lower() not in {".yaml", ".yml"}:
+        raise HTTPException(status_code=400, detail="Only YAML templates are supported")
+    return candidate
+
+
+def _authorize_scan(scan_id: int, current_user: dict):
+    scan = get_scan(
+        scan_id=scan_id,
+        user_id=current_user["id"],
+        role=current_user["role"],
+        organization_id=current_user.get("organization_id"),
+    )
+    if not scan:
+        raise HTTPException(status_code=404, detail="Scan not found")
+    return scan
+
+
+@router.get("/{scan_id}/nuclei-template")
+async def download_nuclei_template(
+    scan_id: int,
+    template: str = Query(..., min_length=1),
+    current_user: dict = Depends(get_current_user),
+):
+    _authorize_scan(scan_id, current_user)
+    path = _template_file(template)
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="Template not found")
+    try:
+        content = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        logger.error("Could not read Nuclei template %s: %s", path, exc)
+        raise HTTPException(status_code=500, detail="Could not read template")
+    return PlainTextResponse(
+        content,
+        headers={"Content-Disposition": f'attachment; filename="{path.name}"'},
+    )
+
+
+@router.put("/{scan_id}/nuclei-template")
+async def update_nuclei_template(
+    scan_id: int,
+    template: str = Query(..., min_length=1),
+    content: str = Body(..., media_type="text/plain"),
+    current_user: dict = Depends(require_role("scanner")),
+):
+    _authorize_scan(scan_id, current_user)
+    path = _template_file(template)
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="Template not found")
+    if len(content.encode("utf-8")) > 1_000_000:
+        raise HTTPException(status_code=413, detail="Template is too large")
+    try:
+        path.write_text(content, encoding="utf-8")
+    except OSError as exc:
+        logger.error("Could not update Nuclei template %s: %s", path, exc)
+        raise HTTPException(status_code=500, detail="Could not update template")
+    return {"message": "Template updated", "template": template}
 
 
 @router.get("/configs")
@@ -71,6 +140,13 @@ async def create_scan_configuration(
         group_ids = json.loads(target_group_ids) if target_group_ids else []
     except:
         group_ids = []
+
+    if schedule_type and schedule_value:
+        if scheduler._create_trigger(schedule_type, schedule_value) is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid schedule. Use daily hour (0-23), weekly day,hour (day 0-6), or monthly day,hour."
+            )
     
     config_id = create_scan_config(
         name=name,
@@ -104,6 +180,7 @@ async def start_scan(
     test_network: bool = Form(False),
     test_default_credentials: bool = Form(False),
     search_exploits: bool = Form(False),
+    run_nuclei: Optional[bool] = Form(None),
     current_user: dict = Depends(get_current_user)
 ):
     
@@ -196,6 +273,7 @@ async def start_scan(
             target_id_list,
             test_default_credentials,
             search_exploits,
+            run_nuclei=run_nuclei,
             port_scan_enabled=test_network,
             port_scan_with_cves=test_network,  
             port_scan_with_exploits=search_exploits  
@@ -500,7 +578,7 @@ async def start_next_scan(
 ):
     queue_manager = get_scan_queue_manager()
     user_queue = queue_manager.get_user_queue(current_user['id'])
-    await user_queue._try_start_scans()
+    user_queue._try_start_scans()
     return {"message": "Queue processed"}
 
 

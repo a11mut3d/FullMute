@@ -20,6 +20,72 @@ def get_scanner_db_path():
 
 
 def get_domain_results(domain: str) -> dict:
+    # Web scans persist their complete JSON result in scan_targets.result_path.
+    # Use it first so reports contain the same data shown on the scan details page.
+    try:
+        with get_db_connection() as web_conn:
+            row = web_conn.execute("""
+                SELECT st.result_path, st.status, s.completed_at, t.domain
+                FROM scan_targets st
+                JOIN scans s ON s.id = st.scan_id
+                JOIN targets t ON t.id = st.target_id
+                WHERE t.domain = ?
+                  AND st.result_path IS NOT NULL
+                  AND st.result_path != ''
+                ORDER BY COALESCE(s.completed_at, s.created_at) DESC
+                LIMIT 1
+            """, (domain,)).fetchone()
+        if row:
+            data = json.loads(row["result_path"] or "{}")
+            if isinstance(data, dict):
+                exploits = data.get("exploits", {})
+                if isinstance(exploits, dict):
+                    exploits = [
+                        dict(exploit, cve_id=cve_id)
+                        for cve_id, items in exploits.items()
+                        for exploit in (items if isinstance(items, list) else [])
+                        if isinstance(exploit, dict)
+                    ]
+                open_ports = data.get("open_ports", [])
+                port_exploits = []
+                port_cves = []
+                for port in open_ports if isinstance(open_ports, list) else []:
+                    if not isinstance(port, dict):
+                        continue
+                    for cve in port.get("cves", []) if isinstance(port.get("cves"), list) else []:
+                        if isinstance(cve, dict):
+                            port_cves.append(dict(
+                                cve,
+                                technology=f"{port.get('service') or port.get('product') or 'unknown'}:{port.get('port', '')}",
+                            ))
+                    for item in port.get("exploits", []) if isinstance(port.get("exploits"), list) else []:
+                        if isinstance(item, dict):
+                            cve_id = item.get("cve_id")
+                            for exploit in item.get("exploits", []) if isinstance(item.get("exploits"), list) else []:
+                                if isinstance(exploit, dict):
+                                    port_exploits.append(dict(
+                                        exploit,
+                                        cve_id=cve_id,
+                                        port=port.get("port"),
+                                        service=port.get("service"),
+                                    ))
+                if not isinstance(exploits, list):
+                    exploits = []
+                exploits.extend(port_exploits)
+                return {
+                    "domain": row["domain"],
+                    "technologies": data.get("technologies", []),
+                    "cves": (data.get("cves", []) if isinstance(data.get("cves", []), list) else []) + port_cves,
+                    "sensitive_files": data.get("sensitive_files", []),
+                    "default_credentials": data.get("default_credentials", []),
+                    "exploits": exploits if isinstance(exploits, list) else [],
+                    "ssh_credentials": data.get("ssh_credentials", []),
+                    "open_ports": open_ports,
+                    "nuclei": data.get("nuclei", []),
+                }
+    except (json.JSONDecodeError, sqlite3.Error, TypeError) as exc:
+        setup_logger().warning("Could not load web scan result for %s: %s", domain, exc)
+
     db_path = get_scanner_db_path()
     logger = setup_logger()
 

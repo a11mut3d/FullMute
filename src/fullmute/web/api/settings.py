@@ -6,6 +6,7 @@ from fullmute.web.auth import get_current_user
 from fullmute.web.database import (
     get_user_settings, update_user_settings, get_or_create_user_settings
 )
+from fullmute.web.config import config
 
 router = APIRouter()
 
@@ -20,6 +21,7 @@ class UserSettings(BaseModel):
     port_scan_with_exploits: bool = False
     test_default_credentials: bool = False
     search_exploits: bool = False
+    nuclei_enabled: bool = False
 
 
 @router.get("")
@@ -37,7 +39,11 @@ async def get_user_settings_endpoint(current_user: dict = Depends(get_current_us
         "port_scan_with_cves": settings.get('port_scan_with_cves', False),
         "port_scan_with_exploits": settings.get('port_scan_with_exploits', False),
         "test_default_credentials": settings.get('test_default_credentials', False),
-        "search_exploits": settings.get('search_exploits', False)
+        "search_exploits": settings.get('search_exploits', False),
+        "nuclei_enabled": settings.get('nuclei_enabled', False),
+        "nuclei_binary": config.nuclei_binary,
+        "nuclei_templates_path": config.nuclei_templates_path,
+        "nuclei_timeout": config.nuclei_timeout
     }
 
 
@@ -51,6 +57,7 @@ async def update_user_settings_endpoint(
     port_scan_with_exploits: bool = Form(False),
     test_default_credentials: bool = Form(False),
     search_exploits: bool = Form(False),
+    nuclei_enabled: bool = Form(False),
     current_user: dict = Depends(get_current_user)
 ):
     
@@ -62,7 +69,6 @@ async def update_user_settings_endpoint(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail=f"Invalid proxy format: {proxy}. Must start with http://, https://, socks5://, or socks4://"
                 )
-
     success = update_user_settings(
         user_id=current_user['id'],
         nvd_api_key=nvd_api_key,
@@ -72,7 +78,8 @@ async def update_user_settings_endpoint(
         port_scan_with_cves=port_scan_with_cves,
         port_scan_with_exploits=port_scan_with_exploits,
         test_default_credentials=test_default_credentials,
-        search_exploits=search_exploits
+        search_exploits=search_exploits,
+        nuclei_enabled=nuclei_enabled
     )
 
     if success:

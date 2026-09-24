@@ -5,7 +5,7 @@ from io import TextIOWrapper
 from fullmute.web.auth import get_current_user, require_role
 from fullmute.web.database import (
     add_target_group, get_target_groups, add_target,
-    add_targets_batch, get_targets, delete_target, get_db_connection
+    add_targets_batch, get_targets, get_target_ids, delete_target, get_db_connection
 )
 from fullmute.utils.logger import setup_logger
 
@@ -95,14 +95,30 @@ async def delete_group(
 async def get_all_targets(
     group_id: Optional[int] = Query(None),
     search: Optional[str] = Query(None),
+    limit: Optional[int] = Query(None, ge=1, le=500),
+    offset: int = Query(0, ge=0),
     current_user: dict = Depends(get_current_user)
 ):
     
     if current_user['role'] == 'admin':
-        return get_targets(group_id=group_id, search=search, organization_id=None)
+        return get_targets(group_id=group_id, search=search, organization_id=None, limit=limit, offset=offset)
     else:
         
-        return get_targets(group_id=group_id, search=search, created_by=current_user['id'])
+        return get_targets(group_id=group_id, search=search, created_by=current_user['id'], limit=limit, offset=offset)
+
+
+@router.get("/ids")
+async def get_all_target_ids(
+    group_id: Optional[int] = Query(None),
+    search: Optional[str] = Query(None),
+    current_user: dict = Depends(get_current_user)
+):
+    kwargs = {"group_id": group_id, "search": search}
+    if current_user['role'] == 'admin':
+        kwargs["organization_id"] = None
+    else:
+        kwargs["created_by"] = current_user['id']
+    return {"ids": get_target_ids(**kwargs)}
 
 
 @router.post("", dependencies=[Depends(require_role("scanner"))])
