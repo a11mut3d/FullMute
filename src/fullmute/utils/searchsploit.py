@@ -17,46 +17,6 @@ def validate_cve(cve_id: str) -> bool:
     return bool(CVE_PATTERN.match(cve_id))
 
 
-def search_sploit(cve_id: str) -> List[Dict]:
-    
-    if not validate_cve(cve_id):
-        logger.warning(f"Invalid CVE ID format: {cve_id}")
-        return []
-    
-    try:
-        
-        
-        result = subprocess.run(
-            ['searchsploit', '--cve', cve_id],
-            capture_output=True,
-            text=True,
-            timeout=30,  
-            shell=False  
-        )
-        
-        if result.returncode != 0:
-            
-            if 'not found' in result.stderr.lower() or not result.stdout.strip():
-                logger.debug(f"No exploits found for {cve_id}")
-                return []
-            logger.warning(f"searchsploit error for {cve_id}: {result.stderr}")
-            return []
-        
-        
-        exploits = parse_searchsploit_output(result.stdout, cve_id)
-        return exploits
-        
-    except subprocess.TimeoutExpired:
-        logger.warning(f"searchsploit timeout for {cve_id}")
-        return []
-    except FileNotFoundError:
-        logger.warning("searchsploit command not found")
-        return []
-    except Exception as e:
-        logger.error(f"Error running searchsploit for {cve_id}: {e}")
-        return []
-
-
 def parse_searchsploit_output(output: str, cve_id: str) -> List[Dict]:
     exploits = []
     lines = output.strip().split('\n')

@@ -163,10 +163,15 @@ async def check_url_safety(url: str, check_redirects: bool = True) -> bool:
         except ValueError:
             pass
         try:
-            addr_info = socket.getaddrinfo(
-                hostname, None,
-                socket.AF_UNSPEC,
-                socket.SOCK_STREAM
+            addr_info = await asyncio.wait_for(
+                asyncio.to_thread(
+                    socket.getaddrinfo,
+                    hostname,
+                    None,
+                    socket.AF_UNSPEC,
+                    socket.SOCK_STREAM
+                ),
+                timeout=5.0
             )
             if not addr_info:
                 logger.warning(f"No DNS records for hostname: {hostname}")
@@ -176,7 +181,7 @@ async def check_url_safety(url: str, check_redirects: bool = True) -> bool:
                 if is_private_ip(ip):
                     logger.warning(f"Blocked access to private IP: {ip} for hostname: {hostname}")
                     return False
-        except socket.gaierror as e:
+        except (socket.gaierror, asyncio.TimeoutError) as e:
             logger.warning(f"DNS resolution failed for {hostname}: {e}")
             return False
         except Exception as e:

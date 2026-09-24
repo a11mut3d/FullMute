@@ -87,7 +87,11 @@ class CVEChecker:
 
             
             'apache': 'apache',
+            'apache httpd': 'apache',
             'nginx': 'nginx',
+            'openssh': 'openbsd',
+            'vsftpd': 'vsftpd',
+            'proftpd': 'proftpd',
             'microsoft-iis': 'microsoft',
             'litespeed': 'litespeed-technologies',
             'openresty': 'openresty',
@@ -369,12 +373,15 @@ class CVEChecker:
     def _map_vendor(self, technology_name: str) -> Optional[str]:
         name_lower = technology_name.lower().replace(' ', '_').replace('.', '').replace('-', '_')
         
+        normalized_mapping = {
+            key.lower().replace(' ', '_').replace('.', '').replace('-', '_'): value
+            for key, value in self.vendor_mapping.items()
+        }
+        if name_lower in normalized_mapping:
+            return normalized_mapping[name_lower]
         
-        if name_lower in self.vendor_mapping:
-            return self.vendor_mapping[name_lower]
         
-        
-        for key, value in self.vendor_mapping.items():
+        for key, value in normalized_mapping.items():
             if key in name_lower or name_lower in key:
                 return value
         
