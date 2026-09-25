@@ -258,84 +258,134 @@ class CVEChecker:
 
         return cves
 
-    async def _query_nvd_api(self, vendor: str, product: str, version: str) -> List[Dict]:
-        
-        cpe_match = f"cpe:2.3:a:{vendor}:{product}:{version}:*:*:*:*:*:*:*"
+    def _build_product_variants(self, product: str) -> List[str]:
+        raw_name = (product or '').strip()
+        if not raw_name:
+            return []
 
-        params = {
-            "virtualMatchString": cpe_match,
-            "resultsPerPage": 2000  
+        base_variants = []
+        normalized = raw_name.lower().replace(' ', '_').replace('-', '_').replace('.', '_')
+        for candidate in [raw_name, normalized, raw_name.lower(), raw_name.replace(' ', '_')]:
+            if candidate and candidate not in base_variants:
+                base_variants.append(candidate)
+
+        alias_map = {
+            'apache_http_server': ['apache_http_server', 'http_server', 'httpd', 'apache'],
+            'apache': ['apache_http_server', 'http_server', 'httpd', 'apache'],
+            'http_server': ['http_server', 'apache_http_server', 'httpd', 'apache'],
+            'httpd': ['httpd', 'apache_http_server', 'http_server', 'apache'],
+            'nginx': ['nginx', 'nginx_web_server'],
+            'nginx_web_server': ['nginx_web_server', 'nginx'],
+            'wordpress': ['wordpress', 'wp'],
+            'wp': ['wordpress', 'wp'],
+            'joomla': ['joomla'],
+            'drupal': ['drupal'],
+            'iis': ['iis', 'microsoft_iis'],
+            'microsoft_iis': ['microsoft_iis', 'iis'],
+            'tomcat': ['tomcat', 'apache_tomcat'],
+            'apache_tomcat': ['apache_tomcat', 'tomcat'],
+            'jquery': ['jquery'],
+            'bootstrap': ['bootstrap'],
+            'node_js': ['node_js', 'nodejs'],
+            'nodejs': ['nodejs', 'node_js'],
         }
 
+        candidates = []
+        for variant in base_variants:
+            key = variant.lower().replace(' ', '_').replace('-', '_').replace('.', '_')
+            for alias in alias_map.get(key, [variant]):
+                clean = alias.strip()
+                if clean and clean not in candidates:
+                    candidates.append(clean)
+
+        if not candidates:
+            return [raw_name]
+
+        return candidates
+
+    async def _query_nvd_api(self, vendor: str, product: str, version: str) -> List[Dict]:
+        vendor = (vendor or '').strip()
+        if not vendor:
+            return []
+
+        product_variants = self._build_product_variants(product)
+        seen_cpe = set()
         retry_count = 0
         delay = self.initial_delay
 
-        while retry_count < self.max_retries:
-            try:
-                
-                if self._session is None or self._session.closed:
-                    self._session = aiohttp.ClientSession(headers=self.headers)
-                
-                async with self._session.get(self.nvd_base_url, params=params) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        cves = []
+        for product_variant in product_variants:
+            cpe_match = f"cpe:2.3:a:{vendor}:{product_variant}:{version}:*:*:*:*:*:*:*"
+            if cpe_match in seen_cpe:
+                continue
+            seen_cpe.add(cpe_match)
 
-                        for item in data.get('vulnerabilities', []):
-                            cve = item.get('cve', {})
-                            cve_id = cve.get('id')
+            params = {
+                "cpeName": cpe_match,
+                "resultsPerPage": 2000
+            }
 
-                            
-                            descriptions = cve.get('descriptions', [])
-                            description = next((desc['value'] for desc in descriptions if desc.get('lang') == 'en'), '')
+            while retry_count < self.max_retries:
+                try:
+                    if self._session is None or self._session.closed:
+                        self._session = aiohttp.ClientSession(headers=self.headers)
 
-                            
-                            metrics = cve.get('metrics', {})
-                            cvss_data = self._extract_cvss_data(metrics)
+                    async with self._session.get(self.nvd_base_url, params=params) as response:
+                        if response.status == 200:
+                            data = await response.json()
+                            cves = []
 
-                            
-                            published = cve.get('published')
+                            for item in data.get('vulnerabilities', []):
+                                cve = item.get('cve', {})
+                                cve_id = cve.get('id')
+                                descriptions = cve.get('descriptions', [])
+                                description = next((desc['value'] for desc in descriptions if desc.get('lang') == 'en'), '')
+                                metrics = cve.get('metrics', {})
+                                cvss_data = self._extract_cvss_data(metrics)
+                                published = cve.get('published')
+                                refs = cve.get('references', [])
+                                reference_urls = [ref.get('url') for ref in refs if ref.get('url')]
 
-                            
-                            refs = cve.get('references', [])
-                            reference_urls = [ref.get('url') for ref in refs if ref.get('url')]
+                                cves.append({
+                                    'id': cve_id,
+                                    'description': description,
+                                    'cvss': cvss_data,
+                                    'published_date': published,
+                                    'last_modified': cve.get('lastModified'),
+                                    'references': reference_urls
+                                })
 
-                            cves.append({
-                                'id': cve_id,
-                                'description': description,
-                                'cvss': cvss_data,
-                                'published_date': published,
-                                'last_modified': cve.get('lastModified'),
-                                'references': reference_urls
-                            })
-
-                        return cves
-                    elif response.status == 404:
-                        
-                        logger.debug(f"No CVEs found for {vendor}:{product}:{version} (status 404)")
-                        return []
-                    elif response.status == 429:
-                        
-                        logger.warning(f"NVD API rate limited (status 429), retrying in {delay}s...")
-                        retry_count += 1
-                        if retry_count < self.max_retries:
-                            await asyncio.sleep(delay)
-                            delay *= 2  
+                            if cves:
+                                return cves
+                            break
+                        elif response.status == 404:
+                            logger.debug(f"No CVEs found for {vendor}:{product_variant}:{version} (status 404)")
+                            break
+                        elif response.status == 429:
+                            logger.warning(f"NVD API rate limited (status 429), retrying in {delay}s...")
+                            retry_count += 1
+                            if retry_count < self.max_retries:
+                                await asyncio.sleep(delay)
+                                delay *= 2
+                            else:
+                                logger.error("NVD API rate limited, max retries exceeded")
+                                return []
                         else:
-                            logger.error(f"NVD API rate limited, max retries exceeded")
+                            logger.error(f"NVD API request failed with status {response.status}")
                             return []
+                except Exception as e:
+                    logger.error(f"Error querying NVD API: {e}")
+                    retry_count += 1
+                    if retry_count < self.max_retries:
+                        await asyncio.sleep(delay)
+                        delay *= 2
                     else:
-                        logger.error(f"NVD API request failed with status {response.status}")
+                        logger.error(f"NVD API request failed after {self.max_retries} retries: {e}")
                         return []
-            except Exception as e:
-                logger.error(f"Error querying NVD API: {e}")
-                retry_count += 1
-                if retry_count < self.max_retries:
-                    await asyncio.sleep(delay)
-                    delay *= 2  
-                else:
-                    logger.error(f"NVD API request failed after {self.max_retries} retries: {e}")
-                    return []
+
+            retry_count = 0
+            delay = self.initial_delay
+
+        return []
 
     def _extract_cvss_data(self, metrics: Dict) -> Dict:
         cvss_data = {}
