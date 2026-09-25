@@ -11,7 +11,7 @@ scanner:
   nuclei_templates_path: './nuclei-templates'
   nuclei_timeout: 120
   bypass_cloudflare: false
-  max_concurrent: 5
+  max_concurrent: 20
   max_delay: 2.0
   max_retries: 3
   min_delay: 0.5
