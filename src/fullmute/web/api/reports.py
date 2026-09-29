@@ -72,6 +72,19 @@ def get_domain_results(domain: str) -> dict:
                 if not isinstance(exploits, list):
                     exploits = []
                 exploits.extend(port_exploits)
+                nuclei = data.get("nuclei", [])
+                nuclei_templates = [
+                    {
+                        "cve_id": item.get("cve_id"),
+                        "template_name": item.get("template_name") or (
+                            Path(str(item.get("template", ""))).name or None
+                        ),
+                        "status": item.get("status", "unknown"),
+                        "findings_count": len(item.get("findings", []))
+                        if isinstance(item.get("findings"), list) else 0,
+                    }
+                    for item in nuclei if isinstance(item, dict)
+                ] if isinstance(nuclei, list) else []
                 return {
                     "domain": row["domain"],
                     "technologies": data.get("technologies", []),
@@ -79,9 +92,36 @@ def get_domain_results(domain: str) -> dict:
                     "sensitive_files": data.get("sensitive_files", []),
                     "default_credentials": data.get("default_credentials", []),
                     "exploits": exploits if isinstance(exploits, list) else [],
+                    "exploit_links": [
+                        {
+                            "cve_id": item.get("cve_id"),
+                            "title": item.get("title") or item.get("name") or "",
+                            "exploit_id": item.get("exploit_id") or item.get("EDB-ID"),
+                            "url": (
+                                item.get("edb_url")
+                                or item.get("exploit_url")
+                                or item.get("url")
+                                or (
+                                    f"https://www.exploit-db.com/exploits/"
+                                    f"{item.get('exploit_id') or item.get('EDB-ID')}"
+                                    if item.get("exploit_id") or item.get("EDB-ID")
+                                    else None
+                                )
+                            ),
+                        }
+                        for item in exploits
+                        if isinstance(item, dict) and (
+                            item.get("edb_url")
+                            or item.get("exploit_url")
+                            or item.get("url")
+                            or item.get("exploit_id")
+                            or item.get("EDB-ID")
+                        )
+                    ],
                     "ssh_credentials": data.get("ssh_credentials", []),
                     "open_ports": open_ports,
-                    "nuclei": data.get("nuclei", []),
+                    "nuclei": nuclei if isinstance(nuclei, list) else [],
+                    "nuclei_templates": nuclei_templates,
                 }
     except (json.JSONDecodeError, sqlite3.Error, TypeError) as exc:
         setup_logger().warning("Could not load web scan result for %s: %s", domain, exc)
