@@ -174,6 +174,7 @@ async def run_scan(scan_id: int, user_id: int, target_ids: List[int], test_defau
             'max_delay': 1.5,
             'nvd_api_key': nvd_api_key if nvd_api_key else None,
             'test_default_credentials': test_default_credentials,  
+            'search_exploits': search_exploits,
             'max_scans_before_cleanup': 20  
         }
 
@@ -263,7 +264,15 @@ async def run_scan(scan_id: int, user_id: int, target_ids: List[int], test_defau
                                             'cvss_score': cve.get('cvss', {}).get('score', ''),
                                             'description': cve.get('description', ''),
                                             'tech_name': tech_name.split(' (')[0] if ' (' in tech_name else tech_name,
-                                            'tech_version': ''
+                                            'tech_version': (
+                                                tech_name.rsplit(' (', 1)[1][:-1]
+                                                if ' (' in tech_name and tech_name.endswith(')')
+                                                else ''
+                                            ),
+                                            'applicability': cve.get('applicability', ''),
+                                            'version_range_confirmed': cve.get(
+                                                'version_range_confirmed', False
+                                            ),
                                         })
                     elif isinstance(cves, list):
                         cve_list = cves
@@ -272,19 +281,9 @@ async def run_scan(scan_id: int, user_id: int, target_ids: List[int], test_defau
                     cve_count = len(cve_list)
 
                     
-                    exploit_results = {}
-                    if search_exploits and cve_list:
-                        from fullmute.utils.searchsploit import search_sploit_batch
-                        cve_ids = [cve['cve_id'] for cve in cve_list if cve.get('cve_id')]
-                        if cve_ids:
-                            logger.info(f"Searching exploits for {len(cve_ids)} CVEs...")
-                            loop = asyncio.get_running_loop()
-                            exploit_results = await loop.run_in_executor(
-                                None, search_sploit_batch, cve_ids
-                            )
-                            total_exploits = sum(len(exps) for exps in exploit_results.values())
-                            if total_exploits > 0:
-                                logger.info(f"Found {total_exploits} exploits for {domain}")
+                    exploit_results = result.get('exploits', {}) or {}
+                    if not isinstance(exploit_results, dict):
+                        exploit_results = {}
 
                     nuclei_results = []
                     if run_nuclei and cve_list:
@@ -352,8 +351,8 @@ async def run_scan(scan_id: int, user_id: int, target_ids: List[int], test_defau
                         if exploit_results and isinstance(cve_list, list):
                             for c in cve_list:
                                 cid = c.get('cve_id') or c.get('id')
-                                if cid and cid in exploit_results and exploit_results.get(cid):
-                                    c['exploits'] = exploit_results.get(cid)
+                                if cid and cid in exploit_results:
+                                    c['exploits'] = exploit_results[cid]
 
                         result_data = {
                             'domain': domain,

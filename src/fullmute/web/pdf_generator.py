@@ -309,6 +309,83 @@ class PDFReportGenerator:
             else:
                 elements.append(Paragraph("No CVEs found.", self.styles['NormalSmall']))
 
+            exploit_links = []
+            for cve in cves if isinstance(cves, list) else []:
+                if not isinstance(cve, dict):
+                    continue
+                cve_id = cve.get('cve_id') or cve.get('id') or 'Unknown'
+                for exploit in cve.get('exploits', []) if isinstance(cve.get('exploits'), list) else []:
+                    if isinstance(exploit, dict):
+                        exploit_links.append((cve_id, exploit))
+            for exploit in domain_info.get('exploits', []) if isinstance(domain_info.get('exploits'), list) else []:
+                if isinstance(exploit, dict):
+                    exploit_links.append((exploit.get('cve_id') or 'N/A', exploit))
+            for exploit in domain_info.get('exploit_links', []) if isinstance(domain_info.get('exploit_links'), list) else []:
+                if isinstance(exploit, dict):
+                    exploit_links.append((exploit.get('cve_id') or 'N/A', exploit))
+
+            if exploit_links:
+                elements.append(Paragraph("EXPLOIT DATABASE REFERENCES", self.styles['Normal']))
+                seen_exploits = set()
+                for cve_id, exploit in exploit_links:
+                    exploit_id = exploit.get('exploit_id') or exploit.get('EDB-ID')
+                    url = (
+                        exploit.get('edb_url')
+                        or exploit.get('exploit_url')
+                        or exploit.get('url')
+                    )
+                    if not url and exploit_id:
+                        url = f"https://www.exploit-db.com/exploits/{exploit_id}"
+                    if not url and isinstance(exploit.get('path'), str):
+                        path = exploit['path']
+                        url = path if path.startswith(('http://', 'https://')) else None
+                    title = exploit.get('title') or exploit.get('name') or exploit.get('path') or 'Exploit reference'
+                    key = (str(cve_id), str(url or title))
+                    if key in seen_exploits:
+                        continue
+                    seen_exploits.add(key)
+                    label = f"{cve_id}: {title}"
+                    if exploit_id:
+                        label += f" (EDB-{exploit_id})"
+                    if url and str(url).startswith(('http://', 'https://')):
+                        escaped_url = escape(str(url)).replace('"', '&quot;')
+                        label = f'<link href="{escaped_url}" color="blue">{escape(label)}</link>'
+                    elements.append(Paragraph(label, self.styles['NormalSmall']))
+
+            nuclei_templates = domain_info.get('nuclei_templates', [])
+            if not nuclei_templates:
+                nuclei_results = domain_info.get('nuclei', [])
+                if not isinstance(nuclei_results, list):
+                    nuclei_results = []
+                nuclei_templates = [
+                    {
+                        'cve_id': item.get('cve_id'),
+                        'template_name': item.get('template_name') or (
+                            str(item.get('template', '')).replace('\\', '/').rsplit('/', 1)[-1]
+                            or None
+                        ),
+                        'status': item.get('status', 'unknown'),
+                        'findings_count': len(item.get('findings', []))
+                        if isinstance(item.get('findings'), list) else 0,
+                    }
+                    for item in nuclei_results
+                    if isinstance(item, dict)
+                ]
+            if nuclei_templates:
+                elements.append(Paragraph("NUCLEI CVE TEMPLATES", self.styles['Normal']))
+                for item in nuclei_templates:
+                    if not isinstance(item, dict):
+                        continue
+                    cve_id = escape(str(item.get('cve_id') or 'N/A'))
+                    template_name = escape(str(item.get('template_name') or 'Template not found'))
+                    status = escape(str(item.get('status') or 'unknown'))
+                    findings_count = item.get('findings_count', 0)
+                    elements.append(Paragraph(
+                        f"{cve_id} - {template_name} (status: {status}; "
+                        f"findings: {findings_count})",
+                        self.styles['NormalSmall'],
+                    ))
+
             open_ports = domain_info.get('open_ports', [])
             if open_ports:
                 elements.append(Paragraph("OPEN PORTS AND SERVICE VULNERABILITIES", self.styles['Normal']))
