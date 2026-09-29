@@ -10,9 +10,25 @@ from fullmute.utils.logger import setup_logger
 logger = setup_logger()
 
 @click.group()
-@click.option('--config', default='config.yaml', help='Path to config file')
+@click.option(
+    '--config',
+    default='config.yaml',
+    show_default=True,
+    type=click.Path(dir_okay=False),
+    help='Path to the YAML configuration file.',
+)
 @click.pass_context
 def cli(ctx, config):
+    """FullMute scanner: scan targets and search saved results.
+
+    Run ``fullmute COMMAND --help`` to see every option for a command.
+
+    \b
+    Examples:
+      fullmute search --help
+      fullmute scan --help
+      fullmute port scan --help
+    """
     ctx.ensure_object(dict)
     ctx.obj['config'] = config
 
@@ -231,17 +247,106 @@ def init(db_path):
 
 
 @cli.command()
-@click.argument('db_path')
-@click.option('--search-type', '-t', type=click.Choice(['cve', 'cms', 'plugin', 'technology', 'domain', 'server', 'database', 'language']), required=True, help='Type of search')
-@click.option('--query', '-q', required=True, help='Search query')
-def search(db_path, search_type, query):
+@click.argument(
+    'db_path',
+    metavar='DB_PATH',
+    type=click.Path(exists=True, dir_okay=False, readable=True),
+)
+@click.option(
+    '--search-type',
+    '-t',
+    type=click.Choice([
+        'cve', 'cms', 'plugin', 'technology', 'domain', 'server',
+        'database', 'language', 'sensitive-file',
+    ]),
+    required=True,
+    help=(
+        'Search category: cve, cms, plugin, technology, domain, server, '
+        'database, language, or sensitive-file.'
+    ),
+)
+@click.option(
+    '--query',
+    '-q',
+    required=True,
+    metavar='TEXT',
+    help=(
+        'Text to find. For sensitive-file, use a file name (for example '
+        '".env") or an exact stored URL/path.'
+    ),
+)
+@click.pass_context
+def search(ctx, db_path, search_type, query):
+    """Search saved scanner database results.
+
+    Sensitive-file searches match one exact file name across domains, or an
+    exact stored path/URL.
+
+    \b
+    Examples:
+      fullmute search fullmute.db -t sensitive-file -q .env
+      fullmute search fullmute.db -t sensitive-file -q /wp-config.php
+      fullmute search fullmute.db -t cve -q CVE-2024
+      fullmute search fullmute.db -t technology -q WordPress
+    """
+    file_query = query.strip()
+    if search_type == 'sensitive-file' and not file_query:
+        raise click.BadParameter(
+            'A file name or path is required for sensitive-file search.',
+            ctx=ctx,
+            param_hint='--query',
+        )
+
     try:
         from fullmute.db.queries import DBQueries
         db = DBQueries(db_path)
 
         results = []
 
-        if search_type == 'cve':
+        if search_type == 'sensitive-file':
+            import sqlite3
+
+            escaped_query = (
+                file_query.lstrip('/')
+                .replace('\\', '\\\\')
+                .replace('%', '\\%')
+                .replace('_', '\\_')
+            )
+            conn = sqlite3.connect(db_path)
+            try:
+                cursor = conn.cursor()
+                cursor.execute(
+                    r'''
+                    SELECT DISTINCT d.domain, sf.file_path, sf.file_type,
+                                    sf.verification_result, sf.found_at
+                    FROM domains d
+                    JOIN sensitive_files sf ON d.id = sf.domain_id
+                    WHERE lower(sf.file_path) = lower(?)
+                       OR lower(sf.file_path) LIKE lower(?) ESCAPE '\'
+                    ORDER BY d.domain, sf.file_path
+                    ''',
+                    (file_query, f'%/{escaped_query}'),
+                )
+                results = cursor.fetchall()
+            finally:
+                conn.close()
+
+            if results:
+                click.echo(
+                    f"\nFound {len(results)} sensitive-file result(s) for "
+                    f"'{file_query}':"
+                )
+                for domain, file_path, file_type, verification, found_at in results:
+                    click.echo(f"  Domain: {domain}")
+                    click.echo(f"    File: {file_path}")
+                    click.echo(f"    Type: {file_type or 'unknown'}")
+                    click.echo(f"    Verification: {verification or 'unknown'}")
+                    click.echo(f"    Found: {found_at or 'unknown'}")
+                    click.echo()
+            else:
+                click.echo(f"No sensitive files found matching '{file_query}'")
+
+        elif search_type == 'cve':
             
             import sqlite3
             conn = sqlite3.connect(db_path)
@@ -594,7 +699,17 @@ def scan_one(ctx, domain):
                             cve_id = cve.get('id', 'N/A')
                             severity = cve.get('cvss', {}).get('severity', 'N/A')
                             score = cve.get('cvss', {}).get('score', 'N/A')
-                            click.echo(f"    - {cve_id} (Severity: {severity}, Score: {score})")
+                            if not cve.get('version_range_confirmed', False):
+                                click.echo(
+                                    f"    - {cve_id} (NVD exact CPE match; explicit affected "
+                                    f"version range not specified, "
+                                    f"Severity: {severity}, Score: {score})"
+                                )
+                            else:
+                                click.echo(
+                                    f"    - {cve_id} (version match; Severity: {severity}, "
+                                    f"Score: {score})"
+                                )
                         if len(cve_list) > 3:
                             click.echo(f"    ... and {len(cve_list) - 3} more")
 
