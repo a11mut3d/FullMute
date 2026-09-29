@@ -46,6 +46,15 @@ def _update_schema_if_needed(conn):
         except sqlite3.Error as e:
             logger.warning(f"Could not add final_url column: {e}")
 
+    cursor.execute("PRAGMA table_info(cves)")
+    cve_columns = [column[1] for column in cursor.fetchall()]
+    if 'applicability' not in cve_columns:
+        try:
+            cursor.execute("ALTER TABLE cves ADD COLUMN applicability TEXT")
+            logger.info("Added applicability column to cves table")
+        except sqlite3.Error as e:
+            logger.warning(f"Could not add applicability column to cves table: {e}")
+
     cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='default_credentials'")
     if not cursor.fetchone():
         try:

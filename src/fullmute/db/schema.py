@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS cves (
     last_modified TIMESTAMP,
     vector_string TEXT,
     references_json TEXT,
+    applicability TEXT,
     FOREIGN KEY (technology_id) REFERENCES technologies (id)
 );
 

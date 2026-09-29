@@ -97,8 +97,8 @@ class DBQueries:
                 cursor.execute('''
                     INSERT OR IGNORE INTO cves
                     (technology_id, cve_id, description, severity, cvss_score, cvss_version,
-                     published_date, last_modified, vector_string, references_json)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     published_date, last_modified, vector_string, references_json, applicability)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ''', (
                     cve_data.get('technology_id'),
                     cve_data.get('cve_id'),
@@ -109,7 +109,8 @@ class DBQueries:
                     cve_data.get('published_date'),
                     cve_data.get('last_modified'),
                     cve_data.get('vector_string'),
-                    json.dumps(cve_data.get('references', []))
+                    json.dumps(cve_data.get('references', [])),
+                    cve_data.get('applicability')
                 ))
         except Exception as e:
             logger.error(f"Failed to add CVE: {e}")
