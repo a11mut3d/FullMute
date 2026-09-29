@@ -219,29 +219,19 @@ COMMON_PASSWORDS = [
 ]
 
 COMMON_LOGIN_PATHS = [
-    "/", "/admin", "/admin.php", "/admin/",
+    "/admin", "/admin.php", "/admin/",
     "/login", "/login.php", "/login/",
     "/signin", "/sign-in", "/sign_in",
     "/auth", "/authenticate", "/authentication",
     "/wp-admin", "/wp-login.php",
     "/administrator", "/administrator/",
+    "/bitrix/admin", "/bitrix/admin/",
     "/manager", "/manager/html",
     "/console", "/admin/console",
-    "/panel", "/controlpanel", "/cpanel",
-    "/user", "/users", "/account",
-    "/portal", "/webportal",
-    "/dashboard", "/dash",
-    "/member", "/members",
     "/siteadmin", "/sysadmin",
     "/phpmyadmin", "/pma",
-    "/mysql", "/sqladmin",
 ]
 
-LOGIN_CONTEXT_WORDS = {
-    "login", "log-in", "signin", "sign-in", "auth", "authenticate",
-    "authentication", "admin", "administrator", "dashboard", "panel",
-    "console", "backend", "control", "manage", "wp-login", "wp-admin",
-}
 NON_LOGIN_CONTEXT_WORDS = {
     "contact", "feedback", "support", "comment", "comments", "review",
     "newsletter", "subscribe", "subscription", "register", "signup",
@@ -300,46 +290,41 @@ class DefaultCredentialsChecker:
         return change_ratio > self.content_change_threshold
 
     def _is_login_context(
-        self, url: str, page_html: str = "", form_html: str = "", action_url: str = ""
+        self,
+        url: str,
+        page_html: str = "",
+        form_html: str = "",
+        action_url: str = "",
+        require_credentials_fields: bool = True,
     ) -> bool:
-        """Allow credential submission only for an explicit login/admin context."""
-        path_text = " ".join(
-            urlparse(value).path.lower()
+        """Allow credential submission only on explicit login/admin routes."""
+        paths = [
+            [part for part in urlparse(value).path.lower().split("/") if part]
             for value in (url, action_url)
             if value
-        )
-        if any(word in path_text for word in NON_LOGIN_CONTEXT_WORDS):
+        ]
+        route_parts = {part for path in paths for part in path}
+        if route_parts.intersection(NON_LOGIN_CONTEXT_WORDS):
             return False
+
+        allowed_route_parts = {
+            "admin", "admin.php", "administrator", "wp-admin", "wp-login.php",
+            "login", "login.php", "log-in", "signin", "sign-in", "sign_in",
+            "user-login", "user_login", "auth", "authenticate", "authentication",
+            "bitrix", "manager", "manager.html", "phpmyadmin", "pma",
+            "siteadmin", "sysadmin", "console", "backend",
+        }
+        if not route_parts.intersection(allowed_route_parts):
+            return False
+
+        if not require_credentials_fields:
+            return True
 
         form_context = form_html or page_html
-        if any(
-            re.search(rf"\b{re.escape(word)}\b", form_html, re.IGNORECASE)
-            for word in NON_LOGIN_CONTEXT_WORDS
-        ):
-            return False
-
-        page_context = " ".join(
-            re.findall(r"<(?:title|h1|h2|h3)[^>]*>(.*?)</(?:title|h1|h2|h3)>", page_html,
-                       re.IGNORECASE | re.DOTALL)
-        )
-        context_source = form_html if form_html else page_context
-        context_text = " ".join((url, action_url, context_source)).lower()
-        form_login_markers = (
-            r"\b(login|log-in|signin|sign-in|authenticate|authentication)\b",
-            r"\b(admin|administrator|dashboard|control\s*panel|backoffice|backend)\b",
-        )
-        has_context_marker = any(
-            re.search(pattern, form_context, re.IGNORECASE) for pattern in form_login_markers
-        )
-        has_context_marker = has_context_marker or any(
-            re.search(rf"\b{re.escape(word)}\b", context_text, re.IGNORECASE)
-            for word in LOGIN_CONTEXT_WORDS
-        )
-        has_credentials_fields = bool(
+        return bool(
             re.search(r"\b(username|user[\s_-]*name|login|email)\b", form_context, re.IGNORECASE)
             and re.search(r"\b(password|passwd|pwd)\b", form_context, re.IGNORECASE)
         )
-        return has_credentials_fields and has_context_marker
 
     async def detect_login_forms(self, url: str, html: str) -> List[LoginForm]:
         """Detect traditional <form> login forms and simple JS-based login endpoints.
@@ -523,7 +508,7 @@ class DefaultCredentialsChecker:
         parsed = urlparse(base_url)
         base = f"{parsed.scheme}://{parsed.netloc}"
 
-        for path in COMMON_LOGIN_PATHS[:15]:
+        for path in COMMON_LOGIN_PATHS:
             test_url = urljoin(base, path)
             try:
                 async with session.head(test_url, ssl=False, allow_redirects=True) as resp:
@@ -786,7 +771,13 @@ class DefaultCredentialsChecker:
             except Exception as e:
                 logger.debug(f"Failed to fetch original page: {e}")
                 original_html = ""
-        if not self._is_login_context(form.url, original_html, "", form.action_url):
+        if not self._is_login_context(
+            form.url,
+            original_html,
+            "",
+            form.action_url,
+            require_credentials_fields=form.method != "BASIC",
+        ):
             logger.debug("Skipping credential submission outside login/admin context: %s", form.action_url)
             return results
 
@@ -932,7 +923,13 @@ class DefaultCredentialsChecker:
             result["credentials_to_test"] = len(credentials)
 
             for form in forms:
-                if not self._is_login_context(form.url, html, "", form.action_url):
+                if not self._is_login_context(
+                    form.url,
+                    html,
+                    "",
+                    form.action_url,
+                    require_credentials_fields=form.method != "BASIC",
+                ):
                     continue
                 login_results = await self.test_credentials(form, credentials, html)
                 result["credentials_tested"] += len(credentials)
@@ -959,7 +956,13 @@ class DefaultCredentialsChecker:
                                             detected_type="basic_auth"
                                         ))
                                 for path_form in path_forms:
-                                    if not self._is_login_context(path_form.url, path_html, "", path_form.action_url):
+                                    if not self._is_login_context(
+                                        path_form.url,
+                                        path_html,
+                                        "",
+                                        path_form.action_url,
+                                        require_credentials_fields=path_form.method != "BASIC",
+                                    ):
                                         continue
                                     path_results = await self.test_credentials(path_form, credentials, path_html)
                                     result["credentials_tested"] += len(credentials)
