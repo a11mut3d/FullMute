@@ -193,9 +193,17 @@ class FullMuteScanner:
                             version = parts[1][:-1]
                             tech_with_versions.append((name, version))
 
+            if not tech_with_versions and any(technologies.values()):
+                logger.info(
+                    f"Technologies detected for {domain}, but no explicit versions were found; "
+                    "skipping version-specific NVD CVE lookup"
+                )
 
             if tech_with_versions:
-                logger.info(f"Checking CVEs for {len(tech_with_versions)} techs")
+                logger.info(
+                    f"Checking CVEs for {len(tech_with_versions)} techs: "
+                    f"{tech_with_versions}"
+                )
                 try:
                     cve_results = await self.cve_checker.check_cves_batch(tech_with_versions)
                     results["cves"] = cve_results
@@ -203,21 +211,34 @@ class FullMuteScanner:
                     if cve_results:
                         self.stats['with_cves'] += 1
                         logger.info(f"Found CVEs for {domain}: {len(cve_results)} technology(s) affected")
-                        if self.config.get('nuclei_enabled'):
+                        cve_ids = list(dict.fromkeys(
+                            cve.get('id')
+                            for items in cve_results.values()
+                            for cve in items
+                            if cve.get('id')
+                        ))
+
+                        if self.config.get('search_exploits') and cve_ids:
+                            from fullmute.utils.searchsploit import search_sploit_batch
+                            results["exploits"] = await asyncio.get_running_loop().run_in_executor(
+                                None, search_sploit_batch, cve_ids
+                            )
+                            for items in cve_results.values():
+                                for cve in items:
+                                    cve["exploits"] = results["exploits"].get(cve.get("id"), [])
+
+                        if self.config.get('nuclei_enabled') and cve_ids:
                             from fullmute.utils.nuclei import NucleiRunner
-                            cve_ids = [
-                                cve.get('id')
-                                for items in cve_results.values()
-                                for cve in items
-                                if cve.get('id')
-                            ]
                             results["nuclei"] = await NucleiRunner(
                                 binary=self.config.get('nuclei_binary', 'nuclei'),
-                                templates_path=self.config.get('nuclei_templates_path', ''),
+                                templates_path=(
+                                    self.config.get('nuclei_templates_path')
+                                    or './nuclei-templates'
+                                ),
                                 timeout=self.config.get('nuclei_timeout', 120),
                             ).run_for_cves(final_url, cve_ids)
                 except Exception as e:
-                    logger.info(f"CVE check failed for {domain}: {e}")
+                    logger.error(f"CVE lookup or enrichment failed for {domain}: {e}")
 
             logger.info(f"Running SensitiveFileVerifier for {final_url}")
             try:
@@ -458,7 +479,8 @@ class FullMuteScanner:
                                         'published_date': cve.get('published_date'),
                                         'last_modified': cve.get('last_modified'),
                                         'vector_string': cve.get('cvss', {}).get('vector'),
-                                        'references': cve.get('references', [])
+                                        'references': cve.get('references', []),
+                                        'applicability': cve.get('applicability'),
                                     }
                                     self.db.add_cve(cve_data)
                             elif plugin_id:

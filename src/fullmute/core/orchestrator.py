@@ -5,7 +5,6 @@ import time
 from pathlib import Path
 from fullmute.core.scanner import FullMuteScanner
 from fullmute.scanner.port_scanner import PortScanner, TOP_20_PORTS
-from fullmute.utils.searchsploit import search_sploit_batch
 from fullmute.utils.nuclei import NucleiRunner
 from fullmute.utils.logger import setup_logger
 from fullmute.db.engine import init_db
@@ -98,22 +97,6 @@ class ScanOrchestrator:
             domain = result.get('domain')
             if not domain or result.get('error'):
                 return result
-
-            cves = result.get('cves', {})
-            cve_ids = []
-            if isinstance(cves, dict):
-                for items in cves.values():
-                    if not isinstance(items, list):
-                        continue
-                    cve_ids.extend(
-                        cve.get('id') or cve.get('cve_id')
-                        for cve in items
-                        if isinstance(cve, dict) and (cve.get('id') or cve.get('cve_id'))
-                    )
-            if cve_ids:
-                result['exploits'] = await asyncio.get_running_loop().run_in_executor(
-                    None, search_sploit_batch, list(dict.fromkeys(cve_ids))
-                )
 
             async with semaphore:
                 started = time.monotonic()
@@ -235,15 +218,89 @@ class ScanOrchestrator:
         for result in results:
             if isinstance(result, Exception):
                 continue
-            json_result = {}
-            for key, value in result.items():
-                json_result[key] = value
+            json_result = dict(result)
+            exploit_links = self._collect_exploit_links(json_result)
+            if exploit_links:
+                json_result['exploit_links'] = exploit_links
+            nuclei_results = json_result.get('nuclei', [])
+            if not isinstance(nuclei_results, list):
+                nuclei_results = []
+            json_result['nuclei_templates'] = [
+                {
+                    'cve_id': item.get('cve_id'),
+                    'template_name': item.get('template_name') or Path(
+                        str(item.get('template', ''))
+                    ).name or None,
+                    'status': item.get('status', 'unknown'),
+                    'findings_count': len(item.get('findings', []))
+                    if isinstance(item.get('findings'), list) else 0,
+                }
+                for item in nuclei_results
+                if isinstance(item, dict)
+            ]
             json_results.append(json_result)
 
         with open(output_path, 'w', encoding='utf-8') as f:
             json.dump(json_results, f, indent=2, ensure_ascii=False)
 
         logger.info(f"Results saved to {output_file}")
+
+    @staticmethod
+    def _collect_exploit_links(result):
+        links = []
+        seen = set()
+
+        def add_exploit(exploit, cve_id=None):
+            if not isinstance(exploit, dict):
+                return
+            exploit_id = exploit.get('exploit_id') or exploit.get('EDB-ID')
+            url = (
+                exploit.get('edb_url')
+                or exploit.get('exploit_url')
+                or exploit.get('url')
+            )
+            if not url and exploit_id:
+                url = f"https://www.exploit-db.com/exploits/{exploit_id}"
+            if not url and isinstance(exploit.get('path'), str):
+                url = exploit['path'] if exploit['path'].startswith(('http://', 'https://')) else None
+            if not url:
+                return
+            link_cve = exploit.get('cve_id') or cve_id
+            key = (str(link_cve or ''), str(url))
+            if key in seen:
+                return
+            seen.add(key)
+            links.append({
+                'cve_id': link_cve,
+                'title': exploit.get('title') or exploit.get('name') or '',
+                'exploit_id': exploit_id,
+                'url': url,
+            })
+
+        def add_exploit_collection(collection, cve_id=None):
+            if isinstance(collection, dict):
+                for key, value in collection.items():
+                    add_exploit_collection(value, key if str(key).startswith('CVE-') else cve_id)
+            elif isinstance(collection, list):
+                for item in collection:
+                    if isinstance(item, dict) and isinstance(item.get('exploits'), list):
+                        add_exploit_collection(item['exploits'], item.get('cve_id') or cve_id)
+                    else:
+                        add_exploit(item, cve_id)
+
+        add_exploit_collection(result.get('exploits'))
+        cves = result.get('cves', [])
+        if isinstance(cves, dict):
+            add_exploit_collection(cves)
+        else:
+            add_exploit_collection([
+                cve for cve in cves
+                if isinstance(cve, dict) and cve.get('exploits')
+            ] if isinstance(cves, list) else [])
+        for port in result.get('open_ports', []) if isinstance(result.get('open_ports'), list) else []:
+            if isinstance(port, dict):
+                add_exploit_collection(port.get('exploits'))
+        return links
 
     async def scan_single(self, domain: str):
         self.initialize()
