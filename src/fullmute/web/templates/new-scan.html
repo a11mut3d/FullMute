@@ -160,13 +160,26 @@
                                             <template x-for="target in targets" :key="target.id">
                                                 <tr class="hover:bg-dark-border/30">
                                                     <td class="px-4 py-2">
-                                                        <input type="checkbox" :value="target.id" x-model="selectedTargets" class="rounded">
+                                                        <input
+                                                            type="checkbox"
+                                                            :checked="selectedTargets.includes(target.id)"
+                                                            @change="toggleTarget(target.id, $event.target.checked)"
+                                                            class="rounded"
+                                                        >
                                                     </td>
                                                     <td class="px-4 py-2" x-text="target.domain"></td>
                                                     <td class="px-4 py-2 text-sm text-gray-400" x-text="target.group_name || '-'"></td>
                                                 </tr>
                                             </template>
-                                            <tr x-show="targets.length === 0">
+                                            <tr x-show="targetsLoading && targets.length === 0">
+                                                <td colspan="3" class="px-4 py-8 text-center text-primary-400">
+                                                    <i class="fas fa-circle-notch fa-spin mr-2"></i>Loading targets...
+                                                </td>
+                                            </tr>
+                                            <tr x-show="targetError">
+                                                <td colspan="3" class="px-4 py-8 text-center text-red-300" x-text="targetError"></td>
+                                            </tr>
+                                            <tr x-show="!targetsLoading && !targetError && targets.length === 0">
                                                 <td colspan="3" class="px-4 py-8 text-center text-gray-400">
                                                     No targets available. <a href="/targets" class="text-primary-400 hover:underline">Add targets first</a>
                                                 </td>
@@ -311,22 +324,46 @@ function newScanApp() {
         searchExploits: false,
         runNuclei: false,
         loading: false,
+        targetError: '',
+
+        authHeaders() {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                throw new Error('Your session has expired. Please sign in again.');
+            }
+            return { 'Authorization': 'Bearer ' + token };
+        },
 
         async init() {
             const userStr = localStorage.getItem('user');
             if (userStr) {
-                this.user = JSON.parse(userStr);
-            } else {
+                try {
+                    this.user = JSON.parse(userStr);
+                } catch (err) {
+                    console.error('Invalid saved user session:', err);
+                    localStorage.removeItem('user');
+                }
+            }
+            if (!this.user) {
+                localStorage.removeItem('token');
                 window.location.href = '/login';
                 return;
             }
             await this.loadTargets();
             await this.loadTargetGroups();
-            const response = await fetch('/api/settings', {
-                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-            });
-            if (response.ok) {
-                this.runNuclei = (await response.json()).nuclei_enabled || false;
+            try {
+                const response = await fetch('/api/settings', {
+                    headers: this.authHeaders(),
+                });
+                if (response.ok) {
+                    this.runNuclei = (await response.json()).nuclei_enabled || false;
+                } else if (response.status === 401) {
+                    window.location.href = '/login';
+                } else {
+                    console.error('Failed to load scan settings:', response.status);
+                }
+            } catch (err) {
+                console.error('Failed to load scan settings:', err);
             }
         },
 
@@ -337,22 +374,25 @@ function newScanApp() {
                     this.targets = [];
                     this.targetOffset = 0;
                     this.targetHasMore = true;
+                    this.targetError = '';
                 }
                 if (!this.targetHasMore) return;
                 this.targetsLoading = true;
-                const token = localStorage.getItem('token');
                 const response = await fetch(`/api/targets?limit=${this.targetPageSize}&offset=${this.targetOffset}`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
+                    headers: this.authHeaders(),
                 });
                 if (response.ok) {
                     const page = await response.json() || [];
                     this.targets.push(...page);
                     this.targetOffset += page.length;
                     this.targetHasMore = page.length === this.targetPageSize;
+                } else {
+                    const data = await response.json().catch(() => ({}));
+                    this.targetError = data.detail || `Could not load targets (HTTP ${response.status}).`;
                 }
             } catch (err) {
                 console.error('Failed to load targets:', err);
-                this.targets = [];
+                this.targetError = err.message || 'Could not load targets.';
             } finally {
                 this.targetsLoading = false;
             }
@@ -367,21 +407,22 @@ function newScanApp() {
 
         async loadTargetGroups() {
             try {
-                const token = localStorage.getItem('token');
                 const response = await fetch('/api/targets/groups', {
-                    headers: { 'Authorization': `Bearer ${token}` }
+                    headers: this.authHeaders(),
                 });
                 if (response.ok) {
                     this.targetGroups = await response.json() || [];
+                } else {
+                    console.error('Failed to load target groups:', response.status);
                 }
             } catch (err) {
                 console.error('Failed to load groups:', err);
-                this.targetGroups = [];
             }
         },
 
-        selectGroup(groupId) {
+        async selectGroup(groupId) {
             try {
+                groupId = Number(groupId);
                 const index = this.selectedGroupIds.indexOf(groupId);
                 if (index > -1) {
                     this.selectedGroupIds.splice(index, 1);
@@ -390,25 +431,51 @@ function newScanApp() {
                 }
 
                 const selectedIds = new Set();
-                this.targets.forEach(target => {
-                    if (target.group_id && this.selectedGroupIds.includes(target.group_id)) {
-                        selectedIds.add(target.id);
+                for (const selectedGroupId of this.selectedGroupIds) {
+                    const response = await fetch(
+                        `/api/targets/ids?group_id=${encodeURIComponent(selectedGroupId)}`,
+                        { headers: this.authHeaders() }
+                    );
+                    if (!response.ok) {
+                        const data = await response.json().catch(() => ({}));
+                        throw new Error(data.detail || `Could not select group (HTTP ${response.status}).`);
                     }
-                });
-
+                    const data = await response.json();
+                    (data.ids || []).forEach(id => selectedIds.add(Number(id)));
+                }
                 this.selectedTargets = Array.from(selectedIds);
             } catch (err) {
                 console.error('Error selecting group:', err);
+                this.targetError = err.message || 'Could not select this target group.';
             }
+        },
+
+        toggleTarget(targetId, checked) {
+            const normalizedId = Number(targetId);
+            const selected = new Set(this.selectedTargets.map(Number));
+            if (checked) {
+                selected.add(normalizedId);
+            } else {
+                selected.delete(normalizedId);
+            }
+            this.selectedTargets = Array.from(selected);
         },
 
         async toggleAllTargets(checked) {
             if (checked) {
-                const response = await fetch('/api/targets/ids', {
-                    headers: { 'Authorization': `****** }
-                });
-                if (response.ok) {
-                    this.selectedTargets = (await response.json()).ids || [];
+                try {
+                    const response = await fetch('/api/targets/ids', {
+                        headers: this.authHeaders(),
+                    });
+                    if (response.ok) {
+                        this.selectedTargets = (await response.json()).ids || [];
+                    } else {
+                        const data = await response.json().catch(() => ({}));
+                        this.targetError = data.detail || `Could not select all targets (HTTP ${response.status}).`;
+                    }
+                } catch (err) {
+                    console.error('Failed to select all targets:', err);
+                    this.targetError = err.message || 'Could not select all targets.';
                 }
             } else {
                 this.selectedTargets = [];
@@ -420,9 +487,8 @@ function newScanApp() {
                 alert('Please select at least one target');
                 return;
             }
-
             this.loading = true;
-            const token = localStorage.getItem('token');
+            this.loading = true;
             const formData = new FormData();
 
             if (this.scanType === 'scheduled') {
@@ -446,7 +512,7 @@ function newScanApp() {
 
                 const response = await fetch('/api/scans/start', {
                     method: 'POST',
-                    headers: { 'Authorization': `Bearer ${token}` },
+                    headers: this.authHeaders(),
                     body: formData
                 });
 
