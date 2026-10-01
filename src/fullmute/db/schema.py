@@ -38,6 +38,8 @@ CREATE TABLE IF NOT EXISTS cves (
     vector_string TEXT,
     references_json TEXT,
     applicability TEXT,
+    exploits_json TEXT,
+    nuclei_templates_json TEXT,
     FOREIGN KEY (technology_id) REFERENCES technologies (id)
 );
 
@@ -66,6 +68,8 @@ CREATE TABLE IF NOT EXISTS plugin_cves (
     last_modified TIMESTAMP,
     vector_string TEXT,
     references_json TEXT,
+    exploits_json TEXT,
+    nuclei_templates_json TEXT,
     FOREIGN KEY (plugin_id) REFERENCES plugins (id)
 );
 
@@ -142,6 +146,7 @@ CREATE TABLE IF NOT EXISTS port_cves (
     last_modified TIMESTAMP,
     vector_string TEXT,
     references_json TEXT,
+    nuclei_templates_json TEXT,
     FOREIGN KEY (open_port_id) REFERENCES open_ports (id)
 );
 

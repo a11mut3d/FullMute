@@ -48,12 +48,40 @@ def _update_schema_if_needed(conn):
 
     cursor.execute("PRAGMA table_info(cves)")
     cve_columns = [column[1] for column in cursor.fetchall()]
-    if 'applicability' not in cve_columns:
-        try:
-            cursor.execute("ALTER TABLE cves ADD COLUMN applicability TEXT")
-            logger.info("Added applicability column to cves table")
-        except sqlite3.Error as e:
-            logger.warning(f"Could not add applicability column to cves table: {e}")
+    cve_migrations = {
+        'applicability': 'TEXT',
+        'exploits_json': 'TEXT',
+        'nuclei_templates_json': 'TEXT',
+    }
+    for column, column_type in cve_migrations.items():
+        if column not in cve_columns:
+            try:
+                cursor.execute(f"ALTER TABLE cves ADD COLUMN {column} {column_type}")
+                logger.info("Added %s column to cves table", column)
+            except sqlite3.Error as e:
+                logger.warning("Could not add %s column to cves table: %s", column, e)
+
+    for table in ('plugin_cves', 'port_cves'):
+        cursor.execute(f"PRAGMA table_info({table})")
+        columns = [column[1] for column in cursor.fetchall()]
+        migrations = {
+            'exploits_json': 'TEXT',
+            'nuclei_templates_json': 'TEXT',
+        } if table == 'plugin_cves' else {
+            'nuclei_templates_json': 'TEXT',
+        }
+        for column, column_type in migrations.items():
+            if column not in columns:
+                try:
+                    cursor.execute(
+                        f"ALTER TABLE {table} ADD COLUMN {column} {column_type}"
+                    )
+                    logger.info("Added %s column to %s table", column, table)
+                except sqlite3.Error as e:
+                    logger.warning(
+                        "Could not add %s column to %s table: %s",
+                        column, table, e
+                    )
 
     cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='default_credentials'")
     if not cursor.fetchone():

@@ -97,8 +97,9 @@ class DBQueries:
                 cursor.execute('''
                     INSERT OR IGNORE INTO cves
                     (technology_id, cve_id, description, severity, cvss_score, cvss_version,
-                     published_date, last_modified, vector_string, references_json, applicability)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     published_date, last_modified, vector_string, references_json, applicability,
+                     exploits_json, nuclei_templates_json)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ''', (
                     cve_data.get('technology_id'),
                     cve_data.get('cve_id'),
@@ -110,7 +111,9 @@ class DBQueries:
                     cve_data.get('last_modified'),
                     cve_data.get('vector_string'),
                     json.dumps(cve_data.get('references', [])),
-                    cve_data.get('applicability')
+                    cve_data.get('applicability'),
+                    json.dumps(cve_data.get('exploits', [])),
+                    json.dumps(cve_data.get('nuclei_templates', []))
                 ))
         except Exception as e:
             logger.error(f"Failed to add CVE: {e}")
@@ -226,8 +229,9 @@ class DBQueries:
                 cursor.execute('''
                     INSERT OR IGNORE INTO plugin_cves
                     (plugin_id, cve_id, description, severity, cvss_score, cvss_version,
-                     published_date, last_modified, vector_string, references_json)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     published_date, last_modified, vector_string, references_json,
+                     exploits_json, nuclei_templates_json)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ''', (
                     plugin_cve_data.get('plugin_id'),
                     plugin_cve_data.get('cve_id'),
@@ -239,6 +243,10 @@ class DBQueries:
                     plugin_cve_data.get('last_modified'),
                     plugin_cve_data.get('vector_string'),
                     plugin_cve_data.get('references_json')
+                    if isinstance(plugin_cve_data.get('references_json'), str)
+                    else json.dumps(plugin_cve_data.get('references', [])),
+                    json.dumps(plugin_cve_data.get('exploits', [])),
+                    json.dumps(plugin_cve_data.get('nuclei_templates', []))
                 ))
         except Exception as e:
             logger.error(f"Failed to add plugin CVE: {e}")
@@ -387,8 +395,8 @@ class DBQueries:
                     INSERT INTO port_cves
                     (open_port_id, cve_id, description, severity, cvss_score,
                      cvss_version, published_date, last_modified, vector_string,
-                     references_json)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     references_json, nuclei_templates_json)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ''', (
                     cve_data.get('open_port_id'),
                     cve_data.get('cve_id'),
@@ -399,7 +407,8 @@ class DBQueries:
                     cve_data.get('published_date'),
                     cve_data.get('last_modified'),
                     cve_data.get('vector_string'),
-                    json.dumps(cve_data.get('references', []))
+                    json.dumps(cve_data.get('references', [])),
+                    json.dumps(cve_data.get('nuclei_templates', []))
                 ))
                 return cursor.lastrowid
         except Exception as e:
