@@ -1,8 +1,11 @@
 import asyncio
 import gc
 import multiprocessing
+import re
 import time
+import xml.etree.ElementTree as ET
 from typing import List, Dict, Any, Optional
+from urllib.parse import urlsplit, urlunsplit
 from fullmute.detector.signature_loader import SignatureLoader
 from fullmute.detector.tech_detector import TechDetector
 from fullmute.core.verifier import SensitiveFileVerifier
@@ -142,6 +145,24 @@ class FullMuteScanner:
                 tech_detector,
                 timeout=max(1.0, float(self.config.get('tech_detection_timeout', 15)))
             )
+
+            if any(
+                tech.split(' (', 1)[0].strip().casefold() in {'joomla', 'joomla!'}
+                for tech_list in technologies.values()
+                for tech in tech_list
+            ):
+                joomla_version = await self._fetch_joomla_xml_version(final_url)
+                if joomla_version:
+                    for tech_list in technologies.values():
+                        for index, tech in enumerate(tech_list):
+                            name = tech.split(' (', 1)[0].strip()
+                            if name.casefold() in {'joomla', 'joomla!'}:
+                                tech_list[index] = f"{name} ({joomla_version})"
+                    logger.info(
+                        f"Joomla version confirmed from language XML: "
+                        f"{joomla_version}"
+                    )
+
             results["technologies"] = technologies
             logger.debug(f"Tech detection result for {domain}: {list(technologies.keys())}")
 
@@ -164,34 +185,26 @@ class FullMuteScanner:
 
 
             tech_with_versions = []
-            for tech_type, tech_list in technologies.items():
+            for tech_list in technologies.values():
                 for tech in tech_list:
+                    if not isinstance(tech, str) or ' (' not in tech or not tech.endswith(')'):
+                        if isinstance(tech, str):
+                            logger.info(
+                                f"Skipping NVD CVE lookup for detected technology "
+                                f"without an explicit version: {tech}"
+                            )
+                        continue
+                    name, version = tech.rsplit(' (', 1)
+                    version = version[:-1].strip()
+                    if name.strip() and version:
+                        tech_with_versions.append((name.strip(), version))
+                    else:
+                        logger.info(
+                            f"Skipping NVD CVE lookup for detected technology "
+                            f"with an empty name or version: {tech}"
+                        )
 
-                    if ' (' in tech and tech.endswith(')'):
-                        parts = tech.rsplit(' (', 1)
-                        if len(parts) == 2:
-                            name = parts[0]
-                            version = parts[1][:-1]
-                            tech_with_versions.append((name, version))
-
-
-            if 'plugins' in technologies:
-                for plugin in technologies['plugins']:
-                    if ' (' in plugin and plugin.endswith(')'):
-                        parts = plugin.rsplit(' (', 1)
-                        if len(parts) == 2:
-                            name = parts[0]
-                            version = parts[1][:-1]
-                            tech_with_versions.append((name, version))
-
-            if 'themes' in technologies:
-                for theme in technologies['themes']:
-                    if ' (' in theme and theme.endswith(')'):
-                        parts = theme.rsplit(' (', 1)
-                        if len(parts) == 2:
-                            name = parts[0]
-                            version = parts[1][:-1]
-                            tech_with_versions.append((name, version))
+            tech_with_versions = list(dict.fromkeys(tech_with_versions))
 
             if not tech_with_versions and any(technologies.values()):
                 logger.info(
@@ -210,7 +223,11 @@ class FullMuteScanner:
 
                     if cve_results:
                         self.stats['with_cves'] += 1
-                        logger.info(f"Found CVEs for {domain}: {len(cve_results)} technology(s) affected")
+                        total_cves = sum(len(items) for items in cve_results.values())
+                        logger.info(
+                            f"Found {total_cves} CVEs across "
+                            f"{len(cve_results)} technologies for {domain}"
+                        )
                         cve_ids = list(dict.fromkeys(
                             cve.get('id')
                             for items in cve_results.values()
@@ -238,7 +255,9 @@ class FullMuteScanner:
                                 timeout=self.config.get('nuclei_timeout', 120),
                             ).run_for_cves(final_url, cve_ids)
                 except Exception as e:
-                    logger.error(f"CVE lookup or enrichment failed for {domain}: {e}")
+                    logger.exception(
+                        f"CVE lookup or enrichment failed for {domain}: {e}"
+                    )
 
             logger.info(f"Running SensitiveFileVerifier for {final_url}")
             try:
@@ -294,7 +313,8 @@ class FullMuteScanner:
 
             logger.info(
                 f"Scanned {domain} - Tech: {len(technologies.get('cms', []))} CMS, "
-                f"CVEs: {len(results['cves'])}, Files: {len(sensitive_files)}, "
+                f"CVEs: {sum(len(items) for items in results['cves'].values())}, "
+                f"Files: {len(sensitive_files)}, "
                 f"Default Cred: {len(results['default_credentials'])}"
             )
 
@@ -304,6 +324,63 @@ class FullMuteScanner:
             self.stats['failed'] += 1
 
         return results
+
+    async def _fetch_joomla_xml_version(self, site_url: str) -> str:
+        parsed_url = urlsplit(site_url)
+        if not parsed_url.hostname:
+            logger.warning(
+                "Cannot check Joomla version XML: invalid site URL %s",
+                site_url,
+            )
+            return ""
+
+        hostname = parsed_url.hostname
+        if ':' in hostname and not hostname.startswith('['):
+            hostname = f"[{hostname}]"
+
+        port = parsed_url.port
+        if port and not (
+            parsed_url.scheme == 'http' and port == 80
+        ):
+            hostname = f"{hostname}:{port}"
+
+        xml_url = urlunsplit((
+            'https',
+            hostname,
+            '/language/en-GB/en-GB.xml',
+            '',
+            '',
+        ))
+
+        try:
+            body, _, _, status_code, _ = await self.http_client.fetch(xml_url)
+        except Exception:
+            logger.exception("Joomla version XML request failed: %s", xml_url)
+            return ""
+
+        if not body or status_code != 200:
+            logger.info(
+                "Joomla version XML unavailable at %s (HTTP %s)",
+                xml_url,
+                status_code,
+            )
+            return ""
+
+        try:
+            root = ET.fromstring(body)
+        except ET.ParseError:
+            logger.warning("Invalid Joomla version XML returned by %s", xml_url)
+            return ""
+
+        for element in root.iter():
+            if element.tag.rsplit('}', 1)[-1].casefold() != 'version':
+                continue
+            version = (element.text or '').strip()
+            if re.fullmatch(r'\d+(?:\.\d+){1,3}(?:[-+][0-9A-Za-z.-]+)?', version):
+                return version
+
+        logger.info("No valid <version> tag found in Joomla XML at %s", xml_url)
+        return ""
 
     async def _detect_technologies_with_timeout(self, detector: TechDetector,
                                                 timeout: float) -> Dict[str, List[str]]:
