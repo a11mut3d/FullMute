@@ -619,6 +619,8 @@ class DefaultCredentialsChecker:
             return False, "401 Unauthorized", -100
         if status_code == 403:
             return False, "403 Forbidden", -100
+        if status_code >= 400:
+            return False, f"HTTP {status_code} response", -100
 
         login_form_patterns = [
             (r'<form[^>]*login', 'login form tag'),
@@ -633,6 +635,23 @@ class DefaultCredentialsChecker:
         if original_has_form and response_has_form:
             failure_reasons.append("Login form still present")
             score -= 5
+
+        strong_success_patterns = [
+            r'login\s*successful',
+            r'authentication\s*successful',
+            r'logged\s*in',
+            r'Howdy,\s*\w+',
+            r'welcome\s+back',
+            r'<a\b[^>]*href=["\'][^"\']*(?:logout|log-out|sign-out)[^"\']*["\'][^>]*>',
+            r'<button\b[^>]*[^>]*>\s*(?:log\s*out|sign\s*out)\s*</button>',
+        ]
+        new_success_indicators = [
+            pattern for pattern in strong_success_patterns
+            if re.search(pattern, response_text, re.IGNORECASE)
+            and not re.search(pattern, original_text, re.IGNORECASE)
+        ]
+        if new_success_indicators:
+            reasons.append("New explicit authenticated-state indicator")
 
         content_changed = self._has_significant_change(original_text, response_text)
         if content_changed:
@@ -748,10 +767,36 @@ class DefaultCredentialsChecker:
             score -= 10
             reasons.append("Login form still present (-10)")
 
-        if score >= 12:
-            return True, f"SUCCESS (Score: {score}) - " + "; ".join(reasons), score
-        elif score >= 7:
-            return True, f"POSSIBLE SUCCESS (Score: {score}) - " + "; ".join(reasons), score
+        try:
+            original = urlparse(original_url)
+            response = urlparse(response_url)
+            response_path_parts = {
+                part.casefold()
+                for part in response.path.split("/")
+                if part
+            }
+            admin_path_parts = {
+                "admin", "wp-admin", "administrator", "dashboard",
+                "console", "manage", "backend",
+            }
+            redirected_to_admin = (
+                response.hostname
+                and original.hostname
+                and response.hostname.casefold() == original.hostname.casefold()
+                and response.path != original.path
+                and bool(response_path_parts & admin_path_parts)
+                and not response_has_form
+            )
+        except ValueError:
+            redirected_to_admin = False
+
+        if new_success_indicators:
+            return True, f"CONFIRMED SUCCESS (Score: {score}) - " + "; ".join(reasons), score
+        if redirected_to_admin:
+            reasons.append("Redirected to same-host admin area and login form disappeared")
+            return True, f"CONFIRMED SUCCESS (Score: {score}) - " + "; ".join(reasons), score
+        if score >= 7:
+            return False, f"POSSIBLE SUCCESS (Score: {score}) - " + "; ".join(reasons), score
         else:
             return False, f"UNLIKELY (Score: {score}) - " + "; ".join(reasons + failure_reasons), score
 
