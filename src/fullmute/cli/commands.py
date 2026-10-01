@@ -1,4 +1,5 @@
 import click
+import builtins
 import json
 import asyncio
 from pathlib import Path
@@ -729,7 +730,48 @@ def export(db_path, format):
     try:
         from fullmute.db.queries import DBQueries
 
+        init_db(db_path)
         db = DBQueries(db_path)
+
+        def decode_list(value):
+            try:
+                decoded = json.loads(value or '[]')
+            except (TypeError, json.JSONDecodeError):
+                return []
+            return decoded if isinstance(decoded, builtins.list) else []
+
+        def attach_cve_enrichment(cve):
+            cve['references'] = decode_list(cve.pop('references_json', None))
+            cve['exploits'] = decode_list(cve.pop('exploits_json', None))
+            cve['nuclei_templates'] = decode_list(
+                cve.pop('nuclei_templates_json', None)
+            )
+            exploit_links = []
+            for exploit in cve['exploits']:
+                if not isinstance(exploit, dict):
+                    continue
+                exploit_id = exploit.get('exploit_id') or exploit.get('EDB-ID')
+                path = exploit.get('path')
+                if not exploit_id and isinstance(path, str):
+                    path_stem = Path(path.replace('\\', '/')).stem
+                    if path_stem.isdigit():
+                        exploit_id = path_stem
+                url = (
+                    exploit.get('edb_url')
+                    or exploit.get('exploit_url')
+                    or exploit.get('url')
+                )
+                if not url and exploit_id:
+                    url = f"https://www.exploit-db.com/exploits/{exploit_id}"
+                if url:
+                    exploit_links.append({
+                        'cve_id': cve.get('cve_id'),
+                        'title': exploit.get('title') or exploit.get('name') or '',
+                        'exploit_id': exploit_id,
+                        'url': url,
+                    })
+            cve['exploit_links'] = exploit_links
+            return cve
 
         domains = db.fetch_all_domains()
 
@@ -748,10 +790,13 @@ def export(db_path, format):
 
                     cursor.execute('''
                         SELECT cve_id, description, severity, cvss_score, cvss_version,
-                               published_date, last_modified, vector_string
+                               published_date, last_modified, vector_string, references_json,
+                               applicability, exploits_json, nuclei_templates_json
                         FROM cves WHERE technology_id = ?
                     ''', (tech_id,))
-                    tech_dict['cves'] = [dict(row) for row in cursor.fetchall()]
+                    tech_dict['cves'] = [
+                        attach_cve_enrichment(dict(row)) for row in cursor.fetchall()
+                    ]
 
                     technologies.append(tech_dict)
 
@@ -764,10 +809,13 @@ def export(db_path, format):
 
                     cursor.execute('''
                         SELECT cve_id, description, severity, cvss_score, cvss_version,
-                               published_date, last_modified, vector_string
+                               published_date, last_modified, vector_string, references_json,
+                               exploits_json, nuclei_templates_json
                         FROM plugin_cves WHERE plugin_id = ?
                     ''', (plugin_id,))
-                    plugin_dict['cves'] = [dict(row) for row in cursor.fetchall()]
+                    plugin_dict['cves'] = [
+                        attach_cve_enrichment(dict(row)) for row in cursor.fetchall()
+                    ]
 
                     plugins.append(plugin_dict)
 
@@ -796,8 +844,9 @@ def export(db_path, format):
                         port_id = port_dict['id']
 
                         cursor.execute('''
-                            SELECT cve_id, description, severity, cvss_score, cvss_version,
-                                   published_date, last_modified, vector_string
+                            SELECT id, cve_id, description, severity, cvss_score, cvss_version,
+                                   published_date, last_modified, vector_string,
+                                   nuclei_templates_json
                             FROM port_cves WHERE open_port_id = ?
                         ''', (port_id,))
                         port_cve_rows = cursor.fetchall()
@@ -805,6 +854,9 @@ def export(db_path, format):
                         for cve_row in port_cve_rows:
                             cve_dict = dict(cve_row)
                             cve_id = cve_dict['id']
+                            cve_dict['nuclei_templates'] = decode_list(
+                                cve_dict.pop('nuclei_templates_json', None)
+                            )
 
                             cursor.execute('''
                                 SELECT exploit_title, exploit_path, exploit_type,
@@ -812,6 +864,22 @@ def export(db_path, format):
                                 FROM port_exploits WHERE port_cve_id = ?
                             ''', (cve_id,))
                             cve_dict['exploits'] = [dict(row) for row in cursor.fetchall()]
+                            cve_dict['exploit_links'] = []
+                            for exploit in cve_dict['exploits']:
+                                exploit_id = Path(
+                                    str(exploit.get('exploit_path') or '').replace('\\', '/')
+                                ).stem
+                                url = (
+                                    f"https://www.exploit-db.com/exploits/{exploit_id}"
+                                    if exploit_id.isdigit() else None
+                                )
+                                if url:
+                                    cve_dict['exploit_links'].append({
+                                        'cve_id': cve_dict.get('cve_id'),
+                                        'title': exploit.get('exploit_title') or '',
+                                        'exploit_id': exploit_id,
+                                        'url': url,
+                                    })
 
                             port_cves.append(cve_dict)
 
@@ -826,6 +894,34 @@ def export(db_path, format):
             domain_dict['sensitive_files'] = sensitive_files
             domain_dict['default_credentials'] = default_credentials
             domain_dict['port_scans'] = port_scans
+            domain_dict['exploit_links'] = [
+                link for technology in technologies
+                for cve in technology.get('cves', [])
+                for link in cve.get('exploit_links', [])
+            ] + [
+                link for plugin in plugins
+                for cve in plugin.get('cves', [])
+                for link in cve.get('exploit_links', [])
+            ] + [
+                link for scan in port_scans
+                for port in scan.get('open_ports', [])
+                for cve in port.get('cves', [])
+                for link in cve.get('exploit_links', [])
+            ]
+            domain_dict['nuclei_templates'] = [
+                template for technology in technologies
+                for cve in technology.get('cves', [])
+                for template in cve.get('nuclei_templates', [])
+            ] + [
+                template for plugin in plugins
+                for cve in plugin.get('cves', [])
+                for template in cve.get('nuclei_templates', [])
+            ] + [
+                template for scan in port_scans
+                for port in scan.get('open_ports', [])
+                for cve in port.get('cves', [])
+                for template in cve.get('nuclei_templates', [])
+            ]
 
             detailed_data.append(domain_dict)
 
@@ -856,15 +952,38 @@ def export(db_path, format):
                         file_paths = [f['file_path'] for f in item.get('sensitive_files', [])]
                         cred_entries = [f"{c['username']}:{c['password']}@{c['login_url']}" for c in item.get('default_credentials', [])]
                         port_entries = []
+                        exploit_entries = []
+                        nuclei_entries = []
+                        for technology in item.get('technologies', []):
+                            cves = technology.get('cves', [])
+                            for cve in cves:
+                                exploit_entries.extend(cve.get('exploit_links', []))
+                                nuclei_entries.extend(cve.get('nuclei_templates', []))
+                        for plugin in item.get('plugins', []):
+                            for cve in plugin.get('cves', []):
+                                exploit_entries.extend(cve.get('exploit_links', []))
+                                nuclei_entries.extend(cve.get('nuclei_templates', []))
                         for ps in item.get('port_scans', []):
                             for op in ps.get('open_ports', []):
                                 port_entries.append(f"{op['port']}/{op['service']}")
+                                for cve in op.get('cves', []):
+                                    exploit_entries.extend(cve.get('exploit_links', []))
+                                    nuclei_entries.extend(cve.get('nuclei_templates', []))
 
                         flat_item['tech_details'] = '; '.join(tech_names)
                         flat_item['plugin_details'] = '; '.join(plugin_names)
                         flat_item['file_details'] = '; '.join(file_paths)
                         flat_item['credential_details'] = '; '.join(cred_entries)
                         flat_item['port_details'] = '; '.join(port_entries)
+                        flat_item['exploit_links'] = '; '.join(
+                            f"{item.get('cve_id')}: {item.get('title') or 'Exploit'} - {item.get('url')}"
+                            for item in exploit_entries
+                        )
+                        flat_item['nuclei_templates'] = '; '.join(
+                            f"{item.get('cve_id')}: {item.get('template_name') or 'Template not found'} "
+                            f"[{item.get('status', 'unknown')}, findings: {item.get('findings_count', 0)}]"
+                            for item in nuclei_entries
+                        )
 
                         for key in ['technologies', 'plugins', 'sensitive_files', 'default_credentials', 'port_scans']:
                             if key in flat_item:
