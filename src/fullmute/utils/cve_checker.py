@@ -1,10 +1,7 @@
 import aiohttp
 import asyncio
-import json
 import time
-import re
 from typing import Dict, List, Optional, Tuple
-from collections import deque
 from fullmute.utils.logger import setup_logger
 
 logger = setup_logger()
@@ -296,7 +293,10 @@ class CVEChecker:
         requests = []
         seen_cpe = set()
         for product_variant in product_variants:
-            cpe_match = f"cpe:2.3:a:{vendor}:{product_variant}:{version}:*:*:*:*:*:*:*"
+            cpe_match = (
+                f"cpe:2.3:a:{vendor.lower()}:{product_variant.lower()}:"
+                f"{version}:*:*:*:*:*:*:*"
+            )
             if cpe_match.casefold() in seen_cpe:
                 continue
             seen_cpe.add(cpe_match.casefold())
@@ -304,70 +304,33 @@ class CVEChecker:
                 product_variant,
                 {
                     "cpeName": cpe_match,
-                    "isVulnerable": "",
-                    "noRejected": "",
                     "resultsPerPage": 2000,
                 },
             ))
 
-        version_parts = re.findall(r'\d+', version)
-        if version_parts:
-            version_prefix = '.'.join(version_parts[:2])
-            search_product = (product or '').strip()
-            if search_product:
-                requests.append((
-                    product_variants[0] if product_variants else search_product,
-                    {
-                        "keywordSearch": f"{search_product} {version_prefix}",
-                        "noRejected": "",
-                        "resultsPerPage": 2000,
-                    },
-                ))
-
-        confirmed_cves = {}
+        found_cves = {}
         retry_count = 0
         delay = self.initial_delay
 
         for product_variant, params in requests:
+            page_start = 0
             while retry_count < self.max_retries:
                 try:
                     if self._session is None or self._session.closed:
                         self._session = aiohttp.ClientSession(headers=self.headers)
 
+                    if page_start:
+                        params["startIndex"] = page_start
+                    if self.rate_limiter:
+                        await self.rate_limiter.acquire()
                     async with self._session.get(self.nvd_base_url, params=params) as response:
                         if response.status == 200:
                             data = await response.json()
-                            unrelated_count = 0
-                            unconfirmed_count = 0
-
                             for item in data.get('vulnerabilities', []):
                                 cve = item.get('cve', {})
-                                if not self._matches_product(
-                                    cve,
-                                    vendor,
-                                    product_variant,
-                                ):
-                                    unrelated_count += 1
-                                    continue
-                                version_confirmed = self._is_version_affected(
-                                    cve,
-                                    vendor,
-                                    product_variant,
-                                    version,
-                                )
-                                if not version_confirmed:
-                                    unconfirmed_count += 1
-                                    continue
-                                applicability = (
-                                    'nvd_affected_data'
-                                    if self._matches_affected_product(
-                                        cve,
-                                        vendor,
-                                        product_variant,
-                                    )
-                                    else 'nvd_exact_cpe_match'
-                                )
                                 cve_id = cve.get('id')
+                                if not cve_id:
+                                    continue
                                 descriptions = cve.get('descriptions', [])
                                 description = next((desc['value'] for desc in descriptions if desc.get('lang') == 'en'), '')
                                 metrics = cve.get('metrics', {})
@@ -383,25 +346,17 @@ class CVEChecker:
                                     'published_date': published,
                                     'last_modified': cve.get('lastModified'),
                                     'references': reference_urls,
-                                    'applicability': applicability,
+                                    'applicability': 'nvd_exact_cpe_match',
                                     'version_range_confirmed': True,
                                 }
-                                if cve_id:
-                                    confirmed_cves[cve_id] = cve_result
+                                found_cves[cve_id] = cve_result
 
-                            if unrelated_count:
-                                logger.info(
-                                    f"Excluded {unrelated_count} unrelated NVD CVE records for "
-                                    f"{vendor}:{product_variant}:{version}"
-                                )
-
-                            if unconfirmed_count:
-                                logger.info(
-                                    f"Excluded {unconfirmed_count} NVD CVE records for "
-                                    f"{vendor}:{product_variant}:{version}: NVD did not "
-                                    "confirm this exact installed version as affected"
-                                )
-
+                            vulnerabilities = data.get('vulnerabilities', [])
+                            total_results = int(data.get('totalResults', len(vulnerabilities)))
+                            next_start = page_start + len(vulnerabilities)
+                            if vulnerabilities and next_start < total_results:
+                                page_start = next_start
+                                continue
                             break
                         elif response.status == 404:
                             logger.debug(f"No CVEs found for {vendor}:{product_variant}:{version} (status 404)")
@@ -440,261 +395,7 @@ class CVEChecker:
             retry_count = 0
             delay = self.initial_delay
 
-        return list(confirmed_cves.values())
-
-    @staticmethod
-    def _version_key(version: str):
-        tokens = re.findall(r'\d+|[a-z]+', version.lower())
-        key = [(0, int(token)) if token.isdigit() else (1, token) for token in tokens]
-        while key and key[-1] == (0, 0):
-            key.pop()
-        return tuple(key)
-
-    @classmethod
-    def _version_in_range(cls, version: str, match: Dict) -> bool:
-        version_key = cls._version_key(version)
-        if not version_key:
-            return False
-
-        explicit_version = match.get('criteria', '').split(':')[5:6]
-        explicit_version = explicit_version[0] if explicit_version else '*'
-        if explicit_version == '-':
-            return False
-        if explicit_version not in {'*', '-'}:
-            if version_key != cls._version_key(explicit_version):
-                return False
-
-        start_including = match.get('versionStartIncluding')
-        start_excluding = match.get('versionStartExcluding')
-        end_including = match.get('versionEndIncluding')
-        end_excluding = match.get('versionEndExcluding')
-
-        # NVD's unbounded wildcard entries do not establish that this
-        # particular installed version is affected.
-        if not any((start_including, start_excluding, end_including, end_excluding)):
-            return explicit_version not in {'*', '-'}
-
-        if start_including and version_key < cls._version_key(start_including):
-            return False
-        if start_excluding and version_key <= cls._version_key(start_excluding):
-            return False
-        if end_including and version_key > cls._version_key(end_including):
-            return False
-        if end_excluding and version_key >= cls._version_key(end_excluding):
-            return False
-        return True
-
-    @classmethod
-    def _is_version_affected(
-        cls,
-        cve: Dict,
-        vendor: str,
-        product: str,
-        version: str,
-    ) -> bool:
-        vendor = vendor.casefold()
-        product = product.casefold()
-
-        def walk(node: Dict) -> bool:
-            matches = []
-            for match in node.get('cpeMatch', []):
-                criteria = match.get('criteria', '')
-                parts = criteria.split(':')
-                if (
-                    len(parts) < 6
-                    or parts[0:2] != ['cpe', '2.3']
-                    or parts[3].casefold() != vendor
-                    or parts[4].casefold() != product
-                ):
-                    matches.append(False)
-                    continue
-                matches.append(
-                    match.get('vulnerable') is True
-                    and cls._version_in_range(version, match)
-                )
-
-            child_results = [walk(child) for child in node.get('children', [])]
-            results = matches + child_results
-            if not results or node.get('negate'):
-                return False
-            if node.get('operator', 'OR').upper() == 'AND':
-                return all(results)
-            return any(results)
-
-        for configuration in cve.get('configurations', []):
-            node_results = [walk(node) for node in configuration.get('nodes', [])]
-            if not node_results:
-                continue
-            if (
-                all(node_results)
-                if configuration.get('operator', 'OR').upper() == 'AND'
-                else any(node_results)
-            ):
-                return True
-        if cls._has_explicit_cpe_version_match(cve, vendor, product):
-            return False
-        return cls._is_affected_data_version(cve, vendor, product, version)
-
-    @classmethod
-    def _has_explicit_cpe_version_match(
-        cls,
-        cve: Dict,
-        vendor: str,
-        product: str,
-    ) -> bool:
-        vendor = vendor.casefold()
-        product = product.casefold()
-
-        def walk(node: Dict) -> bool:
-            for match in node.get('cpeMatch', []):
-                parts = match.get('criteria', '').split(':')
-                if (
-                    len(parts) >= 6
-                    and parts[0:2] == ['cpe', '2.3']
-                    and parts[3].casefold() == vendor
-                    and parts[4].casefold() == product
-                    and match.get('vulnerable') is True
-                    and (
-                        parts[5] not in {'*', '-'}
-                        or any(match.get(field) for field in (
-                            'versionStartIncluding',
-                            'versionStartExcluding',
-                            'versionEndIncluding',
-                            'versionEndExcluding',
-                        ))
-                    )
-                ):
-                    return True
-            return any(walk(child) for child in node.get('children', []))
-
-        return any(
-            walk(node)
-            for configuration in cve.get('configurations', [])
-            for node in configuration.get('nodes', [])
-        )
-
-    @staticmethod
-    def _matches_affected_product(cve: Dict, vendor: str, product: str) -> bool:
-        vendor = CVEChecker._normalize_affected_vendor(vendor)
-        product = product.casefold()
-        return any(
-            isinstance(affected, dict)
-            and CVEChecker._normalize_affected_vendor(
-                str(affected.get('vendor', ''))
-            ) == vendor
-            and str(affected.get('product', '')).casefold() == product
-            for affected in CVEChecker._iter_affected_products(cve)
-        )
-
-    @staticmethod
-    def _normalize_affected_vendor(vendor: str) -> str:
-        normalized = re.sub(r'\s+', ' ', vendor.casefold().strip())
-        aliases = {
-            'wordpress.org': 'wordpress',
-            'wordpress foundation': 'wordpress',
-            'automattic': 'wordpress',
-        }
-        return aliases.get(normalized, normalized)
-
-    @staticmethod
-    def _iter_affected_products(cve: Dict):
-        for affected_record in cve.get('affected', []):
-            if not isinstance(affected_record, dict):
-                continue
-            affected_data = affected_record.get('affectedData')
-            if isinstance(affected_data, list):
-                yield from (
-                    item for item in affected_data if isinstance(item, dict)
-                )
-            else:
-                yield affected_record
-
-    @classmethod
-    def _is_affected_data_version(
-        cls,
-        cve: Dict,
-        vendor: str,
-        product: str,
-        version: str,
-    ) -> bool:
-        target_key = cls._version_key(version)
-        if not target_key:
-            return False
-
-        for affected in cls._iter_affected_products(cve):
-            if (
-                not isinstance(affected, dict)
-                or cls._normalize_affected_vendor(
-                    str(affected.get('vendor', ''))
-                ) != cls._normalize_affected_vendor(vendor)
-                or str(affected.get('product', '')).casefold() != product.casefold()
-            ):
-                continue
-
-            for version_entry in affected.get('versions', []):
-                if not isinstance(version_entry, dict) or version_entry.get('status') != 'affected':
-                    continue
-
-                start_version = str(version_entry.get('version', '*'))
-                if start_version not in {'*', '-'}:
-                    start_key = cls._version_key(start_version)
-                    if not start_key or target_key < start_key:
-                        continue
-
-                less_than = version_entry.get('lessThan')
-                less_than_or_equal = version_entry.get('lessThanOrEqual')
-                if less_than and target_key >= cls._version_key(str(less_than)):
-                    continue
-                if less_than_or_equal and target_key > cls._version_key(str(less_than_or_equal)):
-                    continue
-
-                if not less_than and not less_than_or_equal and start_version not in {'*', '-'}:
-                    if target_key != cls._version_key(start_version):
-                        continue
-
-                status = 'affected'
-                for change in sorted(
-                    version_entry.get('changes', []),
-                    key=lambda item: cls._version_key(str(item.get('at', '')))
-                    if isinstance(item, dict) else (),
-                ):
-                    if not isinstance(change, dict) or not change.get('at'):
-                        continue
-                    if target_key < cls._version_key(str(change['at'])):
-                        break
-                    status = change.get('status', status)
-
-                if status == 'affected':
-                    return True
-
-        return False
-
-    @staticmethod
-    def _matches_product(cve: Dict, vendor: str, product: str) -> bool:
-        vendor = vendor.casefold()
-        product = product.casefold()
-
-        def walk(node: Dict) -> bool:
-            for match in node.get('cpeMatch', []):
-                parts = match.get('criteria', '').split(':')
-                if (
-                    len(parts) >= 6
-                    and parts[0:2] == ['cpe', '2.3']
-                    and parts[3].casefold() == vendor
-                    and parts[4].casefold() == product
-                    and match.get('vulnerable') is True
-                ):
-                    return True
-            return any(walk(child) for child in node.get('children', []))
-
-        has_cpe_match = any(
-            walk(node)
-            for configuration in cve.get('configurations', [])
-            for node in configuration.get('nodes', [])
-        )
-        return has_cpe_match or CVEChecker._matches_affected_product(
-            cve, vendor, product
-        )
+        return list(found_cves.values())
 
     def _extract_cvss_data(self, metrics: Dict) -> Dict:
         cvss_data = {}
@@ -723,7 +424,7 @@ class CVEChecker:
             cvss_data = {
                 'version': '2.0',
                 'score': metric.get('cvssData', {}).get('baseScore'),
-                'severity': metric.get('severity'),
+                'severity': metric.get('cvssData', {}).get('baseSeverity') or metric.get('baseSeverity'),
                 'vector': metric.get('cvssData', {}).get('vectorString')
             }
         
@@ -776,9 +477,6 @@ class CVEChecker:
 
             
             for name, version in batch:
-                
-                if self.rate_limiter:
-                    await self.rate_limiter.acquire()
                 
                 cves = await self.check_cves_for_technology(name, version)
                 
