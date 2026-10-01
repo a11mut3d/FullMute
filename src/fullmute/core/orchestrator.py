@@ -154,15 +154,36 @@ class ScanOrchestrator:
                     result.get('final_url') or domain,
                     port_cve_ids,
                 )
-            self._save_port_results(db, domain, result['open_ports'], started)
+            self._save_port_results(
+                db,
+                domain,
+                result['open_ports'],
+                started,
+                result.get('nuclei', []),
+            )
             return result
 
         return await asyncio.gather(*(enrich(result) for result in results))
 
-    def _save_port_results(self, db, domain, ports, started):
+    def _save_port_results(self, db, domain, ports, started, nuclei_results=None):
         domain_id = db.get_domain_id(domain)
         if not domain_id:
             return
+        nuclei_by_cve = {}
+        for item in nuclei_results or []:
+            if not isinstance(item, dict) or not item.get('cve_id'):
+                continue
+            template = item.get('template')
+            nuclei_by_cve.setdefault(item['cve_id'], []).append({
+                'cve_id': item.get('cve_id'),
+                'template_name': item.get('template_name') or (
+                    Path(str(template).replace('\\', '/')).name if template else None
+                ),
+                'template': template,
+                'status': item.get('status', 'unknown'),
+                'findings_count': len(item.get('findings', []))
+                if isinstance(item.get('findings'), list) else 0,
+            })
         port_scan_id = db.add_port_scan({
             'domain_id': domain_id,
             'total_ports_scanned': len(TOP_20_PORTS),
@@ -193,6 +214,7 @@ class ScanOrchestrator:
                     'severity': cve.get('severity') or cve.get('cvss', {}).get('severity'),
                     'cvss_score': cve.get('cvss_score') or cve.get('cvss', {}).get('score'),
                     'vector_string': cve.get('vector_string') or cve.get('cvss', {}).get('vector'),
+                    'nuclei_templates': nuclei_by_cve.get(cve_id, []),
                 })
                 if not port_cve_id:
                     continue

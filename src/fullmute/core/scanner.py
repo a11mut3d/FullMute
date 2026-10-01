@@ -454,6 +454,23 @@ class FullMuteScanner:
 
 
                 cve_results = results.get('cves', {})
+                nuclei_by_cve = {}
+                for item in results.get('nuclei', []):
+                    if not isinstance(item, dict) or not item.get('cve_id'):
+                        continue
+                    nuclei_by_cve.setdefault(item['cve_id'], []).append({
+                        'cve_id': item.get('cve_id'),
+                        'template_name': item.get('template_name') or (
+                            str(item.get('template', '')).replace(
+                                '\\', '/'
+                            ).rsplit('/', 1)[-1]
+                            if item.get('template') else None
+                        ),
+                        'template': item.get('template'),
+                        'status': item.get('status', 'unknown'),
+                        'findings_count': len(item.get('findings', []))
+                        if isinstance(item.get('findings'), list) else 0,
+                    })
                 for tech_identifier, cves in cve_results.items():
 
                     if ' (' in tech_identifier and tech_identifier.endswith(')'):
@@ -481,6 +498,10 @@ class FullMuteScanner:
                                         'vector_string': cve.get('cvss', {}).get('vector'),
                                         'references': cve.get('references', []),
                                         'applicability': cve.get('applicability'),
+                                        'exploits': cve.get('exploits', []),
+                                        'nuclei_templates': nuclei_by_cve.get(
+                                            cve.get('id'), []
+                                        ),
                                     }
                                     self.db.add_cve(cve_data)
                             elif plugin_id:
@@ -495,7 +516,11 @@ class FullMuteScanner:
                                         'published_date': cve.get('published_date'),
                                         'last_modified': cve.get('last_modified'),
                                         'vector_string': cve.get('cvss', {}).get('vector'),
-                                        'references': cve.get('references', [])
+                                        'references': cve.get('references', []),
+                                        'exploits': cve.get('exploits', []),
+                                        'nuclei_templates': nuclei_by_cve.get(
+                                            cve.get('id'), []
+                                        ),
                                     }
                                     self.db.add_plugin_cve(plugin_cve_data)
 
