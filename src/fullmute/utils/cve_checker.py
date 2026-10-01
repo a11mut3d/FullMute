@@ -7,6 +7,10 @@ from fullmute.utils.logger import setup_logger
 logger = setup_logger()
 
 
+class NVDLookupError(RuntimeError):
+    """Raised when the NVD API did not complete a CVE lookup successfully."""
+
+
 class RateLimiter:
     def __init__(self, rate: float = 50/30, capacity: int = 10):
         self.rate = rate  
@@ -17,18 +21,22 @@ class RateLimiter:
         
     async def acquire(self):
         async with self._lock:
-            now = time.monotonic()
-            elapsed = now - self.last_update
-            self.tokens = min(self.capacity, self.tokens + elapsed * self.rate)
-            self.last_update = now
-            
-            if self.tokens < 1:
+            while True:
+                now = time.monotonic()
+                elapsed = now - self.last_update
+                self.tokens = min(
+                    self.capacity,
+                    self.tokens + elapsed * self.rate,
+                )
+                self.last_update = now
+
+                if self.tokens >= 1:
+                    self.tokens -= 1
+                    return
+
                 wait_time = (1 - self.tokens) / self.rate
                 logger.debug(f"Rate limiter: waiting {wait_time:.2f}s")
                 await asyncio.sleep(wait_time)
-                self.tokens = 0
-            else:
-                self.tokens -= 1
 
 
 class CVEChecker:
@@ -55,6 +63,8 @@ class CVEChecker:
         self._cache: Dict[str, dict] = {}
         self._cache_ttl = 3600  
         self._negative_cache_ttl = 60
+        self._cache_lock = asyncio.Lock()
+        self._inflight: Dict[str, asyncio.Task] = {}
         
         
         self._session: Optional[aiohttp.ClientSession] = None
@@ -233,10 +243,12 @@ class CVEChecker:
         
         vendor = self._map_vendor(name)
         if not vendor:
-            logger.info(f"Skipping NVD lookup for {name} {version}: no vendor mapping")
+            logger.warning(
+                f"Skipping NVD lookup for detected technology {name} {version}: "
+                "no NVD vendor mapping exists"
+            )
             return []
 
-        
         return await self._query_nvd_api(vendor, name, version)
 
     def _build_product_variants(self, product: str) -> List[str]:
@@ -309,6 +321,7 @@ class CVEChecker:
             ))
 
         found_cves = {}
+        successful_requests = 0
         retry_count = 0
         delay = self.initial_delay
 
@@ -326,6 +339,12 @@ class CVEChecker:
                     async with self._session.get(self.nvd_base_url, params=params) as response:
                         if response.status == 200:
                             data = await response.json()
+                            successful_requests += 1
+                            logger.debug(
+                                "NVD returned %s CVE records for %s",
+                                data.get('totalResults', 0),
+                                params.get('cpeName'),
+                            )
                             for item in data.get('vulnerabilities', []):
                                 cve = item.get('cve', {})
                                 cve_id = cve.get('id')
@@ -359,9 +378,12 @@ class CVEChecker:
                                 continue
                             break
                         elif response.status == 404:
-                            logger.debug(f"No CVEs found for {vendor}:{product_variant}:{version} (status 404)")
+                            logger.warning(
+                                "NVD rejected exact CPE %s with HTTP 404",
+                                params.get('cpeName'),
+                            )
                             break
-                        elif response.status == 429:
+                        elif response.status in {403, 429}:
                             retry_after = response.headers.get("Retry-After")
                             try:
                                 wait_time = max(delay, float(retry_after)) if retry_after else max(
@@ -370,18 +392,26 @@ class CVEChecker:
                             except ValueError:
                                 wait_time = max(delay, 6.0 if not self.nvd_api_key else 1.0)
                             logger.warning(
-                                f"NVD API rate limited (status 429), retrying in {wait_time}s..."
+                                "NVD API rate limited or forbidden "
+                                f"(status {response.status}), retrying in {wait_time}s..."
                             )
                             retry_count += 1
                             if retry_count < self.max_retries:
                                 await asyncio.sleep(wait_time)
                                 delay *= 2
                             else:
-                                logger.error("NVD API rate limited, max retries exceeded")
-                                return []
+                                raise NVDLookupError(
+                                    f"NVD rate limit retries exhausted "
+                                    f"(HTTP {response.status}) for "
+                                    f"{params.get('cpeName')}"
+                                )
                         else:
-                            logger.error(f"NVD API request failed with status {response.status}")
-                            return []
+                            raise NVDLookupError(
+                                f"NVD API request failed with HTTP "
+                                f"{response.status} for {params.get('cpeName')}"
+                            )
+                except NVDLookupError:
+                    raise
                 except Exception as e:
                     logger.error(f"Error querying NVD API: {e}")
                     retry_count += 1
@@ -389,12 +419,19 @@ class CVEChecker:
                         await asyncio.sleep(delay)
                         delay *= 2
                     else:
-                        logger.error(f"NVD API request failed after {self.max_retries} retries: {e}")
-                        return []
+                        raise NVDLookupError(
+                            f"NVD request failed after {self.max_retries} "
+                            f"attempts for {params.get('cpeName')}: {e}"
+                        ) from e
 
             retry_count = 0
             delay = self.initial_delay
 
+        if requests and not successful_requests:
+            raise NVDLookupError(
+                f"NVD returned no successful responses for "
+                f"{vendor}:{product}:{version}"
+            )
         return list(found_cves.values())
 
     def _extract_cvss_data(self, metrics: Dict) -> Dict:
@@ -443,63 +480,87 @@ class CVEChecker:
 
     async def check_cves_batch(self, technologies: List[Tuple[str, str]]) -> Dict[str, List[Dict]]:
         results = {}
-        
-        
-        techs_to_check = []
-        for name, version in technologies:
+        unique_technologies = list(dict.fromkeys(technologies))
+        if not unique_technologies:
+            return results
+
+        logger.info(
+            "Checking CVEs for %s technologies",
+            len(unique_technologies),
+        )
+
+        for name, version in unique_technologies:
             cache_key = f"{name}_{version}"
-            
-            
-            if cache_key in self._cache:
-                cached_result = self._cache[cache_key]
+            try:
+                cves = await self._get_or_start_lookup(cache_key, name, version)
+            except NVDLookupError as exc:
+                logger.error(
+                    "NVD lookup failed for %s %s: %s",
+                    name,
+                    version,
+                    exc,
+                )
+                continue
+
+            if cves:
+                results[f"{name} ({version})"] = cves
+                logger.info(
+                    "NVD matched %s CVEs for %s %s",
+                    len(cves), name, version,
+                )
+            else:
+                logger.info("NVD matched 0 CVEs for %s %s", name, version)
+
+        logger.info(
+            "CVE check completed: %s technologies with CVEs found",
+            len(results),
+        )
+        return results
+
+    async def _get_or_start_lookup(
+        self,
+        cache_key: str,
+        name: str,
+        version: str,
+    ) -> List[Dict]:
+        async with self._cache_lock:
+            cached_result = self._cache.get(cache_key)
+            if cached_result:
                 cache_ttl = cached_result.get(
                     'ttl',
-                    self._cache_ttl if cached_result.get('cves') else self._negative_cache_ttl
+                    self._cache_ttl
+                    if cached_result.get('cves')
+                    else self._negative_cache_ttl,
                 )
                 if time.time() - cached_result.get('timestamp', 0) < cache_ttl:
-                    if cached_result.get('cves'):
-                        results[f"{name} ({version})"] = cached_result['cves']
-                    continue
-            
-            techs_to_check.append((name, version))
-        
-        if not techs_to_check:
-            logger.debug(f"All CVE results cached, skipping API calls")
-            return results
-        
-        logger.info(f"Checking CVEs for {len(techs_to_check)} technologies (cached {len(technologies) - len(techs_to_check)})")
+                    return cached_result.get('cves', [])
 
-        
-        batch_size = 3  
+            task = self._inflight.get(cache_key)
+            if task is None:
+                task = asyncio.create_task(
+                    self._query_and_cache(cache_key, name, version)
+                )
+                self._inflight[cache_key] = task
 
-        for i in range(0, len(techs_to_check), batch_size):
-            batch = techs_to_check[i:i + batch_size]
+        return await asyncio.shield(task)
 
-            
-            for name, version in batch:
-                
-                cves = await self.check_cves_for_technology(name, version)
-                
-                
-                cache_key = f"{name}_{version}"
-                self._cache[cache_key] = {
-                    'cves': cves,
-                    'timestamp': time.time(),
-                    'ttl': self._cache_ttl if cves else self._negative_cache_ttl,
-                }
-                
-                if cves:
-                    results[f"{name} ({version})"] = cves
-
-                
-                await asyncio.sleep(0.3)
-
-            
-            if i + batch_size < len(techs_to_check):
-                await asyncio.sleep(1.0)
-
-        logger.info(f"CVE check completed: {len(results)} technologies with CVEs found")
-        return results
+    async def _query_and_cache(
+        self,
+        cache_key: str,
+        name: str,
+        version: str,
+    ) -> List[Dict]:
+        try:
+            cves = await self.check_cves_for_technology(name, version)
+            self._cache[cache_key] = {
+                'cves': cves,
+                'timestamp': time.time(),
+                'ttl': self._cache_ttl if cves else self._negative_cache_ttl,
+            }
+            return cves
+        finally:
+            async with self._cache_lock:
+                self._inflight.pop(cache_key, None)
     
     async def close(self):
         if self._session and not self._session.closed:
