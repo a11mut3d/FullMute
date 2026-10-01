@@ -179,6 +179,36 @@ def get_domain_results(domain: str) -> dict:
         """, (domain_row['id'],))
         result['cves'] = [dict(row) for row in cursor.fetchall()]
         logger.info(f"Found {len(result['cves'])} CVEs")
+        for cve in result['cves']:
+            for storage_key, result_key in (
+                ('exploits_json', 'exploits'),
+                ('nuclei_templates_json', 'nuclei_templates'),
+                ('references_json', 'references'),
+            ):
+                try:
+                    decoded = json.loads(cve.get(storage_key) or '[]')
+                except (TypeError, json.JSONDecodeError):
+                    decoded = []
+                cve[result_key] = decoded if isinstance(decoded, list) else []
+            cve['exploit_links'] = []
+            for exploit in cve['exploits']:
+                if not isinstance(exploit, dict):
+                    continue
+                exploit_id = exploit.get('exploit_id') or exploit.get('EDB-ID')
+                url = (
+                    exploit.get('edb_url')
+                    or exploit.get('exploit_url')
+                    or exploit.get('url')
+                )
+                if not url and exploit_id:
+                    url = f"https://www.exploit-db.com/exploits/{exploit_id}"
+                if url:
+                    cve['exploit_links'].append({
+                        'cve_id': cve.get('cve_id'),
+                        'title': exploit.get('title') or exploit.get('name') or '',
+                        'exploit_id': exploit_id,
+                        'url': url,
+                    })
 
         # Get sensitive files
         cursor.execute("SELECT * FROM sensitive_files WHERE domain_id = ?", (domain_row['id'],))
@@ -217,7 +247,18 @@ def get_domain_results(domain: str) -> dict:
             open_ports = []
 
         # Process exploits and SSH credentials
-        all_exploits = []
+        all_exploits = [
+            dict(exploit, cve_id=cve.get('cve_id'))
+            for cve in result['cves']
+            for exploit in cve.get('exploits', [])
+            if isinstance(exploit, dict)
+        ]
+        nuclei_templates = [
+            template
+            for cve in result['cves']
+            for template in cve.get('nuclei_templates', [])
+            if isinstance(template, dict)
+        ]
         ssh_creds = []
 
         for port in open_ports:
@@ -254,6 +295,12 @@ def get_domain_results(domain: str) -> dict:
                             })
 
         result['exploits'] = all_exploits
+        result['exploit_links'] = [
+            link
+            for cve in result['cves']
+            for link in cve.get('exploit_links', [])
+        ]
+        result['nuclei_templates'] = nuclei_templates
         result['ssh_credentials'] = ssh_creds
         result['open_ports'] = open_ports
         logger.info(f"Found {len(all_exploits)} exploits and {len(ssh_creds)} SSH credentials")
