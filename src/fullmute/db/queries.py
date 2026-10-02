@@ -33,9 +33,18 @@ class DBQueries:
 
                 if 'final_url' in columns:
                     cursor.execute('''
-                        INSERT OR REPLACE INTO domains
+                        INSERT INTO domains
                         (domain, scanned_at, has_camera, is_alive, response_time, http_status, final_url, technologies, sensitive_files)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        ON CONFLICT(domain) DO UPDATE SET
+                            scanned_at = excluded.scanned_at,
+                            has_camera = excluded.has_camera,
+                            is_alive = excluded.is_alive,
+                            response_time = excluded.response_time,
+                            http_status = excluded.http_status,
+                            final_url = excluded.final_url,
+                            technologies = excluded.technologies,
+                            sensitive_files = excluded.sensitive_files
                     ''', (
                         domain_data.get('domain'),
                         domain_data.get('scanned_at', datetime.now()),
@@ -49,9 +58,17 @@ class DBQueries:
                     ))
                 else:
                     cursor.execute('''
-                        INSERT OR REPLACE INTO domains
+                        INSERT INTO domains
                         (domain, scanned_at, has_camera, is_alive, response_time, http_status, technologies, sensitive_files)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        ON CONFLICT(domain) DO UPDATE SET
+                            scanned_at = excluded.scanned_at,
+                            has_camera = excluded.has_camera,
+                            is_alive = excluded.is_alive,
+                            response_time = excluded.response_time,
+                            http_status = excluded.http_status,
+                            technologies = excluded.technologies,
+                            sensitive_files = excluded.sensitive_files
                     ''', (
                         domain_data.get('domain'),
                         domain_data.get('scanned_at', datetime.now()),
