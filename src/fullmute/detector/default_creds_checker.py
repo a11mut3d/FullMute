@@ -241,10 +241,12 @@ NON_LOGIN_CONTEXT_WORDS = {
 
 class DefaultCredentialsChecker:
     def __init__(self, timeout: int = 10, max_attempts: int = 5,
-                 content_change_threshold: float = 0.6):
+                 content_change_threshold: float = 0.6,
+                 path_probe_concurrency: int = 8):
         self.timeout = timeout
         self.max_attempts = max_attempts
         self.content_change_threshold = content_change_threshold
+        self.path_probe_concurrency = max(1, path_probe_concurrency)
         self.session: Optional[aiohttp.ClientSession] = None
         self._tested_hashes: Set[str] = set()
 
@@ -503,31 +505,56 @@ class DefaultCredentialsChecker:
         return False
 
     async def check_common_paths(self, base_url: str) -> List[str]:
-        found_paths = []
         session = await self._get_session()
         parsed = urlparse(base_url)
         base = f"{parsed.scheme}://{parsed.netloc}"
+        semaphore = asyncio.Semaphore(self.path_probe_concurrency)
+        started = asyncio.get_running_loop().time()
 
-        for path in COMMON_LOGIN_PATHS:
+        async def check_path(path: str) -> Optional[str]:
             test_url = urljoin(base, path)
             try:
-                async with session.head(test_url, ssl=False, allow_redirects=True) as resp:
-                    if resp.status == 200:
-                        found_paths.append(test_url)
-                    elif resp.status in (405, 501):
+                async with semaphore:
+                    try:
+                        async with session.head(
+                            test_url,
+                            ssl=False,
+                            allow_redirects=True,
+                        ) as response:
+                            if response.status == 200:
+                                return test_url
+                            retry_with_get = response.status in (405, 501)
+                    except Exception:
+                        retry_with_get = True
+
+                    if retry_with_get:
                         try:
-                            async with session.get(test_url, ssl=False, allow_redirects=True) as gresp:
-                                if gresp.status == 200:
-                                    found_paths.append(test_url)
+                            async with session.get(
+                                test_url,
+                                ssl=False,
+                                allow_redirects=True,
+                            ) as response:
+                                if response.status == 200:
+                                    return test_url
                         except Exception:
                             pass
-            except Exception:
-                try:
-                    async with session.get(test_url, ssl=False, allow_redirects=True) as gresp:
-                        if gresp.status == 200:
-                            found_paths.append(test_url)
-                except Exception:
-                    continue
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                logger.debug("Error checking login path %s: %s", test_url, exc)
+            return None
+
+        results = await asyncio.gather(
+            *(check_path(path) for path in COMMON_LOGIN_PATHS)
+        )
+        found_paths = [result for result in results if result is not None]
+        logger.debug(
+            "Checked %s login paths for %s in %.2fs (%s found)",
+            len(COMMON_LOGIN_PATHS),
+            base_url,
+            asyncio.get_running_loop().time() - started,
+            len(found_paths),
+        )
         return found_paths
 
     def _get_relevant_credentials(self, detected_tech: List[str]) -> List[CredentialPair]:
