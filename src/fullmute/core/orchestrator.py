@@ -14,9 +14,17 @@ logger = setup_logger()
 
 class ScanOrchestrator:
     def __init__(self, config_path: str = "config.yaml"):
-        self.config_path = Path(config_path)
+        self.config_path = Path(config_path).expanduser().resolve()
         self.config = self._load_config()
         self.scanner = None
+
+    def _database_path(self) -> Path:
+        configured_path = Path(
+            self.config.get('database', {}).get('path', 'fullmute.db')
+        ).expanduser()
+        if not configured_path.is_absolute():
+            configured_path = self.config_path.parent / configured_path
+        return configured_path.resolve()
 
     def _load_config(self):
         if not self.config_path.exists():
@@ -31,17 +39,17 @@ class ScanOrchestrator:
             return {}
 
     def initialize(self):
-        db_path = self.config.get('database', {}).get('path', 'fullmute.db')
+        db_path = self._database_path()
 
         try:
-            init_db(db_path)
+            init_db(str(db_path))
             logger.info(f"Database initialized at {db_path}")
         except Exception as e:
             logger.error(f"Failed to initialize database: {e}")
             raise
 
         scanner_config = self.config.get('scanner', {})
-        self.scanner = FullMuteScanner(db_path, scanner_config)
+        self.scanner = FullMuteScanner(str(db_path), scanner_config)
         logger.info("Scanner initialized")
 
     async def scan_from_file(self, domains_file: str, output_file: str = None,
@@ -86,7 +94,7 @@ class ScanOrchestrator:
         results = await self.scanner.scan(domains, max_concurrent)
         scanner_config = self.config.get('scanner', {})
         nvd_api_key = scanner_config.get('nvd_api_key')
-        db = DBQueries(self.config.get('database', {}).get('path', 'fullmute.db'))
+        db = DBQueries(str(self._database_path()))
         try:
             concurrency = max(1, int(max_concurrent))
         except (TypeError, ValueError):

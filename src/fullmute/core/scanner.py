@@ -80,7 +80,10 @@ class FullMuteScanner:
 
         self.creds_checker = DefaultCredentialsChecker(
             timeout=self.config.get('timeout', 10),
-            max_attempts=self.config.get('creds_max_attempts', 5)
+            max_attempts=self.config.get('creds_max_attempts', 5),
+            path_probe_concurrency=self.config.get(
+                'login_path_probe_concurrency', 8
+            ),
         )
 
         self.stats = {
@@ -97,6 +100,8 @@ class FullMuteScanner:
         logger.info(f"FullMuteScanner initialized: db={db_path}, max_concurrent={max_concurrent}")
 
     async def scan_domain(self, domain: str):
+        scan_started = time.perf_counter()
+        stage_timings = {}
         self.stats['total'] += 1
 
         results = {
@@ -114,8 +119,10 @@ class FullMuteScanner:
             logger.info(f"scan_domain start: {domain}")
             url = f"http://{domain}" if not domain.startswith("http") else domain
 
+            stage_started = time.perf_counter()
             logger.info(f"Fetching URL: {url}")
             html, headers_dict, cookies_dict, status_code, final_url = await self.http_client.fetch(url)
+            stage_timings['fetch'] = time.perf_counter() - stage_started
             logger.info(f"Fetch completed: status={status_code}, final_url={final_url}")
             results["status_code"] = status_code
             results["final_url"] = final_url
@@ -128,6 +135,7 @@ class FullMuteScanner:
             self.stats['successful'] += 1
 
             logger.info(f"Running TechDetector for {final_url}")
+            stage_started = time.perf_counter()
             detection_limit = max(
                 100_000,
                 int(self.config.get('tech_detection_max_html', 2_000_000))
@@ -162,6 +170,7 @@ class FullMuteScanner:
                         f"Joomla version confirmed from language XML: "
                         f"{joomla_version}"
                     )
+            stage_timings['technology_detection'] = time.perf_counter() - stage_started
 
             results["technologies"] = technologies
             logger.debug(f"Tech detection result for {domain}: {list(technologies.keys())}")
@@ -212,6 +221,7 @@ class FullMuteScanner:
                     "skipping version-specific NVD CVE lookup"
                 )
 
+            stage_started = time.perf_counter()
             if tech_with_versions:
                 logger.info(
                     f"Checking CVEs for {len(tech_with_versions)} techs: "
@@ -258,19 +268,23 @@ class FullMuteScanner:
                     logger.exception(
                         f"CVE lookup or enrichment failed for {domain}: {e}"
                     )
+            stage_timings['cve_lookup'] = time.perf_counter() - stage_started
 
+            stage_started = time.perf_counter()
             logger.info(f"Running SensitiveFileVerifier for {final_url}")
             try:
                 sensitive_files = await self.verifier.verify(None, results.get('final_url', url))
             except Exception as e:
                 logger.info(f"Sensitive file verifier error for {domain}: {e}")
                 sensitive_files = []
+            stage_timings['sensitive_file_checks'] = time.perf_counter() - stage_started
 
             results["sensitive_files"] = sensitive_files
 
             if sensitive_files:
                 self.stats['with_files'] += 1
 
+            stage_started = time.perf_counter()
             if self.config.get('test_default_credentials', True):
                 try:
                     detected_tech = []
@@ -307,9 +321,12 @@ class FullMuteScanner:
             else:
                 results["default_credentials"] = []
                 logger.debug(f"Default credentials test disabled for {domain}")
+            stage_timings['default_credential_checks'] = time.perf_counter() - stage_started
 
             logger.info(f"Saving results for {domain}")
+            stage_started = time.perf_counter()
             self._save_to_db(domain, results)
+            stage_timings['database_persistence'] = time.perf_counter() - stage_started
 
             logger.info(
                 f"Scanned {domain} - Tech: {len(technologies.get('cms', []))} CMS, "
@@ -322,6 +339,16 @@ class FullMuteScanner:
             logger.error(f"Error scanning {domain}: {e}")
             results["error"] = str(e)
             self.stats['failed'] += 1
+        finally:
+            logger.info(
+                "Scan timing for %s: total=%.2fs stages=%s",
+                domain,
+                time.perf_counter() - scan_started,
+                {
+                    stage: round(duration, 2)
+                    for stage, duration in stage_timings.items()
+                },
+            )
 
         return results
 
