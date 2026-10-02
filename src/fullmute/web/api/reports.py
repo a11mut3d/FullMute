@@ -236,6 +236,13 @@ def get_domain_results(domain: str) -> dict:
                 cursor.execute("SELECT * FROM open_ports WHERE domain_id = ?", (domain_row['id'],))
             elif 'domain' in columns:
                 cursor.execute("SELECT * FROM open_ports WHERE domain = ?", (domain_row['domain'],))
+            elif 'port_scan_id' in columns:
+                cursor.execute("""
+                    SELECT op.* FROM open_ports op
+                    JOIN port_scans ps ON ps.id = op.port_scan_id
+                    WHERE ps.domain_id = ?
+                    ORDER BY ps.scanned_at DESC, op.port
+                """, (domain_row['id'],))
             else:
                 logger.warning(f"No suitable column in open_ports. Available: {columns}")
                 open_ports = []
