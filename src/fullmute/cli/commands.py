@@ -2,6 +2,7 @@ import click
 import builtins
 import json
 import asyncio
+import re
 from pathlib import Path
 from fullmute.core.orchestrator import ScanOrchestrator
 from fullmute.detector.signature_loader import SignatureLoader
@@ -9,6 +10,28 @@ from fullmute.db.engine import init_db
 from fullmute.utils.logger import setup_logger
 
 logger = setup_logger()
+
+
+def _parse_version_search_query(query):
+    match = re.fullmatch(
+        r'\s*(.+?)\s+(\d+(?:\.\d+)*)(?:\s*-\s*(\d+(?:\.\d+)*))?\s*',
+        query,
+    )
+    if not match:
+        raise ValueError(
+            'Use "<technology> <version>" or '
+            '"<technology> <start-version> - <end-version>".'
+        )
+
+    technology, start_version, end_version = match.groups()
+    if not technology.strip():
+        raise ValueError('Technology name is required.')
+    return technology.strip(), start_version, end_version
+
+
+def _version_tuple(version):
+    return tuple(int(part) for part in version.split('.'))
+
 
 @click.group()
 @click.option(
@@ -257,7 +280,7 @@ def init(db_path):
     '--search-type',
     '-t',
     type=click.Choice([
-        'cve', 'cms', 'plugin', 'technology', 'domain', 'server',
+        'cve', 'cms', 'plugin', 'technology', 'version', 'domain', 'server',
         'database', 'language', 'sensitive-file',
     ]),
     required=True,
@@ -272,8 +295,8 @@ def init(db_path):
     required=True,
     metavar='TEXT',
     help=(
-        'Text to find. For sensitive-file, use a file name (for example '
-        '".env") or an exact stored URL/path.'
+        'Text to find. For version, use "<technology> <version>" or '
+        '"<technology> <start-version> - <end-version>".'
     ),
 )
 @click.pass_context
@@ -291,6 +314,22 @@ def search(ctx, db_path, search_type, query):
       fullmute search fullmute.db -t technology -q WordPress
     """
     file_query = query.strip()
+    version_search = None
+    if search_type == 'version':
+        try:
+            version_search = _parse_version_search_query(query)
+            _, start_version, end_version = version_search
+            if end_version and _version_tuple(start_version) > _version_tuple(end_version):
+                raise ValueError(
+                    'The start version must be less than or equal to the end version.'
+                )
+        except ValueError as exc:
+            raise click.BadParameter(
+                str(exc),
+                ctx=ctx,
+                param_hint='--query',
+            ) from exc
+
     if search_type == 'sensitive-file' and not file_query:
         raise click.BadParameter(
             'A file name or path is required for sensitive-file search.',
@@ -483,6 +522,59 @@ def search(ctx, db_path, search_type, query):
                     click.echo(f"  {domain}: {category} -> {tech_name}{version_str}")
             else:
                 click.echo(f"No domains found with technology containing '{query}'")
+
+        elif search_type == 'version':
+            technology_query, start_version, end_version = version_search
+
+            import sqlite3
+            with sqlite3.connect(db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    '''
+                    SELECT DISTINCT d.domain, t.category, t.name, t.version
+                    FROM domains d
+                    JOIN technologies t ON d.id = t.domain_id
+                    WHERE t.name LIKE ? COLLATE NOCASE
+                      AND t.version IS NOT NULL
+                      AND t.version != ''
+                    ORDER BY t.name COLLATE NOCASE, d.domain
+                    ''',
+                    (f'%{technology_query}%',),
+                )
+                technology_rows = cursor.fetchall()
+
+            lower = _version_tuple(start_version)
+            upper = _version_tuple(end_version) if end_version else lower
+
+            results = []
+            for domain, category, name, version in technology_rows:
+                version_match = re.fullmatch(r'\d+(?:\.\d+)*', str(version).strip())
+                if not version_match:
+                    continue
+                detected_version = _version_tuple(version_match.group())
+                width = max(len(detected_version), len(lower), len(upper))
+                padded_version = detected_version + (0,) * (width - len(detected_version))
+                padded_lower = lower + (0,) * (width - len(lower))
+                padded_upper = upper + (0,) * (width - len(upper))
+                if padded_lower <= padded_version <= padded_upper:
+                    results.append((domain, category, name, version))
+
+            version_range = (
+                f'{start_version} - {end_version}'
+                if end_version else start_version
+            )
+            if results:
+                click.echo(
+                    f"\nFound {len(results)} technology result(s) for "
+                    f"'{technology_query}' version {version_range}:"
+                )
+                for domain, category, name, version in results:
+                    click.echo(f"  {domain}: {category} -> {name} ({version})")
+            else:
+                click.echo(
+                    f"No technologies found for '{technology_query}' "
+                    f"version {version_range}"
+                )
 
         elif search_type == 'domain':
             
