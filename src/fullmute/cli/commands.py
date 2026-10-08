@@ -251,7 +251,7 @@ def init(db_path):
 @click.argument(
     'db_path',
     metavar='DB_PATH',
-    type=click.Path(exists=True, dir_okay=False, readable=True),
+    type=click.Path(dir_okay=False, readable=True),
 )
 @click.option(
     '--search-type',
@@ -297,6 +297,32 @@ def search(ctx, db_path, search_type, query):
             ctx=ctx,
             param_hint='--query',
         )
+
+    database_path = Path(db_path).expanduser()
+    if not database_path.is_absolute():
+        working_directory_path = database_path.resolve()
+        if working_directory_path.is_file():
+            database_path = working_directory_path
+        else:
+            config_path = Path(ctx.obj['config']).expanduser().resolve()
+            config_directory_path = (config_path.parent / database_path).resolve()
+            if config_directory_path.is_file():
+                database_path = config_directory_path
+            else:
+                raise click.BadParameter(
+                    f"Database not found at {working_directory_path} or "
+                    f"{config_directory_path}. Use the scanner DB path from "
+                    "database.path in your config.",
+                    ctx=ctx,
+                    param_hint='DB_PATH',
+                )
+    elif not database_path.is_file():
+        raise click.BadParameter(
+            f"Database file not found: {database_path}",
+            ctx=ctx,
+            param_hint='DB_PATH',
+        )
+    db_path = str(database_path.resolve())
 
     try:
         from fullmute.db.queries import DBQueries
@@ -571,8 +597,6 @@ def search(ctx, db_path, search_type, query):
 @click.option('--full', is_flag=True, help='Run web, CVE, Nuclei, Exploit-DB and port scans')
 @click.pass_context
 def scan(ctx, domains_file, output, max_concurrent, timeout, proxy, delay_min, delay_max, full):
-    import os
-
     domains_file = Path(domains_file).resolve()
     
     if not domains_file.exists():
@@ -594,13 +618,12 @@ def scan(ctx, domains_file, output, max_concurrent, timeout, proxy, delay_min, d
             click.echo(f"Error: Invalid file path", err=True)
             return
     
-    if output:
-        output_path = Path(output).resolve()
-        system_dirs = ['/etc', '/usr', '/bin', '/sbin', '/var', '/proc', '/sys']
-        for sys_dir in system_dirs:
-            if str(output_path).startswith(sys_dir):
-                click.echo(f"Error: Cannot write to system directory", err=True)
-                return
+    output_path = Path(output).expanduser().resolve()
+    system_dirs = ['/etc', '/usr', '/bin', '/sbin', '/var', '/proc', '/sys']
+    for sys_dir in system_dirs:
+        if str(output_path).startswith(sys_dir):
+            click.echo("Error: Cannot write to system directory", err=True)
+            return
     
     try:
         orchestrator = ScanOrchestrator(ctx.obj['config'])
@@ -617,11 +640,35 @@ def scan(ctx, domains_file, output, max_concurrent, timeout, proxy, delay_min, d
 
         results = asyncio.run(orchestrator.scan_from_file(
             str(domains_file),
-            output_file=output,
+            output_file=str(output_path),
             full=full,
         ))
 
-        click.echo(f"Scan completed! Results saved to: {output}")
+        scanned_results = [
+            result for result in results
+            if isinstance(result, dict)
+        ]
+        domains_with_cves = 0
+        total_cves = 0
+        for result in scanned_results:
+            cves = result.get('cves', {})
+            if isinstance(cves, dict):
+                count = sum(
+                    len(items) for items in cves.values()
+                    if isinstance(items, builtins.list)
+                )
+            elif isinstance(cves, builtins.list):
+                count = len(cves)
+            else:
+                count = 0
+            total_cves += count
+            domains_with_cves += count > 0
+
+        click.echo(f"Scan completed. Results saved to: {output_path}")
+        click.echo(
+            f"Targets processed: {len(scanned_results)}; "
+            f"targets with CVEs: {domains_with_cves}; CVEs found: {total_cves}"
+        )
 
     except Exception as e:
         click.echo(f"Error during scan: {e}", err=True)
@@ -702,8 +749,8 @@ def scan_one(ctx, domain):
                             score = cve.get('cvss', {}).get('score', 'N/A')
                             if not cve.get('version_range_confirmed', False):
                                 click.echo(
-                                    f"    - {cve_id} (NVD exact CPE match; explicit affected "
-                                    f"version range not specified, "
+                                    f"    - {cve_id} (NVD keyword match; exact affected "
+                                    f"version not confirmed, "
                                     f"Severity: {severity}, Score: {score})"
                                 )
                             else:
