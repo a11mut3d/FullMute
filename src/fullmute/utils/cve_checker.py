@@ -1,5 +1,6 @@
 import aiohttp
 import asyncio
+import re
 import time
 from typing import Dict, List, Optional, Tuple
 from fullmute.utils.logger import setup_logger
@@ -296,6 +297,99 @@ class CVEChecker:
 
         return candidates
 
+    @staticmethod
+    def _version_parts(version: str) -> Optional[Tuple[int, ...]]:
+        parts = re.findall(r'\d+', version or '')
+        return tuple(int(part) for part in parts) if parts else None
+
+    @classmethod
+    def _version_matches_cpe(
+        cls,
+        detected_version: str,
+        cpe_version: str,
+        cpe_match: Dict,
+    ) -> bool:
+        detected_parts = cls._version_parts(detected_version)
+        if detected_parts is None:
+            return False
+
+        if cpe_version == '-':
+            return False
+        if cpe_version not in {'', '*'}:
+            if '*' in cpe_version:
+                prefix_parts = cls._version_parts(cpe_version.split('*', 1)[0].rstrip('.'))
+                if prefix_parts and detected_parts[:len(prefix_parts)] != prefix_parts:
+                    return False
+            else:
+                cpe_parts = cls._version_parts(cpe_version)
+                if cpe_parts is None or detected_parts != cpe_parts:
+                    return False
+
+        for field, inclusive, lower_bound in (
+            ('versionStartIncluding', True, True),
+            ('versionStartExcluding', False, True),
+            ('versionEndIncluding', True, False),
+            ('versionEndExcluding', False, False),
+        ):
+            bound = cpe_match.get(field)
+            if not bound:
+                continue
+            bound_parts = cls._version_parts(str(bound))
+            if bound_parts is None:
+                return False
+            width = max(len(detected_parts), len(bound_parts))
+            detected = detected_parts + (0,) * (width - len(detected_parts))
+            boundary = bound_parts + (0,) * (width - len(bound_parts))
+            if lower_bound and (
+                detected < boundary if inclusive else detected <= boundary
+            ):
+                return False
+            if not lower_bound and (
+                detected > boundary if inclusive else detected >= boundary
+            ):
+                return False
+
+        return True
+
+    @classmethod
+    def _matches_keyword_cve(
+        cls,
+        cve: Dict,
+        vendor: str,
+        products: List[str],
+        version: str,
+    ) -> bool:
+        normalized_vendor = vendor.casefold()
+        normalized_products = {
+            product.casefold().replace('-', '_').replace(' ', '_')
+            for product in products
+        }
+
+        def find_matching_cpe(value):
+            if isinstance(value, dict):
+                criteria = value.get('criteria') or value.get('cpe23Uri')
+                if criteria and value.get('vulnerable', True):
+                    fields = criteria.split(':')
+                    if len(fields) >= 6 and fields[0:2] == ['cpe', '2.3']:
+                        cpe_vendor = fields[3].casefold()
+                        cpe_product = fields[4].casefold().replace('-', '_')
+                        if (
+                            cpe_vendor == normalized_vendor
+                            and cpe_product in normalized_products
+                            and cls._version_matches_cpe(
+                                version,
+                                fields[5],
+                                value,
+                            )
+                        ):
+                            return True
+                return any(find_matching_cpe(child) for child in value.values())
+            if isinstance(value, list):
+                return any(find_matching_cpe(child) for child in value)
+            return False
+
+        return find_matching_cpe(cve.get('configurations', []))
+
     async def _query_nvd_api(self, vendor: str, product: str, version: str) -> List[Dict]:
         vendor = (vendor or '').strip()
         if not vendor:
@@ -325,6 +419,29 @@ class CVEChecker:
         retry_count = 0
         delay = self.initial_delay
 
+        def add_cve(item, applicability, version_range_confirmed=True):
+            cve = item.get('cve', {})
+            cve_id = cve.get('id')
+            if not cve_id:
+                return
+            descriptions = cve.get('descriptions', [])
+            description = next(
+                (desc['value'] for desc in descriptions if desc.get('lang') == 'en'),
+                '',
+            )
+            metrics = cve.get('metrics', {})
+            refs = cve.get('references', [])
+            found_cves[cve_id] = {
+                'id': cve_id,
+                'description': description,
+                'cvss': self._extract_cvss_data(metrics),
+                'published_date': cve.get('published'),
+                'last_modified': cve.get('lastModified'),
+                'references': [ref.get('url') for ref in refs if ref.get('url')],
+                'applicability': applicability,
+                'version_range_confirmed': version_range_confirmed,
+            }
+
         for product_variant, params in requests:
             page_start = 0
             while retry_count < self.max_retries:
@@ -346,29 +463,7 @@ class CVEChecker:
                                 params.get('cpeName'),
                             )
                             for item in data.get('vulnerabilities', []):
-                                cve = item.get('cve', {})
-                                cve_id = cve.get('id')
-                                if not cve_id:
-                                    continue
-                                descriptions = cve.get('descriptions', [])
-                                description = next((desc['value'] for desc in descriptions if desc.get('lang') == 'en'), '')
-                                metrics = cve.get('metrics', {})
-                                cvss_data = self._extract_cvss_data(metrics)
-                                published = cve.get('published')
-                                refs = cve.get('references', [])
-                                reference_urls = [ref.get('url') for ref in refs if ref.get('url')]
-
-                                cve_result = {
-                                    'id': cve_id,
-                                    'description': description,
-                                    'cvss': cvss_data,
-                                    'published_date': published,
-                                    'last_modified': cve.get('lastModified'),
-                                    'references': reference_urls,
-                                    'applicability': 'nvd_exact_cpe_match',
-                                    'version_range_confirmed': True,
-                                }
-                                found_cves[cve_id] = cve_result
+                                add_cve(item, 'nvd_exact_cpe_match')
 
                             vulnerabilities = data.get('vulnerabilities', [])
                             total_results = int(data.get('totalResults', len(vulnerabilities)))
@@ -378,8 +473,9 @@ class CVEChecker:
                                 continue
                             break
                         elif response.status == 404:
-                            logger.warning(
-                                "NVD rejected exact CPE %s with HTTP 404",
+                            logger.debug(
+                                "NVD has no exact CPE entry for %s; "
+                                "will try version-aware keyword lookup if needed",
                                 params.get('cpeName'),
                             )
                             break
@@ -426,6 +522,110 @@ class CVEChecker:
 
             retry_count = 0
             delay = self.initial_delay
+
+        if not found_cves:
+            keyword_params = {
+                'keywordSearch': f"{product} {version}",
+                'resultsPerPage': 2000,
+            }
+            page_start = 0
+            while retry_count < self.max_retries:
+                try:
+                    if self._session is None or self._session.closed:
+                        self._session = aiohttp.ClientSession(headers=self.headers)
+                    if page_start:
+                        keyword_params['startIndex'] = page_start
+                    if self.rate_limiter:
+                        await self.rate_limiter.acquire()
+                    async with self._session.get(
+                        self.nvd_base_url,
+                        params=keyword_params,
+                    ) as response:
+                        if response.status in {403, 429}:
+                            retry_count += 1
+                            retry_after = response.headers.get('Retry-After')
+                            try:
+                                wait_time = max(
+                                    delay,
+                                    float(retry_after) if retry_after else (
+                                        6.0 if not self.nvd_api_key else 1.0
+                                    ),
+                                )
+                            except ValueError:
+                                wait_time = max(
+                                    delay,
+                                    6.0 if not self.nvd_api_key else 1.0,
+                                )
+                            if retry_count >= self.max_retries:
+                                raise NVDLookupError(
+                                    f"NVD keyword search retries exhausted "
+                                    f"(HTTP {response.status}) for "
+                                    f"{product} {version}"
+                                )
+                            logger.warning(
+                                "NVD keyword fallback was rate limited "
+                                "(HTTP %s); retrying in %ss",
+                                response.status,
+                                wait_time,
+                            )
+                            await asyncio.sleep(wait_time)
+                            delay *= 2
+                            continue
+                        if response.status != 200:
+                            raise NVDLookupError(
+                                f"NVD keyword search failed with HTTP "
+                                f"{response.status} for {product} {version}"
+                            )
+                        data = await response.json()
+                        successful_requests += 1
+                        matched_count = 0
+                        for item in data.get('vulnerabilities', []):
+                            cve = item.get('cve', {})
+                            configurations = cve.get('configurations')
+                            if configurations is None:
+                                add_cve(
+                                    item,
+                                    'nvd_keyword_match',
+                                    version_range_confirmed=False,
+                                )
+                                matched_count += 1
+                            elif self._matches_keyword_cve(
+                                cve, vendor, product_variants, version
+                            ):
+                                add_cve(item, 'nvd_keyword_cpe_match')
+                                matched_count += 1
+                        logger.info(
+                            "NVD keyword fallback for %s %s returned %s records; "
+                            "%s matched the product/version configuration",
+                            product,
+                            version,
+                            len(data.get('vulnerabilities', [])),
+                            matched_count,
+                        )
+                        vulnerabilities = data.get('vulnerabilities', [])
+                        total_results = int(
+                            data.get('totalResults', len(vulnerabilities))
+                        )
+                        next_start = page_start + len(vulnerabilities)
+                        if vulnerabilities and next_start < total_results:
+                            page_start = next_start
+                            continue
+                        break
+                except NVDLookupError:
+                    raise
+                except Exception as exc:
+                    logger.error("Error querying NVD keyword fallback: %s", exc)
+                    retry_count += 1
+                    if retry_count < self.max_retries:
+                        await asyncio.sleep(delay)
+                        delay *= 2
+                    else:
+                        raise NVDLookupError(
+                            f"NVD keyword fallback failed after "
+                            f"{self.max_retries} attempts for "
+                            f"{product} {version}: {exc}"
+                        ) from exc
+            retry_count = 0
 
         if requests and not successful_requests:
             raise NVDLookupError(
