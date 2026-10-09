@@ -8,6 +8,12 @@ from fullmute.utils.logger import setup_logger
 logger = setup_logger()
 
 
+class CVECheckResults(dict):
+    def __init__(self):
+        super().__init__()
+        self.completed_lookups = set()
+
+
 class NVDLookupError(RuntimeError):
     """Raised when the NVD API did not complete a CVE lookup successfully."""
 
@@ -315,6 +321,15 @@ class CVEChecker:
 
         if cpe_version == '-':
             return False
+        version_bound_fields = (
+            'versionStartIncluding',
+            'versionStartExcluding',
+            'versionEndIncluding',
+            'versionEndExcluding',
+        )
+        has_version_bounds = any(cpe_match.get(field) for field in version_bound_fields)
+        if cpe_version in {'', '*'} and not has_version_bounds:
+            return False
         if cpe_version not in {'', '*'}:
             if '*' in cpe_version:
                 prefix_parts = cls._version_parts(cpe_version.split('*', 1)[0].rstrip('.'))
@@ -352,7 +367,7 @@ class CVEChecker:
         return True
 
     @classmethod
-    def _matches_keyword_cve(
+    def _matches_vulnerable_cpe(
         cls,
         cve: Dict,
         vendor: str,
@@ -368,7 +383,7 @@ class CVEChecker:
         def find_matching_cpe(value):
             if isinstance(value, dict):
                 criteria = value.get('criteria') or value.get('cpe23Uri')
-                if criteria and value.get('vulnerable', True):
+                if criteria and value.get('vulnerable') is True:
                     fields = criteria.split(':')
                     if len(fields) >= 6 and fields[0:2] == ['cpe', '2.3']:
                         cpe_vendor = fields[3].casefold()
@@ -462,8 +477,25 @@ class CVEChecker:
                                 data.get('totalResults', 0),
                                 params.get('cpeName'),
                             )
+                            matched_count = 0
                             for item in data.get('vulnerabilities', []):
-                                add_cve(item, 'nvd_exact_cpe_match')
+                                cve = item.get('cve', {})
+                                if self._matches_vulnerable_cpe(
+                                    cve,
+                                    vendor,
+                                    product_variants,
+                                    version,
+                                ):
+                                    add_cve(item, 'nvd_exact_cpe_match')
+                                    matched_count += 1
+                            if data.get('vulnerabilities') and not matched_count:
+                                logger.info(
+                                    "NVD exact CPE returned %s records for %s %s, "
+                                    "but none mark that product/version as vulnerable",
+                                    len(data['vulnerabilities']),
+                                    product,
+                                    version,
+                                )
 
                             vulnerabilities = data.get('vulnerabilities', [])
                             total_results = int(data.get('totalResults', len(vulnerabilities)))
@@ -582,14 +614,7 @@ class CVEChecker:
                         for item in data.get('vulnerabilities', []):
                             cve = item.get('cve', {})
                             configurations = cve.get('configurations')
-                            if configurations is None:
-                                add_cve(
-                                    item,
-                                    'nvd_keyword_match',
-                                    version_range_confirmed=False,
-                                )
-                                matched_count += 1
-                            elif self._matches_keyword_cve(
+                            if configurations and self._matches_vulnerable_cpe(
                                 cve, vendor, product_variants, version
                             ):
                                 add_cve(item, 'nvd_keyword_cpe_match')
@@ -679,7 +704,7 @@ class CVEChecker:
         return None
 
     async def check_cves_batch(self, technologies: List[Tuple[str, str]]) -> Dict[str, List[Dict]]:
-        results = {}
+        results = CVECheckResults()
         unique_technologies = list(dict.fromkeys(technologies))
         if not unique_technologies:
             return results
@@ -702,6 +727,7 @@ class CVEChecker:
                 )
                 continue
 
+            results.completed_lookups.add(f"{name} ({version})")
             if cves:
                 results[f"{name} ({version})"] = cves
                 logger.info(
