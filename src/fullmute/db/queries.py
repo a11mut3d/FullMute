@@ -135,6 +135,22 @@ class DBQueries:
         except Exception as e:
             logger.error(f"Failed to add CVE: {e}")
 
+    def delete_cves_for_technology(self, technology_id: int):
+        try:
+            with self._get_cursor() as cursor:
+                cursor.execute(
+                    "DELETE FROM cves WHERE technology_id = ?",
+                    (technology_id,),
+                )
+                return cursor.rowcount
+        except Exception as e:
+            logger.error(
+                "Failed to replace CVEs for technology %s: %s",
+                technology_id,
+                e,
+            )
+            return 0
+
     def add_sensitive_file(self, file_data: dict):
         try:
             with self._get_cursor() as cursor:
@@ -267,6 +283,22 @@ class DBQueries:
                 ))
         except Exception as e:
             logger.error(f"Failed to add plugin CVE: {e}")
+
+    def delete_plugin_cves_for_plugin(self, plugin_id: int):
+        try:
+            with self._get_cursor() as cursor:
+                cursor.execute(
+                    "DELETE FROM plugin_cves WHERE plugin_id = ?",
+                    (plugin_id,),
+                )
+                return cursor.rowcount
+        except Exception as e:
+            logger.error(
+                "Failed to replace CVEs for plugin %s: %s",
+                plugin_id,
+                e,
+            )
+            return 0
 
     def get_cves_for_technology(self, technology_id: int) -> list:
         try:
