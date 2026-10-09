@@ -222,6 +222,7 @@ class FullMuteScanner:
                 )
 
             stage_started = time.perf_counter()
+            completed_cve_lookups = set()
             if tech_with_versions:
                 logger.info(
                     f"Checking CVEs for {len(tech_with_versions)} techs: "
@@ -230,6 +231,11 @@ class FullMuteScanner:
                 try:
                     cve_results = await self.cve_checker.check_cves_batch(tech_with_versions)
                     results["cves"] = cve_results
+                    completed_cve_lookups = getattr(
+                        cve_results,
+                        "completed_lookups",
+                        set(),
+                    )
 
                     if cve_results:
                         self.stats['with_cves'] += 1
@@ -325,7 +331,11 @@ class FullMuteScanner:
 
             logger.info(f"Saving results for {domain}")
             stage_started = time.perf_counter()
-            self._save_to_db(domain, results)
+            self._save_to_db(
+                domain,
+                results,
+                completed_cve_lookups=completed_cve_lookups,
+            )
             stage_timings['database_persistence'] = time.perf_counter() - stage_started
 
             logger.info(
@@ -453,7 +463,12 @@ class FullMuteScanner:
                 process.terminate()
             await asyncio.to_thread(process.join, 1)
 
-    def _save_to_db(self, domain: str, results: Dict[str, Any]):
+    def _save_to_db(
+        self,
+        domain: str,
+        results: Dict[str, Any],
+        completed_cve_lookups=None,
+    ):
         try:
             domain_data = {
                 'domain': domain,
@@ -529,6 +544,18 @@ class FullMuteScanner:
                             plugin_id = self.db.add_plugin(plugin_data)
                             if plugin_id:
                                 plugin_ids[f"{name}_{version}"] = plugin_id
+
+                for technology_identifier in completed_cve_lookups or ():
+                    if ' (' not in technology_identifier or not technology_identifier.endswith(')'):
+                        continue
+                    name, version = technology_identifier.rsplit(' (', 1)
+                    technology_key = f"{name}_{version[:-1]}"
+                    technology_id = technology_ids.get(technology_key)
+                    plugin_id = plugin_ids.get(technology_key)
+                    if technology_id:
+                        self.db.delete_cves_for_technology(technology_id)
+                    if plugin_id:
+                        self.db.delete_plugin_cves_for_plugin(plugin_id)
 
 
                 for theme in themes:
