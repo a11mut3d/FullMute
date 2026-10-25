@@ -1,170 +1,268 @@
 {
   "PHP": {
-    "headers": ["X-Powered-By: PHP/([0-9.]+)|X-Powered-By: PHP", "X-Generator: PHP", "Server: PHP", "Set-Cookie: PHPSESSID"],
-    "html": [
-      "\\\\u003C\\\\u003Fphp",
-      "<?php",
-      "phpinfo\\(\\)",
-      "echo .*;",
-      "\\\\$_GET",
-      "\\\\$_POST",
-      "\\\\$_SESSION",
-      "\\\\$_COOKIE",
-      "require_once",
-      "include_once",
-      "function .*\\(\\)\\s*\\{",
-      "mysql_connect",
-      "mysqli_query",
-      "mysqli_.*\\(",
-      "mysql_.*\\("
+    "headers": [
+      "X-Powered-By:\\s*PHP(?:/[0-9.]+)?",
+      "Server:.*\\bPHP\\b",
+      "Set-Cookie:.*\\bPHPSESSID\\b"
     ],
-    "urls": [".php", ".php3$", ".php4$", ".php5$", ".phtml$"],
-    "cookies": ["PHPSESSID", "phpsessid", "PHP"],
-    "version_pattern": "PHP/([0-9.]+)",
-    "must_have": ["X-Powered-By: PHP", "<?php", "PHPSESSID", "require_once"],
-    "must_not_have": ["Python", "Java", "Node.js", "Ruby", "django", "flask"]
+    "html": [
+      "<\\?php",
+      "\\bPHPSESSID\\b",
+      "wp-content/(?:themes|plugins)/",
+      "wp-includes/",
+      "\\bphpinfo\\s*\\(\\)",
+      "\\$_GET\\b",
+      "\\$_POST\\b",
+      "\\$_SESSION\\b",
+      "\\$_COOKIE\\b",
+      "\\brequire_once\\b",
+      "\\binclude_once\\b",
+      "\\bmysqli?_\\w+\\s*\\("
+    ],
+    "urls": [
+      "\\.php(?:$|[?#])",
+      "\\.php[345](?:$|[?#])",
+      "\\.phtml(?:$|[?#])"
+    ],
+    "cookies": ["^PHPSESSID$", "^php"],
+    "version_pattern": "PHP/([0-9]+(?:\\.[0-9]+)*)",
+    "must_have": [
+      "X-Powered-By:\\s*PHP",
+      "\\bPHPSESSID\\b",
+      "<\\?php",
+      "href=[\"'][^\"']*\\.php"
+    ],
+    "must_not_have": [
+      "X-Powered-By:\\s*(?:ASP\\.NET|Express|Servlet)",
+      "Server:.*\\bApache-Coyote\\b"
+    ]
   },
+
   "Python": {
-    "headers": ["X-Powered-By: Python", "X-Generator: Python", "Server: Python", "X-Frame-Options: SAMEORIGIN"],
-    "html": [
-      "import [a-zA-Z_]",
-      "from [a-zA-Z_].* import",
-      "def [a-zA-Z_].*\\(.*\\):",
-      "class [a-zA-Z_].*:",
-      "print\\(",
-      "request\\.",
-      "flask",
-      "django",
-      "pandas",
-      "numpy",
-      "if __name__ == [\"']__main__[\"']:"
+    "headers": [
+      "X-Powered-By:\\s*Python",
+      "Server:.*\\b(?:Werkzeug|gunicorn|uvicorn)\\b",
+      "Server:.*\\bPython\\b"
     ],
-    "urls": [".py$", "/python", "/django", "/flask"],
-    "cookies": ["python", "django", "csrftoken"],
-    "version_pattern": "",
-    "must_have": ["import ", "def ", "X-Powered-By: Python"],
-    "must_not_have": ["PHP", "Java", "Node.js", "Ruby", "laravel", "express"]
+    "html": [
+      "\\bimport\\s+[a-zA-Z_]\\w*",
+      "\\bfrom\\s+[a-zA-Z_]\\w*\\s+import\\b",
+      "\\bdef\\s+[a-zA-Z_]\\w*\\s*\\([^)]*\\)\\s*:",
+      "\\bclass\\s+[a-zA-Z_]\\w*\\s*(?:\\([^)]*\\))?\\s*:",
+      "\\bif\\s+__name__\\s*==\\s*[\"']__main__[\"']\\s*:",
+      "\\b(?:django|flask|fastapi|tornado|aiohttp)\\b"
+    ],
+    "urls": [
+      "\\.py(?:$|[?#])",
+      "/django(?:/|$)",
+      "/flask(?:/|$)"
+    ],
+    "cookies": ["^csrftoken$", "^sessionid$"],
+    "version_pattern": "Python/([0-9]+(?:\\.[0-9]+)*)",
+    "must_have": [
+      "X-Powered-By:\\s*Python",
+      "Server:.*\\b(?:Werkzeug|gunicorn|uvicorn)\\b",
+      "\\bif\\s+__name__\\s*==\\s*[\"']__main__[\"']\\s*:",
+      "href=[\"'][^\"']*\\.py(?:$|[?#\"'])"
+    ],
+    "must_not_have": [
+      "X-Powered-By:\\s*PHP",
+      "X-Powered-By:\\s*ASP\\.NET",
+      "X-Powered-By:\\s*Express"
+    ]
   },
+
   "Java": {
-    "headers": ["X-Powered-By: Servlet", "X-Powered-By: JSP", "X-Powered-By: Java", "Server: Apache-Coyote", "X-Application-Context"],
-    "html": [
-      "import java\\.",
-      "public class",
-      "private static",
-      "System\\.out\\.",
-      "public void",
-      "HttpServletRequest",
-      "HttpServletResponse",
-      "JSP",
-      "jsp:",
-      "java\\."
+    "headers": [
+      "X-Powered-By:\\s*(?:Servlet|JSP|Java)",
+      "Server:.*\\bApache-Coyote\\b",
+      "X-Application-Context",
+      "Set-Cookie:.*\\bJSESSIONID\\b"
     ],
-    "urls": [".jsp$", ".jspx$", ".jws$", "/servlet", "/java", "/jsp"],
-    "cookies": ["JSESSIONID", "java", "jsessionid"],
-    "version_pattern": "Java/([0-9.]+)|Java ([0-9.]+)",
-    "must_have": ["import java", "public class", "X-Powered-By: Servlet"],
-    "must_not_have": ["PHP", "Python", "Node.js", "Ruby", "laravel", "django"]
+    "html": [
+      "\\bimport\\s+java\\.",
+      "\\bpublic\\s+(?:final\\s+)?class\\s+\\w+",
+      "\\bHttpServletRequest\\b",
+      "\\bHttpServletResponse\\b",
+      "\\bjsp:\\w+",
+      "<%[=@!]?"
+    ],
+    "urls": [
+      "\\.jspx?(?:$|[?#])",
+      "\\.jws(?:$|[?#])",
+      "/servlet(?:/|$)"
+    ],
+    "cookies": ["^JSESSIONID$"],
+    "version_pattern": "Java/([0-9]+(?:\\.[0-9]+)*)",
+    "must_have": [
+      "X-Powered-By:\\s*(?:Servlet|JSP|Java)",
+      "Server:.*\\bApache-Coyote\\b",
+      "\\bJSESSIONID\\b",
+      "href=[\"'][^\"']*\\.jspx?"
+    ],
+    "must_not_have": [
+      "X-Powered-By:\\s*PHP",
+      "X-Powered-By:\\s*Express"
+    ]
   },
+
   "Node.js": {
-    "headers": ["X-Powered-By: Express", "X-Powered-By: Node", "X-Powered-By: Node.js", "Server: Node.js"],
-    "html": [
-      "require\\(",
-      "module\\.exports",
-      "exports\\.",
-      "app\\.get\\(",
-      "app\\.post\\(",
-      "app\\.listen\\(",
-      "express",
-      "socket\\.io",
-      "npm",
-      "package\\.json",
-      "function \\(.*\\) \\{",
-      "var ",
-      "const ",
-      "let "
+    "headers": [
+      "X-Powered-By:\\s*Express",
+      "X-Powered-By:\\s*Node(?:\\.js)?",
+      "Server:.*\\bNode(?:\\.js)?\\b",
+      "Set-Cookie:.*\\bconnect\\.sid\\b"
     ],
-    "urls": ["/node", "/npm", "/package.json", ".js$", "/socket.io"],
-    "cookies": ["connect.sid", "node", "node_session"],
-    "version_pattern": "Node\\.js/([0-9.]+)|Node ([0-9.]+)",
-    "must_have": ["X-Powered-By: Node", "require(", "module.exports"],
-    "must_not_have": ["PHP", "Python", "Java", "Ruby", "laravel", "django"]
+    "html": [
+      "\\bmodule\\.exports\\b",
+      "\\bexports\\.\\w+",
+      "\\brequire\\s*\\(\\s*[\"'][^\"']+[\"']\\s*\\)",
+      "\\bapp\\.(?:get|post|put|delete|use)\\s*\\(",
+      "\\bapp\\.listen\\s*\\(",
+      "\\bsocket\\.io\\b"
+    ],
+    "urls": [
+      "/package\\.json(?:$|[?#])",
+      "/socket\\.io(?:/|$)",
+      "/node(?:/|$)"
+    ],
+    "cookies": ["^connect\\.sid$", "^node_session$"],
+    "version_pattern": "Node(?:\\.js)?/([0-9]+(?:\\.[0-9]+)*)",
+    "must_have": [
+      "X-Powered-By:\\s*Express",
+      "X-Powered-By:\\s*Node(?:\\.js)?",
+      "\\bconnect\\.sid\\b",
+      "/package\\.json",
+      "/socket\\.io"
+    ],
+    "must_not_have": [
+      "X-Powered-By:\\s*PHP",
+      "X-Powered-By:\\s*ASP\\.NET",
+      "Server:.*\\bApache-Coyote\\b"
+    ]
   },
+
   "Ruby": {
-    "headers": ["X-Powered-By: Phusion Passenger", "X-Powered-By: Ruby", "X-Runtime"],
-    "html": [
-      "require [\"'].*[\"']",
-      "def [a-zA-Z_]",
-      "class [A-Z][a-zA-Z_]*",
-      "Rails\\.",
-      "erb:",
-      "<%=.*%>",
-      "gem ",
-      "bundle ",
-      "ruby",
-      "puts ",
-      "gets "
+    "headers": [
+      "X-Powered-By:\\s*(?:Phusion Passenger|Ruby)",
+      "X-Runtime:"
     ],
-    "urls": [".rb$", ".rhtml$", "/ruby", "/rails", "/gems"],
-    "cookies": ["_rails_session", "ruby", "rack.session"],
-    "version_pattern": "Ruby/([0-9.]+)|Ruby ([0-9.]+)",
-    "must_have": ["require '", "def ", "X-Powered-By: Ruby"],
-    "must_not_have": ["PHP", "Python", "Java", "Node.js", "laravel", "django"]
+    "html": [
+      "\\brequire\\s+[\"'][^\"']+[\"']",
+      "\\bRails\\.",
+      "<%=.*?%>",
+      "\\b(?:erb|haml|slim)\\b"
+    ],
+    "urls": [
+      "\\.rb(?:$|[?#])",
+      "\\.rhtml(?:$|[?#])",
+      "/rails(?:/|$)"
+    ],
+    "cookies": ["^_rails_session$", "^rack\\.session$"],
+    "version_pattern": "Ruby/([0-9]+(?:\\.[0-9]+)*)",
+    "must_have": [
+      "X-Powered-By:\\s*(?:Phusion Passenger|Ruby)",
+      "X-Runtime:",
+      "\\b_rails_session\\b",
+      "href=[\"'][^\"']*\\.rb(?:$|[?#\"'])"
+    ],
+    "must_not_have": [
+      "X-Powered-By:\\s*PHP",
+      "X-Powered-By:\\s*Express"
+    ]
   },
+
   "Go": {
-    "headers": ["Server: Go", "X-Powered-By: Go", "X-Go-Version"],
-    "html": [
-      "import \\(\".*\"\\)",
-      "func [a-zA-Z_]",
-      "package main",
-      "fmt\\.",
-      "net/http",
-      "goroutine",
-      "go func",
-      "go \\."
+    "headers": [
+      "X-Powered-By:\\s*Go",
+      "Server:.*\\bGo(?:-http)?\\b"
     ],
-    "urls": [".go$", "/go", "/golang"],
-    "cookies": ["go", "golang"],
-    "version_pattern": "Go/([0-9.]+)|Go ([0-9.]+)",
-    "must_have": ["package ", "import (", "func ", "Server: Go"],
-    "must_not_have": ["PHP", "Python", "Java", "Node.js", "Ruby", "laravel", "django"]
+    "html": [
+      "\\bpackage\\s+main\\b",
+      "\\bfunc\\s+\\w+\\s*\\(",
+      "\\bnet/http\\b",
+      "\\bfmt\\.\\w+",
+      "\\bgo\\s+func\\s*\\("
+    ],
+    "urls": [
+      "\\.go(?:$|[?#])",
+      "/golang(?:/|$)"
+    ],
+    "cookies": ["^go_session$"],
+    "version_pattern": "Go/([0-9]+(?:\\.[0-9]+)*)",
+    "must_have": [
+      "X-Powered-By:\\s*Go",
+      "Server:.*\\bGo(?:-http)?\\b",
+      "\\bpackage\\s+main\\b",
+      "href=[\"'][^\"']*\\.go(?:$|[?#\"'])"
+    ],
+    "must_not_have": [
+      "X-Powered-By:\\s*PHP",
+      "X-Powered-By:\\s*Express"
+    ]
   },
+
   "C#": {
-    "headers": ["X-Powered-By: ASP.NET", "X-AspNet-Version", "X-SourceFiles:.*\\.cs"],
-    "html": [
-      "using System",
-      "namespace ",
-      "public class",
-      "private void",
-      "protected void",
-      "Page_Load",
-      "Response\\.",
-      "Request\\.",
-      "System\\.",
-      "\\.cshtml"
+    "headers": [
+      "X-Powered-By:\\s*ASP\\.NET",
+      "X-AspNet-Version:",
+      "X-AspNetMvc-Version:"
     ],
-    "urls": [".aspx$", ".ashx$", ".asmx$", ".ascx$", ".cs$", ".cshtml$"],
-    "cookies": ["ASP.NET_SessionId", "ASPSESSION", "CSharp"],
-    "version_pattern": "C#/([0-9.]+)|C# ([0-9.]+)",
-    "must_have": ["using System", "namespace ", "X-Powered-By: ASP.NET"],
-    "must_not_have": ["PHP", "Python", "Java", "Node.js", "Ruby", "laravel", "django"]
+    "html": [
+      "\\busing\\s+System(?:\\.\\w+)*\\s*;",
+      "\\bnamespace\\s+[A-Za-z_]\\w*",
+      "\\bPage_Load\\s*\\(",
+      "\\b(?:Response|Request)\\.\\w+"
+    ],
+    "urls": [
+      "\\.aspx(?:$|[?#])",
+      "\\.ashx(?:$|[?#])",
+      "\\.asmx(?:$|[?#])",
+      "\\.ascx(?:$|[?#])",
+      "\\.cshtml(?:$|[?#])"
+    ],
+    "cookies": ["^ASP\\.NET_SessionId$", "^ASPSESSION"],
+    "version_pattern": "(?:ASP\\.NET|C#)/([0-9]+(?:\\.[0-9]+)*)",
+    "must_have": [
+      "X-Powered-By:\\s*ASP\\.NET",
+      "X-AspNet-Version:",
+      "ASP\\.NET_SessionId",
+      "href=[\"'][^\"']*\\.aspx"
+    ],
+    "must_not_have": [
+      "X-Powered-By:\\s*PHP",
+      "X-Powered-By:\\s*Express"
+    ]
   },
+
   "Perl": {
-    "headers": ["X-Powered-By: Perl", "X-Generator: Perl"],
-    "html": [
-      "use [a-zA-Z_]",
-      "#!/usr/bin/perl",
-      "#!/usr/local/bin/perl",
-      "my \\$",
-      "\\$[a-zA-Z_]",
-      "@[a-zA-Z_]",
-      "%[a-zA-Z_]",
-      "print \"",
-      "sub [a-zA-Z_]"
+    "headers": [
+      "X-Powered-By:\\s*Perl",
+      "X-Generator:\\s*Perl"
     ],
-    "urls": [".pl$", ".pm$", ".cgi$", "/perl"],
-    "cookies": ["perl", "cgi"],
-    "version_pattern": "Perl/([0-9.]+)|Perl ([0-9.]+)",
-    "must_have": ["use ", "my $", "#!/usr/bin/perl"],
-    "must_not_have": ["PHP", "Python", "Java", "Node.js", "Ruby", "laravel", "django"]
+    "html": [
+      "#!/usr/bin/(?:env\\s+)?perl",
+      "\\buse\\s+strict\\s*;",
+      "\\buse\\s+warnings\\s*;",
+      "\\bmy\\s+\\$\\w+",
+      "\\bsub\\s+\\w+\\s*\\{"
+    ],
+    "urls": [
+      "\\.pl(?:$|[?#])",
+      "\\.pm(?:$|[?#])",
+      "\\.cgi(?:$|[?#])"
+    ],
+    "cookies": ["^perl_session$"],
+    "version_pattern": "Perl/([0-9]+(?:\\.[0-9]+)*)",
+    "must_have": [
+      "X-Powered-By:\\s*Perl",
+      "#!/usr/bin/(?:env\\s+)?perl",
+      "\\buse\\s+strict\\s*;",
+      "href=[\"'][^\"']*\\.(?:pl|cgi|pm)(?:$|[?#\"'])"
+    ],
+    "must_not_have": [
+      "X-Powered-By:\\s*PHP",
+      "X-Powered-By:\\s*Express"
+    ]
   }
 }

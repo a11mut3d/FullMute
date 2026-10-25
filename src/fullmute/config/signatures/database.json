@@ -1,116 +1,198 @@
 {
   "MySQL": {
-    "headers": ["X-MySQL-Version", "X-Database: MySQL", "X-DB-Engine: MySQL", "X-Database: mysql", "X-DB-Engine: mysql"],
+    "headers": [],
     "html": [
-      "mysql_query",
-      "mysql_connect",
-      "mysql_fetch_array",
-      "MySQL server version",
-      "mysql_num_rows",
-      "MariaDB",
-      "mysql_error",
-      "mysqli_connect",
-      "mysqli_query",
-      "mysql_pconnect",
-      "mysql_select_db",
-      "mysql_real_escape_string"
+      "\\bYou have an error in your SQL syntax\\b",
+      "\\bcheck the manual that corresponds to your (?:MySQL|MariaDB) server version\\b",
+      "\\bUnknown column '[^']+' in 'field list'\\b",
+      "\\bTable '[^']+' doesn't exist\\b",
+      "\\bAccess denied for user '[^']+'@'[^']+' \\(using password: (?:YES|NO)\\)\\b",
+      "\\bmysql_(?:query|connect|fetch_array|num_rows|error|real_escape_string|select_db|pconnect)\\s*\\(",
+      "\\bmysqli_(?:query|connect|fetch_array|num_rows|error|real_escape_string|select_db)\\s*\\(",
+      "\\bPDOException\\b[^<]{0,200}\\bmysql:"
     ],
-    "urls": ["/mysql", "/phpmyadmin", "/adminer", "/myadmin", "/mysql-admin", "/mysqladmin"],
-    "cookies": ["mysql", "mysqldb", "mysql_session", "mysql_login"],
-    "version_pattern": "MySQL ([0-9.]+)|MariaDB ([0-9.]+)",
-    "must_have": ["mysql", "X-Database: MySQL", "phpmyadmin", "mysql_query", "mysqli"],
-    "must_not_have": ["PostgreSQL", "MongoDB", "Redis", "django", "laravel"]
+    "urls": [],
+    "cookies": [],
+    "version_pattern": "(?:MySQL|MariaDB)\\s+([0-9]+(?:\\.[0-9]+)+)",
+    "must_have": [
+      "\\bYou have an error in your SQL syntax\\b",
+      "\\bcheck the manual that corresponds to your (?:MySQL|MariaDB) server version\\b",
+      "\\bUnknown column '[^']+' in 'field list'\\b",
+      "\\bmysql_(?:query|connect|real_escape_string)\\s*\\(",
+      "\\bmysqli_(?:query|connect|real_escape_string)\\s*\\(",
+      "\\bAccess denied for user '[^']+'@'[^']+'"
+    ],
+    "must_not_have": [
+      "\\bPostgreSQL\\b",
+      "\\bpg_(?:query|connect|exec)\\s*\\(",
+      "\\bORA-[0-9]{4,5}\\b",
+      "\\bMicrosoft OLE DB Provider for SQL Server\\b",
+      "\\bSQLite3?::\\b"
+    ]
   },
+
+  "MariaDB": {
+    "headers": [],
+    "html": [
+      "\\bMariaDB\\b",
+      "\\bcheck the manual that corresponds to your MariaDB server version\\b",
+      "\\bMariaDB\\s+[0-9]+\\.[0-9]+"
+    ],
+    "urls": [],
+    "cookies": [],
+    "version_pattern": "MariaDB\\s+([0-9]+(?:\\.[0-9]+)+)",
+    "must_have": [
+      "\\bMariaDB\\b",
+      "\\bcheck the manual that corresponds to your MariaDB server version\\b"
+    ],
+    "must_not_have": [
+      "\\bPostgreSQL\\b",
+      "\\bpg_query\\b",
+      "\\bORA-[0-9]{4,5}\\b",
+      "\\bSQLite3?::\\b"
+    ]
+  },
+
   "PostgreSQL": {
-    "headers": ["X-PostgreSQL-Version", "X-Database: PostgreSQL", "X-DB-Engine: PostgreSQL"],
+    "headers": [],
     "html": [
-      "pg_connect",
-      "pg_query",
-      "pg_fetch_array",
-      "PostgreSQL",
-      "postgres",
-      "pg_exec"
+      "\\bPostgreSQL\\b",
+      "\\bpg_(?:query|connect|fetch_array|exec|error|escape_string)\\s*\\(",
+      "\\bERROR:\\s+syntax error at or near\\b",
+      "\\bERROR:\\s+relation \"[^\"]+\" does not exist\\b",
+      "\\bERROR:\\s+column \"[^\"]+\" does not exist\\b",
+      "\\bFATAL:\\s+password authentication failed for user\\b",
+      "\\bPDOException\\b[^<]{0,200}\\bpgsql:"
     ],
-    "urls": ["/pgadmin", "/phppgadmin"],
-    "cookies": ["postgresql", "postgres", "pgsql"],
-    "version_pattern": "PostgreSQL ([0-9.]+)",
-    "must_have": ["PostgreSQL", "pg_", "X-Database: PostgreSQL", "pgadmin"],
-    "must_not_have": ["MySQL", "MongoDB", "Redis", "django", "laravel"]
+    "urls": [],
+    "cookies": [],
+    "version_pattern": "PostgreSQL\\s+([0-9]+(?:\\.[0-9]+)+)",
+    "must_have": [
+      "\\bpg_(?:query|connect|exec|escape_string)\\s*\\(",
+      "\\bERROR:\\s+syntax error at or near\\b",
+      "\\bERROR:\\s+relation \"[^\"]+\" does not exist\\b",
+      "\\bFATAL:\\s+password authentication failed for user\\b"
+    ],
+    "must_not_have": [
+      "\\bYou have an error in your SQL syntax\\b",
+      "\\bmysqli?_\\w+\\s*\\(",
+      "\\bORA-[0-9]{4,5}\\b",
+      "\\bMicrosoft OLE DB Provider for SQL Server\\b",
+      "\\bSQLite3?::\\b"
+    ]
   },
-  "MongoDB": {
-    "headers": ["X-MongoDB-Version", "X-Database: MongoDB", "X-DB-Engine: MongoDB"],
+
+  "MSSQL": {
+    "headers": [
+      "X-Powered-By:.*\\bSQL Server\\b"
+    ],
     "html": [
-      "mongodb",
-      "mongo_connect",
-      "MongoDB",
-      "db.collection",
-      "collection.find"
+      "\\bMicrosoft OLE DB Provider for SQL Server\\b",
+      "\\bSystem\\.Data\\.SqlClient\\.SqlException\\b",
+      "\\bUnclosed quotation mark after the character string\\b",
+      "\\bIncorrect syntax near\\b",
+      "\\bInvalid column name\\b",
+      "\\bIncorrect syntax near the keyword\\b"
     ],
-    "urls": ["/mongo", "/mongoadmin", "/rockmongo"],
-    "cookies": ["mongodb", "mongo", "mongosession"],
-    "version_pattern": "MongoDB ([0-9.]+)",
-    "must_have": ["MongoDB", "db.collection", "X-Database: MongoDB", "mongo"],
-    "must_not_have": ["MySQL", "PostgreSQL", "Redis", "django", "laravel"]
-  },
-  "Redis": {
-    "headers": ["X-Redis-Version", "X-Database: Redis", "X-DB-Engine: Redis"],
-    "html": [
-      "redis",
-      "redis_connect",
-      "Redis",
-      "redis-cli",
-      "KEYS *"
+    "urls": [],
+    "cookies": [],
+    "version_pattern": "(?:Microsoft SQL Server|SQL Server)\\s*([0-9]+(?:\\.[0-9]+)+)",
+    "must_have": [
+      "\\bMicrosoft OLE DB Provider for SQL Server\\b",
+      "\\bSystem\\.Data\\.SqlClient\\.SqlException\\b",
+      "\\bUnclosed quotation mark after the character string\\b",
+      "\\bIncorrect syntax near\\b"
     ],
-    "urls": ["/redis", "/rediweb"],
-    "cookies": ["redis", "redissession"],
-    "version_pattern": "Redis ([0-9.]+)",
-    "must_have": ["Redis", "redis-cli", "X-Database: Redis", "KEYS"],
-    "must_not_have": ["MySQL", "PostgreSQL", "MongoDB", "django", "laravel"]
+    "must_not_have": [
+      "\\bYou have an error in your SQL syntax\\b",
+      "\\bmysqli?_\\w+\\s*\\(",
+      "\\bPostgreSQL\\b",
+      "\\bpg_query\\b",
+      "\\bORA-[0-9]{4,5}\\b",
+      "\\bSQLite3?::\\b"
+    ]
   },
-  "SQLite": {
-    "headers": ["X-SQLite-Version", "X-Database: SQLite"],
-    "html": [
-      "sqlite",
-      "SQLite",
-      "sqlite3",
-      "sqlite_query",
-      "sqlite_open"
-    ],
-    "urls": ["/sqlite", "/sqliteadmin"],
-    "cookies": ["sqlite", "sqlite_session"],
-    "version_pattern": "SQLite ([0-9.]+)",
-    "must_have": ["SQLite", "sqlite3", "X-Database: SQLite", "sqlite_query"],
-    "must_not_have": ["MySQL", "PostgreSQL", "MongoDB", "django", "laravel"]
-  },
+
   "Oracle": {
-    "headers": ["X-Oracle-Version", "X-Database: Oracle", "X-DB-Engine: Oracle"],
+    "headers": [],
     "html": [
-      "oracle",
-      "Oracle",
-      "oracle_connect",
-      "PL/SQL",
-      "SELECT \\* FROM"
+      "\\bORA-[0-9]{4,5}\\b",
+      "\\bOracle error\\b",
+      "\\bOracle Database\\b",
+      "\\boci_(?:connect|parse|execute|error)\\s*\\(",
+      "\\bORA-00933\\b",
+      "\\bORA-00942\\b",
+      "\\bORA-01756\\b"
     ],
-    "urls": ["/oracle", "/toad", "/sqldeveloper"],
-    "cookies": ["oracle", "oracle_sid"],
-    "version_pattern": "Oracle ([0-9.]+)",
-    "must_have": ["Oracle", "PL/SQL", "X-Database: Oracle", "oracle_connect"],
-    "must_not_have": ["MySQL", "PostgreSQL", "MongoDB", "django", "laravel"]
+    "urls": [],
+    "cookies": [],
+    "version_pattern": "Oracle\\s+(?:Database\\s+)?([0-9]+(?:\\.[0-9]+)+)",
+    "must_have": [
+      "\\bORA-[0-9]{4,5}\\b",
+      "\\bOracle error\\b",
+      "\\boci_(?:connect|parse|execute)\\s*\\("
+    ],
+    "must_not_have": [
+      "\\bYou have an error in your SQL syntax\\b",
+      "\\bPostgreSQL\\b",
+      "\\bpg_query\\b",
+      "\\bMicrosoft OLE DB Provider for SQL Server\\b",
+      "\\bSQLite3?::\\b"
+    ]
   },
-  "Microsoft SQL Server": {
-    "headers": ["X-MSSQL-Version", "X-Database: MSSQL", "X-DB-Engine: MSSQL"],
+
+  "SQLite": {
+    "headers": [],
     "html": [
-      "mssql",
-      "sqlsrv",
-      "MSSQL",
-      "Microsoft SQL Server",
-      "SELECT \\* FROM",
-      "sp_.*"
+      "\\bSQLite3?::\\b",
+      "\\bsqlite_(?:open|query|exec|error)\\s*\\(",
+      "\\bSQLite\\s+version\\b",
+      "\\bunable to open database file\\b",
+      "\\bno such table:\\b",
+      "\\bno such column:\\b",
+      "\\bPDOException\\b[^<]{0,200}\\bsqlite:"
     ],
-    "urls": ["/mssql", "/sqlserver"],
-    "cookies": ["mssql", "mssql_session"],
-    "version_pattern": "SQL Server ([0-9.]+)|Microsoft SQL Server ([0-9.]+)",
-    "must_have": ["SQL Server", "mssql", "X-Database: MSSQL", "sp_"],
-    "must_not_have": ["MySQL", "PostgreSQL", "MongoDB", "django", "laravel"]
+    "urls": [
+      "\\.sqlite3?(?:$|[?#])",
+      "\\.db(?:$|[?#])"
+    ],
+    "cookies": [],
+    "version_pattern": "SQLite\\s+version\\s+([0-9]+(?:\\.[0-9]+)+)",
+    "must_have": [
+      "\\bSQLite3?::\\b",
+      "\\bsqlite_(?:open|query|exec)\\s*\\(",
+      "\\bSQLite\\s+version\\b",
+      "\\bno such table:\\b",
+      "\\bno such column:\\b"
+    ],
+    "must_not_have": [
+      "\\bYou have an error in your SQL syntax\\b",
+      "\\bPostgreSQL\\b",
+      "\\bORA-[0-9]{4,5}\\b",
+      "\\bMicrosoft OLE DB Provider for SQL Server\\b"
+    ]
+  },
+
+  "MongoDB": {
+    "headers": [],
+    "html": [
+      "\\bmongodb://[^\\s\"']+",
+      "\\bMongoClient\\b",
+      "\\bMongoDB\\s+Driver\\b",
+      "\\bMongoDB\\b"
+    ],
+    "urls": [],
+    "cookies": [],
+    "version_pattern": "MongoDB\\s+([0-9]+(?:\\.[0-9]+)*)",
+    "must_have": [
+      "\\bmongodb://[^\\s\"']+",
+      "\\bMongoClient\\b",
+      "\\bMongoDB\\s+Driver\\b"
+    ],
+    "must_not_have": [
+      "\\bPostgreSQL\\b",
+      "\\bORA-[0-9]{4,5}\\b",
+      "\\bSQLite3?::\\b"
+    ]
   }
 }
