@@ -19,3 +19,4 @@ PyJWT
 pydantic-settings
 reportlab
 playwright
+brotli
