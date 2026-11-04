@@ -15,7 +15,6 @@
 * [Features](#features)
 * [Installation](#installation)
 * [Quick Start](#quick-start)
-* [Automated Tests](#automated-tests)
 * [CLI Usage](#cli-usage)
 * [Web Interface](#web-interface)
 * [Configuration](#configuration)
@@ -68,20 +67,6 @@ pip install -e .
 ```bash
 https://www.exploit-db.com/searchsploit
 ```
-
----
-
-## Automated Tests
-
-The local test suite uses only fixtures and temporary SQLite databases; it does
-not scan external hosts or call external vulnerability services.
-
-```bash
-PYTHONPATH=src python -m unittest discover -s test -v
-```
-
-Run this from the repository root. If using a virtual environment, replace
-`python` with its interpreter path, for example `venv/bin/python`.
 
 ---
 
