@@ -1,1 +1,5 @@
-__version__ = "1.2.0"
+from .commands import cli
+
+__all__ = [
+    'cli'
+]
