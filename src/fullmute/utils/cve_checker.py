@@ -4,6 +4,7 @@ import re
 import time
 from typing import Dict, List, Optional, Tuple
 from fullmute.utils.logger import setup_logger
+from fullmute.utils.persistent_cache import PersistentCache
 
 logger = setup_logger()
 
@@ -48,7 +49,10 @@ class RateLimiter:
 
 class CVEChecker:
     def __init__(self, nvd_api_key: Optional[str] = None, max_retries: int = 3,
-                 initial_delay: float = 1.0, rate_limit: bool = True):
+                 initial_delay: float = 1.0, rate_limit: bool = True,
+                 cache_db_path: Optional[str] = None,
+                 cache_ttl: int = 86400,
+                 negative_cache_ttl: int = 21600):
         self.nvd_api_key = nvd_api_key
         self.nvd_base_url = "https://services.nvd.nist.gov/rest/json/cves/2.0"
         self.headers = {
@@ -68,8 +72,9 @@ class CVEChecker:
 
         
         self._cache: Dict[str, dict] = {}
-        self._cache_ttl = 3600  
-        self._negative_cache_ttl = 60
+        self._cache_ttl = max(0, int(cache_ttl))
+        self._negative_cache_ttl = max(0, int(negative_cache_ttl))
+        self._persistent_cache = PersistentCache(cache_db_path, "technology_cves")
         self._cache_lock = asyncio.Lock()
         self._inflight: Dict[str, asyncio.Task] = {}
         
@@ -715,7 +720,9 @@ class CVEChecker:
         )
 
         for name, version in unique_technologies:
-            cache_key = f"{name}_{version}"
+            cache_key = (
+                f"{name.strip().casefold()}|{version.strip().casefold()}"
+            )
             try:
                 cves = await self._get_or_start_lookup(cache_key, name, version)
             except NVDLookupError as exc:
@@ -751,7 +758,7 @@ class CVEChecker:
     ) -> List[Dict]:
         async with self._cache_lock:
             cached_result = self._cache.get(cache_key)
-            if cached_result:
+            if cached_result is not None:
                 cache_ttl = cached_result.get(
                     'ttl',
                     self._cache_ttl
@@ -760,6 +767,16 @@ class CVEChecker:
                 )
                 if time.time() - cached_result.get('timestamp', 0) < cache_ttl:
                     return cached_result.get('cves', [])
+
+            persistent_result = self._persistent_cache.get(cache_key)
+            if persistent_result is not None:
+                ttl = self._cache_ttl if persistent_result else self._negative_cache_ttl
+                self._cache[cache_key] = {
+                    'cves': persistent_result,
+                    'timestamp': time.time(),
+                    'ttl': ttl,
+                }
+                return persistent_result
 
             task = self._inflight.get(cache_key)
             if task is None:
@@ -778,11 +795,13 @@ class CVEChecker:
     ) -> List[Dict]:
         try:
             cves = await self.check_cves_for_technology(name, version)
+            ttl = self._cache_ttl if cves else self._negative_cache_ttl
             self._cache[cache_key] = {
                 'cves': cves,
                 'timestamp': time.time(),
-                'ttl': self._cache_ttl if cves else self._negative_cache_ttl,
+                'ttl': ttl,
             }
+            self._persistent_cache.set(cache_key, cves, ttl)
             return cves
         finally:
             async with self._cache_lock:

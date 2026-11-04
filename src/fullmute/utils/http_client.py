@@ -123,7 +123,25 @@ def is_private_ip(ip: str) -> bool:
         return False
 
 
-def is_blocked_hostname(hostname: str) -> bool:
+def _private_ip_is_allowed(
+    ip: str,
+    allowed_private_networks: Optional[List[Any]] = None,
+) -> bool:
+    if not allowed_private_networks:
+        return False
+    try:
+        address = ipaddress.ip_address(ip)
+    except ValueError:
+        return False
+    if address.is_link_local or address.is_multicast or address.is_reserved or address.is_unspecified:
+        return False
+    return any(address in network for network in allowed_private_networks)
+
+
+def is_blocked_hostname(
+    hostname: str,
+    allowed_private_networks: Optional[List[Any]] = None,
+) -> bool:
     hostname_lower = hostname.lower()
     if hostname_lower in BLOCKED_HOSTS:
         return True
@@ -133,13 +151,19 @@ def is_blocked_hostname(hostname: str) -> bool:
             return True
     try:
         ip = ipaddress.ip_address(hostname)
-        return is_private_ip(str(ip))
+        return is_private_ip(str(ip)) and not _private_ip_is_allowed(
+            str(ip), allowed_private_networks
+        )
     except ValueError:
         pass
     return False
 
 
-async def check_url_safety(url: str, check_redirects: bool = True) -> bool:
+async def check_url_safety(
+    url: str,
+    check_redirects: bool = True,
+    allowed_private_networks: Optional[List[Any]] = None,
+) -> bool:
     try:
         parsed = urlparse(url)
         hostname = parsed.hostname
@@ -149,7 +173,7 @@ async def check_url_safety(url: str, check_redirects: bool = True) -> bool:
         if parsed.scheme not in ('http', 'https'):
             logger.warning(f"Blocked non-HTTP(S) URL: {url}")
             return False
-        if is_blocked_hostname(hostname):
+        if is_blocked_hostname(hostname, allowed_private_networks):
             logger.warning(f"Blocked access to dangerous hostname: {hostname}")
             return False
         if not parsed.netloc:
@@ -157,7 +181,10 @@ async def check_url_safety(url: str, check_redirects: bool = True) -> bool:
             return False
         try:
             ip = ipaddress.ip_address(hostname)
-            if is_private_ip(str(ip)):
+            if (
+                is_private_ip(str(ip))
+                and not _private_ip_is_allowed(str(ip), allowed_private_networks)
+            ):
                 logger.warning(f"Blocked access to private IP: {ip}")
                 return False
         except ValueError:
@@ -178,7 +205,10 @@ async def check_url_safety(url: str, check_redirects: bool = True) -> bool:
                 return False
             for info in addr_info:
                 ip = info[4][0]
-                if is_private_ip(ip):
+                if (
+                    is_private_ip(ip)
+                    and not _private_ip_is_allowed(ip, allowed_private_networks)
+                ):
                     logger.warning(f"Blocked access to private IP: {ip} for hostname: {hostname}")
                     return False
         except (socket.gaierror, asyncio.TimeoutError) as e:
@@ -193,7 +223,11 @@ async def check_url_safety(url: str, check_redirects: bool = True) -> bool:
         return False
 
 
-async def validate_redirect_url(base_url: str, redirect_url: str) -> bool:
+async def validate_redirect_url(
+    base_url: str,
+    redirect_url: str,
+    allowed_private_networks: Optional[List[Any]] = None,
+) -> bool:
     try:
         parsed_base = urlparse(base_url)
         parsed_redirect = urlparse(redirect_url)
@@ -202,7 +236,11 @@ async def validate_redirect_url(base_url: str, redirect_url: str) -> bool:
         if parsed_redirect.scheme not in ('http', 'https'):
             logger.warning(f"Blocked redirect to non-HTTP(S) URL: {redirect_url}")
             return False
-        return await check_url_safety(redirect_url, check_redirects=False)
+        return await check_url_safety(
+            redirect_url,
+            check_redirects=False,
+            allowed_private_networks=allowed_private_networks,
+        )
     except Exception as e:
         logger.error(f"Error validating redirect: {e}")
         return False
@@ -215,7 +253,9 @@ class HttpClient:
 
     def __init__(self, max_retries=3, timeout=15, proxy_enabled=False, proxy_file=None,
                  bypass_cloudflare=True, max_redirects=5, max_concurrent=10,
-                 enable_session_cache=True):
+                 enable_session_cache=True, allowed_private_networks=None):
+        self._closed = False
+        self._session: Optional[ClientSession] = None
         self.max_retries = max_retries
         self.timeout = timeout
         self.proxy_enabled = proxy_enabled
@@ -224,9 +264,27 @@ class HttpClient:
         self.bypass_cloudflare = bypass_cloudflare
         self.max_redirects = max_redirects
         self.enable_session_cache = enable_session_cache
-        self._session: Optional[ClientSession] = None
+        try:
+            allowed_networks = [
+                ipaddress.ip_network(network, strict=False)
+                for network in (allowed_private_networks or [])
+            ]
+        except ValueError as exc:
+            raise ValueError(f"Invalid allowed private network: {exc}") from exc
+        if any(
+            not network.is_private
+            or network.is_link_local
+            or network.is_multicast
+            or network.is_reserved
+            or network.is_unspecified
+            for network in allowed_networks
+        ):
+            raise ValueError(
+                "Allowed networks must be private ranges; link-local, reserved, "
+                "multicast, and public ranges are not allowed"
+            )
+        self.allowed_private_networks = allowed_networks
         self._connector: Optional[TCPConnector] = None
-        self._closed = False
 
         self._host_failures: Dict[str, int] = {}
         self._host_failure_threshold = 3
@@ -327,7 +385,10 @@ class HttpClient:
         return None
 
     async def fetch(self, url: str, headers=None) -> Tuple[Optional[str], Dict, Dict, int, str]:
-        is_safe = await check_url_safety(url)
+        is_safe = await check_url_safety(
+            url,
+            allowed_private_networks=self.allowed_private_networks,
+        )
         if not is_safe:
             logger.error(f"SSRF protection: Blocked access to {url}")
             return None, {}, {}, 403, url
@@ -396,7 +457,11 @@ class HttpClient:
                             if not redirect_url.startswith(('http://', 'https://')):
                                 redirect_url = urljoin(current_url, redirect_url)
 
-                            if not await validate_redirect_url(current_url, redirect_url):
+                            if not await validate_redirect_url(
+                                current_url,
+                                redirect_url,
+                                allowed_private_networks=self.allowed_private_networks,
+                            ):
                                 logger.error(f"SSRF protection: Blocked unsafe redirect to {redirect_url}")
                                 return None, {}, {}, 403, url
 
@@ -418,7 +483,11 @@ class HttpClient:
                             logger.error(f"Too many client redirects ({redirect_count})")
                             return None, {}, {}, 403, url
 
-                        if not await validate_redirect_url(final_url, client_redirect_url):
+                        if not await validate_redirect_url(
+                            final_url,
+                            client_redirect_url,
+                            allowed_private_networks=self.allowed_private_networks,
+                        ):
                             logger.error(f"SSRF protection: Blocked unsafe client redirect to {client_redirect_url}")
                             return None, {}, {}, 403, url
 

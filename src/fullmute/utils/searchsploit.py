@@ -1,8 +1,10 @@
 import subprocess
 import re
 import json
+import shutil
 from typing import List, Dict, Optional
 from fullmute.utils.logger import setup_logger
+from fullmute.utils.persistent_cache import PersistentCache
 
 logger = setup_logger()
 
@@ -135,17 +137,29 @@ def search_sploit(cve_id: str) -> List[Dict]:
     return []
 
 
-def search_sploit_batch(cve_list: List[str]) -> Dict[str, List[Dict]]:
+def search_sploit_batch(
+    cve_list: List[str],
+    cache_db_path: Optional[str] = None,
+    cache_ttl: int = 86400,
+) -> Dict[str, List[Dict]]:
     results = {}
+    cache = PersistentCache(cache_db_path, "cve_exploits")
 
     for cve_id in cve_list:
         if validate_cve(cve_id):
+            cache_key = cve_id.upper()
+            cached = cache.get(cache_key)
+            if cached is not None:
+                results[cve_id] = cached
+                continue
             try:
                 exploits = search_sploit(cve_id)
             except Exception as e:
                 logger.debug(f"Error searching exploits for {cve_id}: {e}")
                 exploits = []
             results[cve_id] = exploits or []
+            if shutil.which("searchsploit"):
+                cache.set(cache_key, results[cve_id], cache_ttl)
             if exploits:
                 logger.info(f"Found {len(exploits)} exploits for {cve_id}")
         else:

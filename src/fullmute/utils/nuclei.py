@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
 
 from fullmute.utils.logger import setup_logger
+from fullmute.utils.persistent_cache import PersistentCache
 
 logger = setup_logger()
 
@@ -18,11 +19,15 @@ class NucleiRunner:
         templates_path: str = "",
         timeout: int = 120,
         max_templates: int = 100,
+        cache_db_path: Optional[str] = None,
+        cache_ttl: int = 86400,
     ):
         self.binary = binary.strip() or "nuclei"
         self.templates_path = Path(templates_path).expanduser() if templates_path else None
         self.timeout = max(1, min(int(timeout), 600))
         self.max_templates = max(1, min(int(max_templates), 500))
+        self.cache_ttl = max(0, int(cache_ttl))
+        self._template_cache = PersistentCache(cache_db_path, "nuclei_templates")
 
     def _resolve_binary(self) -> Optional[str]:
         path = Path(self.binary).expanduser()
@@ -33,6 +38,13 @@ class NucleiRunner:
     def _find_templates(self, cve_id: str) -> List[Path]:
         if not self.templates_path or not self.templates_path.is_dir():
             return []
+        cache_key = f"{self.templates_path.resolve()}:{cve_id.upper()}"
+        cached_paths = self._template_cache.get(cache_key)
+        if cached_paths is not None:
+            paths = [Path(path) for path in cached_paths]
+            if all(path.is_file() for path in paths):
+                return paths
+
         needle = cve_id.lower()
         matches: List[Path] = []
         for template in self.templates_path.rglob("*"):
@@ -48,6 +60,11 @@ class NucleiRunner:
                     matches.append(template)
             except OSError:
                 continue
+        self._template_cache.set(
+            cache_key,
+            [str(path) for path in matches],
+            self.cache_ttl,
+        )
         return matches
 
     async def run_for_cves(self, target: str, cves: Iterable[str]) -> List[Dict[str, Any]]:
