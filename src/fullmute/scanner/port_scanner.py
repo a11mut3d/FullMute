@@ -602,7 +602,12 @@ class PortScanner:
         nvd_api_key: str = None,
         search_exploits: bool = False,
         test_default_credentials: bool = False,
-        resolve_domain: bool = True
+        resolve_domain: bool = True,
+        cache_db_path: str = None,
+        check_cves: bool = True,
+        cve_cache_ttl: int = 86400,
+        negative_cve_cache_ttl: int = 21600,
+        exploit_cache_ttl: int = 86400,
     ) -> List[PortScanResult]:
         
         scan_target = host
@@ -650,17 +655,22 @@ class PortScanner:
             return results
 
         
-        cve_checker = CVEChecker(
-            nvd_api_key=nvd_api_key,
-            rate_limit=True
-        )
-        try:
-            cve_results = await cve_checker.check_cves_batch(services_to_check)
-        finally:
+        cve_results = {}
+        if check_cves:
+            cve_checker = CVEChecker(
+                nvd_api_key=nvd_api_key,
+                rate_limit=True,
+                cache_db_path=cache_db_path,
+                cache_ttl=cve_cache_ttl,
+                negative_cache_ttl=negative_cve_cache_ttl,
+            )
             try:
-                await cve_checker.close()
-            except Exception:
-                pass
+                cve_results = await cve_checker.check_cves_batch(services_to_check)
+            finally:
+                try:
+                    await cve_checker.close()
+                except Exception:
+                    pass
 
         for result in results:
             identity = result.product or result.service
@@ -677,7 +687,11 @@ class PortScanner:
                 if cve_ids:
                     loop = asyncio.get_running_loop()
                     exploit_results = await loop.run_in_executor(
-                        None, search_sploit_batch, cve_ids
+                        None,
+                        search_sploit_batch,
+                        cve_ids,
+                        cache_db_path,
+                        exploit_cache_ttl,
                     )
                     result.exploits = [
                         {'cve_id': cve_id, 'exploits': exps}
@@ -724,7 +738,8 @@ async def scan_ports_with_cves(
     timeout: float = 5.0,
     nvd_api_key: str = None,
     search_exploits: bool = False,
-    resolve_domain: bool = True
+    resolve_domain: bool = True,
+    cache_db_path: str = None,
 ) -> List[Dict]:
 
     scanner = PortScanner(timeout=timeout)
@@ -732,6 +747,7 @@ async def scan_ports_with_cves(
         host,
         ports,
         nvd_api_key=nvd_api_key,
-        search_exploits=search_exploits
+        search_exploits=search_exploits,
+        cache_db_path=cache_db_path,
     )
     return [asdict(r) for r in results]

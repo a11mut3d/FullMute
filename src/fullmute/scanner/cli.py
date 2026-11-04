@@ -56,7 +56,8 @@ def scan(host, ports, timeout, output, with_cves, with_exploits, nvd_api_key):
                     host, 
                     port_list,
                     nvd_api_key=nvd_api_key,
-                    search_exploits=with_exploits
+                    search_exploits=with_exploits,
+                    cache_db_path='fullmute.db',
                 )
             )
         else:
@@ -197,7 +198,8 @@ def save(ctx, db_path, target, with_cves, with_exploits, nvd_api_key):
                     target,
                     TOP_20_PORTS,
                     nvd_api_key=nvd_api_key,
-                    search_exploits=with_exploits
+                    search_exploits=with_exploits,
+                    cache_db_path=db_path,
                 )
             )
         else:
