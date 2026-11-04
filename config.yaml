@@ -6,18 +6,23 @@ logging:
   level: INFO
   max_mb: 50
 scanner:
-  nuclei_enabled: true
+  nuclei_enabled: false
   nuclei_binary: nuclei
   nuclei_templates_path: './nuclei-templates'
   nuclei_timeout: 120
+  allowed_private_networks: []
   bypass_cloudflare: false
-  max_concurrent: 20
+  max_concurrent: 5
   max_delay: 2.0
   max_retries: 3
   min_delay: 0.5
   nvd_api_key: ''
   nvd_initial_delay: 1.0
   nvd_max_retries: 3
+  cve_cache_ttl: 86400
+  negative_cve_cache_ttl: 21600
+  exploit_cache_ttl: 86400
+  nuclei_template_cache_ttl: 86400
   port_scan:
     enabled: true
     ports:
@@ -49,6 +54,7 @@ scanner:
   rotate_user_agents: true
   search_exploits: true
   test_default_credentials: true
+  login_path_probe_concurrency: 8
   timeout: 15
   tech_detection_timeout: 15
   tech_detection_max_html: 2000000
