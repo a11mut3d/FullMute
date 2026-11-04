@@ -844,11 +844,12 @@ def update_scan_results(scan_id: int, results: List[Dict]):
             
             
             cursor.execute("""
-                SELECT id FROM targets 
-                WHERE domain = ? AND created_by = (
-                    SELECT created_by FROM scans WHERE id = ?
-                )
-            """, (domain, scan_id))
+                SELECT st.target_id
+                FROM scan_targets st
+                JOIN targets t ON t.id = st.target_id
+                WHERE st.scan_id = ? AND t.domain = ?
+                LIMIT 1
+            """, (scan_id, domain))
             target_row = cursor.fetchone()
             if not target_row:
                 logger.warning(f"Target not found for domain {domain} in scan {scan_id}")
@@ -894,6 +895,12 @@ def update_scan_results(scan_id: int, results: List[Dict]):
                 scan_id,
                 target_id
             ))
+            if cursor.rowcount != 1:
+                logger.warning(
+                    "No scan-target row updated for scan %s and domain %s",
+                    scan_id,
+                    domain,
+                )
 
         conn.commit()
         logger.info(f"Saved results for scan {scan_id}")

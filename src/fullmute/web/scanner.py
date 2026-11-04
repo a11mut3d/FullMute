@@ -293,6 +293,7 @@ async def run_scan(scan_id: int, user_id: int, target_ids: List[int], test_defau
                             binary=config.nuclei_binary,
                             templates_path=config.nuclei_templates_path,
                             timeout=config.nuclei_timeout,
+                            cache_db_path=scanner_db,
                         ).run_for_cves(result.get('final_url', domain), cve_ids)
 
                     
@@ -308,7 +309,9 @@ async def run_scan(scan_id: int, user_id: int, target_ids: List[int], test_defau
                                 nvd_api_key=nvd_api_key if port_scan_with_cves else None,
                                 search_exploits=port_scan_with_exploits,
                                 test_default_credentials=test_default_credentials,
-                                resolve_domain=True
+                                resolve_domain=True,
+                                cache_db_path=scanner_db,
+                                check_cves=port_scan_with_cves,
                             )
 
                             port_scan_results = []
