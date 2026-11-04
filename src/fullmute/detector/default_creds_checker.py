@@ -794,33 +794,7 @@ class DefaultCredentialsChecker:
             score -= 10
             reasons.append("Login form still present (-10)")
 
-        try:
-            original = urlparse(original_url)
-            response = urlparse(response_url)
-            response_path_parts = {
-                part.casefold()
-                for part in response.path.split("/")
-                if part
-            }
-            admin_path_parts = {
-                "admin", "wp-admin", "administrator", "dashboard",
-                "console", "manage", "backend",
-            }
-            redirected_to_admin = (
-                response.hostname
-                and original.hostname
-                and response.hostname.casefold() == original.hostname.casefold()
-                and response.path != original.path
-                and bool(response_path_parts & admin_path_parts)
-                and not response_has_form
-            )
-        except ValueError:
-            redirected_to_admin = False
-
-        if new_success_indicators:
-            return True, f"CONFIRMED SUCCESS (Score: {score}) - " + "; ".join(reasons), score
-        if redirected_to_admin:
-            reasons.append("Redirected to same-host admin area and login form disappeared")
+        if new_success_indicators and not response_has_form:
             return True, f"CONFIRMED SUCCESS (Score: {score}) - " + "; ".join(reasons), score
         if score >= 7:
             return False, f"POSSIBLE SUCCESS (Score: {score}) - " + "; ".join(reasons), score
