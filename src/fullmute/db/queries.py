@@ -13,7 +13,8 @@ class DBQueries:
 
     @contextmanager
     def _get_cursor(self):
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path, timeout=30)
+        conn.execute("PRAGMA foreign_keys = ON")
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         try:
@@ -81,6 +82,7 @@ class DBQueries:
                     ))
         except Exception as e:
             logger.error(f"Failed to add domain {domain_data.get('domain')}: {e}")
+            raise
 
     def add_technology(self, technology_data: dict):
         try:
@@ -106,7 +108,7 @@ class DBQueries:
                 return result[0] if result else None
         except Exception as e:
             logger.error(f"Failed to add technology: {e}")
-            return None
+            raise
 
     def add_cve(self, cve_data: dict):
         try:
@@ -134,6 +136,7 @@ class DBQueries:
                 ))
         except Exception as e:
             logger.error(f"Failed to add CVE: {e}")
+            raise
 
     def delete_cves_for_technology(self, technology_id: int):
         try:
@@ -149,7 +152,7 @@ class DBQueries:
                 technology_id,
                 e,
             )
-            return 0
+            raise
 
     def add_sensitive_file(self, file_data: dict):
         try:
@@ -168,6 +171,7 @@ class DBQueries:
                 ))
         except Exception as e:
             logger.error(f"Failed to add sensitive file: {e}")
+            raise
 
     def add_default_credential(self, cred_data: dict):
         try:
@@ -176,6 +180,10 @@ class DBQueries:
                     INSERT INTO default_credentials
                     (domain_id, login_url, username, password, description, detection_reason)
                     VALUES (?, ?, ?, ?, ?, ?)
+                    ON CONFLICT DO UPDATE SET
+                        description = excluded.description,
+                        detection_reason = excluded.detection_reason,
+                        found_at = CURRENT_TIMESTAMP
                 ''', (
                     cred_data.get('domain_id'),
                     cred_data.get('login_url'),
@@ -186,6 +194,7 @@ class DBQueries:
                 ))
         except Exception as e:
             logger.error(f"Failed to add default credential: {e}")
+            raise
 
     def get_default_credentials_for_domain(self, domain: str) -> List[Dict[str, Any]]:
         try:
@@ -254,7 +263,7 @@ class DBQueries:
                 return result[0] if result else None
         except Exception as e:
             logger.error(f"Failed to add plugin: {e}")
-            return None
+            raise
 
     def add_plugin_cve(self, plugin_cve_data: dict):
         try:
@@ -283,6 +292,7 @@ class DBQueries:
                 ))
         except Exception as e:
             logger.error(f"Failed to add plugin CVE: {e}")
+            raise
 
     def delete_plugin_cves_for_plugin(self, plugin_id: int):
         try:
@@ -298,7 +308,7 @@ class DBQueries:
                 plugin_id,
                 e,
             )
-            return 0
+            raise
 
     def get_cves_for_technology(self, technology_id: int) -> list:
         try:
@@ -409,7 +419,7 @@ class DBQueries:
                 return cursor.lastrowid
         except Exception as e:
             logger.error(f"Failed to add port scan: {e}")
-            return None
+            raise
 
     def add_open_port(self, port_data: dict) -> Optional[int]:
         try:
@@ -435,7 +445,7 @@ class DBQueries:
                 return cursor.lastrowid
         except Exception as e:
             logger.error(f"Failed to add open port: {e}")
-            return None
+            raise
 
     def add_port_cve(self, cve_data: dict) -> Optional[int]:
         try:
@@ -462,7 +472,7 @@ class DBQueries:
                 return cursor.lastrowid
         except Exception as e:
             logger.error(f"Failed to add port CVE: {e}")
-            return None
+            raise
 
     def add_port_exploit(self, exploit_data: dict) -> Optional[int]:
         try:
@@ -484,7 +494,7 @@ class DBQueries:
                 return cursor.lastrowid
         except Exception as e:
             logger.error(f"Failed to add port exploit: {e}")
-            return None
+            raise
 
     def get_port_scans_for_domain(self, domain_id: int) -> List[Dict]:
         try:

@@ -95,6 +95,15 @@ CREATE TABLE IF NOT EXISTS http_cache (
     expires_at TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS enrichment_cache (
+    namespace TEXT NOT NULL,
+    cache_key TEXT NOT NULL,
+    payload TEXT NOT NULL,
+    cached_at REAL NOT NULL,
+    expires_at REAL NOT NULL,
+    PRIMARY KEY (namespace, cache_key)
+);
+
 CREATE TABLE IF NOT EXISTS default_credentials (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     domain_id INTEGER,

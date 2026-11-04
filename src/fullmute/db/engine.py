@@ -28,9 +28,34 @@ def init_db(db_path: str):
     if table_exists:
         _update_schema_if_needed(conn)
 
+    _ensure_default_credential_uniqueness(conn)
     conn.commit()
     conn.close()
     logger.info(f"Database initialized at {db_path}")
+
+
+def _ensure_default_credential_uniqueness(conn):
+    conn.execute("""
+        DELETE FROM default_credentials
+        WHERE id NOT IN (
+            SELECT MIN(id)
+            FROM default_credentials
+            GROUP BY
+                COALESCE(domain_id, -1),
+                login_url,
+                username,
+                COALESCE(password, '')
+        )
+    """)
+    conn.execute("""
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_default_creds_unique
+        ON default_credentials (
+            COALESCE(domain_id, -1),
+            login_url,
+            username,
+            COALESCE(password, '')
+        )
+    """)
 
 
 def _update_schema_if_needed(conn):
