@@ -33,7 +33,15 @@ class ScanOrchestrator:
 
         try:
             with open(self.config_path, 'r', encoding='utf-8') as f:
-                return yaml.safe_load(f)
+                config = yaml.safe_load(f)
+                if config is None:
+                    return {}
+                if not isinstance(config, dict):
+                    logger.error(
+                        f"Configuration at {self.config_path} must contain a YAML mapping"
+                    )
+                    return {}
+                return config
         except Exception as e:
             logger.error(f"Failed to load config: {e}")
             return {}
@@ -66,11 +74,13 @@ class ScanOrchestrator:
 
         if full:
             scanner_config = self.config.setdefault('scanner', {})
-            scanner_config.update({
-                'nuclei_enabled': True,
-                'search_exploits': True,
-                'test_default_credentials': True,
-            })
+            scanner_config.setdefault('nuclei_enabled', True)
+            scanner_config.setdefault('search_exploits', True)
+            scanner_config.setdefault('test_default_credentials', True)
+            scanner_config.setdefault('check_cves', True)
+            scanner_config.setdefault('sensitive_files_enabled', True)
+            scanner_config.setdefault('technology_detection_enabled', True)
+            scanner_config.setdefault('port_scan_enabled', True)
 
         self.initialize()
         try:
@@ -93,6 +103,10 @@ class ScanOrchestrator:
     async def _scan_full(self, domains, max_concurrent):
         results = await self.scanner.scan(domains, max_concurrent)
         scanner_config = self.config.get('scanner', {})
+        cache_db_path = scanner_config.get(
+            'enrichment_cache_path',
+            str(self._database_path()),
+        )
         nvd_api_key = scanner_config.get('nvd_api_key')
         db = DBQueries(str(self._database_path()))
         try:
@@ -106,34 +120,44 @@ class ScanOrchestrator:
             if not domain or result.get('error'):
                 return result
 
-            async with semaphore:
-                started = time.monotonic()
-                port_results = await PortScanner(
-                    timeout=float(scanner_config.get('port_scan', {}).get('timeout', 5.0)),
-                    max_concurrent=10,
-                ).scan_with_cves(
-                    domain,
-                    ports=scanner_config.get('port_scan', {}).get('ports', TOP_20_PORTS),
-                    nvd_api_key=nvd_api_key,
-                    search_exploits=True,
-                    test_default_credentials=True,
-                )
-
             result['open_ports'] = []
-            for port_result in port_results:
-                port_data = {
-                    'port': port_result.port,
-                    'protocol': port_result.protocol,
-                    'state': port_result.state,
-                    'service': port_result.service,
-                    'version': port_result.version,
-                    'product': port_result.product,
-                    'banner': port_result.banner or '',
-                    'ssl': port_result.ssl,
-                    'cves': port_result.cves or [],
-                    'exploits': port_result.exploits or [],
-                }
-                result['open_ports'].append(port_data)
+            started = time.monotonic()
+            if scanner_config.get('port_scan_enabled', True):
+                async with semaphore:
+                    port_results = await PortScanner(
+                        timeout=float(scanner_config.get('port_scan', {}).get('timeout', 5.0)),
+                        max_concurrent=10,
+                    ).scan_with_cves(
+                        domain,
+                        ports=scanner_config.get('port_scan', {}).get('ports', TOP_20_PORTS),
+                        nvd_api_key=nvd_api_key,
+                        search_exploits=bool(scanner_config.get('search_exploits')),
+                        test_default_credentials=bool(
+                            scanner_config.get('test_default_credentials')
+                        ),
+                        cache_db_path=cache_db_path,
+                        check_cves=bool(scanner_config.get('check_cves', True)),
+                        cve_cache_ttl=scanner_config.get('cve_cache_ttl', 86400),
+                        negative_cve_cache_ttl=scanner_config.get(
+                            'negative_cve_cache_ttl', 21600
+                        ),
+                        exploit_cache_ttl=scanner_config.get(
+                            'exploit_cache_ttl', 86400
+                        ),
+                    )
+                for port_result in port_results:
+                    result['open_ports'].append({
+                        'port': port_result.port,
+                        'protocol': port_result.protocol,
+                        'state': port_result.state,
+                        'service': port_result.service,
+                        'version': port_result.version,
+                        'product': port_result.product,
+                        'banner': port_result.banner or '',
+                        'ssl': port_result.ssl,
+                        'cves': port_result.cves or [],
+                        'exploits': port_result.exploits or [],
+                    })
 
             result['port_scan_count'] = len(result['open_ports'])
             result['port_cves_count'] = sum(
@@ -150,25 +174,30 @@ class ScanOrchestrator:
                 for cve in port.get('cves', [])
                 if isinstance(cve, dict) and (cve.get('id') or cve.get('cve_id'))
             ))
-            if port_cve_ids:
+            if port_cve_ids and scanner_config.get('nuclei_enabled'):
                 nuclei = NucleiRunner(
                     binary=scanner_config.get('nuclei_binary', 'nuclei'),
                     templates_path=scanner_config.get(
                         'nuclei_templates_path', './nuclei-templates'
                     ),
                     timeout=scanner_config.get('nuclei_timeout', 120),
+                    cache_db_path=cache_db_path,
+                    cache_ttl=scanner_config.get(
+                        'nuclei_template_cache_ttl', 86400
+                    ),
                 )
                 result['nuclei'] = result.get('nuclei', []) + await nuclei.run_for_cves(
                     result.get('final_url') or domain,
                     port_cve_ids,
                 )
-            self._save_port_results(
-                db,
-                domain,
-                result['open_ports'],
-                started,
-                result.get('nuclei', []),
-            )
+            if scanner_config.get('port_scan_enabled', True):
+                self._save_port_results(
+                    db,
+                    domain,
+                    result['open_ports'],
+                    started,
+                    result.get('nuclei', []),
+                )
             return result
 
         return await asyncio.gather(*(enrich(result) for result in results))
