@@ -33,6 +33,65 @@ def _version_tuple(version):
     return tuple(int(part) for part in version.split('.'))
 
 
+def _merge_allowed_private_networks(scanner_config, requested_networks):
+    configured = scanner_config.get('allowed_private_networks', [])
+    if isinstance(configured, str):
+        configured = [item.strip() for item in configured.split(',') if item.strip()]
+    scanner_config['allowed_private_networks'] = builtins.list(dict.fromkeys(
+        builtins.list(configured or []) + builtins.list(requested_networks or [])
+    ))
+
+
+def _configure_scan_stages(scanner_config, overrides, *, full=False, only_technologies=False):
+    if full:
+        scanner_config.update({
+            'technology_detection_enabled': True,
+            'check_cves': True,
+            'search_exploits': True,
+            'nuclei_enabled': True,
+            'port_scan_enabled': True,
+            'sensitive_files_enabled': True,
+            'test_default_credentials': True,
+        })
+    if only_technologies:
+        scanner_config.update({
+            'technology_detection_enabled': True,
+            'check_cves': False,
+            'search_exploits': False,
+            'nuclei_enabled': False,
+            'port_scan_enabled': False,
+            'sensitive_files_enabled': False,
+            'test_default_credentials': False,
+        })
+
+    for key, value in overrides.items():
+        if value is not None:
+            scanner_config[key] = value
+
+    if scanner_config.get('check_cves', True) is False:
+        if overrides.get('search_exploits') is True or overrides.get('nuclei_enabled') is True:
+            raise click.UsageError(
+                '--exploits and --nuclei require CVE lookup; remove --no-cves '
+                'or disable the dependent options.'
+            )
+        scanner_config['search_exploits'] = False
+        scanner_config['nuclei_enabled'] = False
+
+
+def _format_result_items(items):
+    formatted = []
+    for item in items:
+        if isinstance(item, dict):
+            name = item.get('name') or item.get('vendor') or str(item)
+            version = item.get('version') or item.get('ver')
+            formatted.append(f"{name} {version}" if version else str(name))
+        elif isinstance(item, (builtins.list, tuple)):
+            formatted.append(' '.join(str(part) for part in item if part is not None))
+        else:
+            formatted.append(str(item))
+    return ', '.join(formatted)
+
+
 @click.group()
 @click.option(
     '--config',
@@ -686,36 +745,46 @@ def search(ctx, db_path, search_type, query):
 @click.option('--proxy', is_flag=True, help='Use proxies')
 @click.option('--delay-min', default=1.0, help='Minimum delay between requests')
 @click.option('--delay-max', default=3.0, help='Maximum delay between requests')
-@click.option('--full', is_flag=True, help='Run web, CVE, Nuclei, Exploit-DB and port scans')
+@click.option(
+    '--allow-private-network',
+    multiple=True,
+    metavar='CIDR',
+    help='Allow a private network range for CLI scans (repeatable; e.g. 192.168.1.0/24)',
+)
+@click.option('--technologies/--no-technologies', default=None, help='Enable or skip technology detection.')
+@click.option('--cves/--no-cves', 'check_cves', default=None, help='Enable or skip NVD lookups.')
+@click.option('--exploits/--no-exploits', 'search_exploits', default=None, help='Enable or skip Exploit-DB searches.')
+@click.option('--nuclei/--no-nuclei', 'nuclei_enabled', default=None, help='Enable or skip Nuclei template runs.')
+@click.option('--port-scan/--no-port-scan', 'port_scan_enabled', default=None, help='Enable or skip port scanning.')
+@click.option('--sensitive-files/--no-sensitive-files', 'sensitive_files_enabled', default=None, help='Enable or skip sensitive-file checks.')
+@click.option('--default-credentials/--no-default-credentials', 'test_default_credentials', default=None, help='Enable or skip default-credential checks.')
+@click.option('--only-technologies', is_flag=True, help='Run only technology detection; skip CVE enrichment, ports, and additional checks.')
+@click.option('--full', is_flag=True, help='Enable all scan stages; individual --no-* options override it.')
 @click.pass_context
-def scan(ctx, domains_file, output, max_concurrent, timeout, proxy, delay_min, delay_max, full):
+def scan(ctx, domains_file, output, max_concurrent, timeout, proxy, delay_min, delay_max,
+         allow_private_network, technologies, check_cves, search_exploits,
+         nuclei_enabled, port_scan_enabled, sensitive_files_enabled,
+         test_default_credentials, only_technologies, full):
     domains_file = Path(domains_file).resolve()
     
     if not domains_file.exists():
-        click.echo(f"Error: File {domains_file} not found", err=True)
-        return
+        raise click.ClickException(f"File {domains_file} not found")
     
     if not domains_file.is_file():
-        click.echo(f"Error: {domains_file} is not a file", err=True)
-        return
+        raise click.ClickException(f"{domains_file} is not a file")
     
     if domains_file.suffix.lower() != '.txt':
-        click.echo(f"Error: File must have .txt extension", err=True)
-        return
-    
-    file_path_str = str(domains_file)
-    dangerous_patterns = ['\x00', '..', '~']
-    for pattern in dangerous_patterns:
-        if pattern in file_path_str:
-            click.echo(f"Error: Invalid file path", err=True)
-            return
+        raise click.ClickException("Input file must have a .txt extension")
     
     output_path = Path(output).expanduser().resolve()
     system_dirs = ['/etc', '/usr', '/bin', '/sbin', '/var', '/proc', '/sys']
-    for sys_dir in system_dirs:
-        if str(output_path).startswith(sys_dir):
-            click.echo("Error: Cannot write to system directory", err=True)
-            return
+    for sys_dir in map(Path, system_dirs):
+        try:
+            output_path.relative_to(sys_dir)
+        except ValueError:
+            continue
+        else:
+            raise click.ClickException("Cannot write to a system directory")
     
     try:
         orchestrator = ScanOrchestrator(ctx.obj['config'])
@@ -727,13 +796,32 @@ def scan(ctx, domains_file, output, max_concurrent, timeout, proxy, delay_min, d
         scanner_config['proxy_enabled'] = proxy
         scanner_config['min_delay'] = delay_min
         scanner_config['max_delay'] = delay_max
+        _merge_allowed_private_networks(scanner_config, allow_private_network)
+
+        _configure_scan_stages(
+            scanner_config,
+            {
+                'technology_detection_enabled': technologies,
+                'check_cves': check_cves,
+                'search_exploits': search_exploits,
+                'nuclei_enabled': nuclei_enabled,
+                'port_scan_enabled': port_scan_enabled,
+                'sensitive_files_enabled': sensitive_files_enabled,
+                'test_default_credentials': test_default_credentials,
+            },
+            full=full,
+            only_technologies=only_technologies,
+        )
+
         if full:
-            click.echo("Full mode: web, CVE, Nuclei, Exploit-DB and port scanning enabled")
+            click.echo("Full mode enabled; explicit --no-* options take precedence.")
+        if only_technologies:
+            click.echo("Technology-only mode: all enrichment and active checks are disabled.")
 
         results = asyncio.run(orchestrator.scan_from_file(
             str(domains_file),
             output_file=str(output_path),
-            full=full,
+            full=bool(scanner_config.get('port_scan_enabled')),
         ))
 
         scanned_results = [
@@ -745,14 +833,20 @@ def scan(ctx, domains_file, output, max_concurrent, timeout, proxy, delay_min, d
         for result in scanned_results:
             cves = result.get('cves', {})
             if isinstance(cves, dict):
-                count = sum(
+                technology_cve_count = sum(
                     len(items) for items in cves.values()
                     if isinstance(items, builtins.list)
                 )
             elif isinstance(cves, builtins.list):
-                count = len(cves)
+                technology_cve_count = len(cves)
             else:
-                count = 0
+                technology_cve_count = 0
+            port_cve_count = sum(
+                len(port.get('cves', []))
+                for port in result.get('open_ports', [])
+                if isinstance(port, dict) and isinstance(port.get('cves', []), builtins.list)
+            )
+            count = technology_cve_count + port_cve_count
             total_cves += count
             domains_with_cves += count > 0
 
@@ -762,105 +856,136 @@ def scan(ctx, domains_file, output, max_concurrent, timeout, proxy, delay_min, d
             f"targets with CVEs: {domains_with_cves}; CVEs found: {total_cves}"
         )
 
+    except click.ClickException:
+        raise
     except Exception as e:
-        click.echo(f"Error during scan: {e}", err=True)
+        raise click.ClickException(f"Scan failed: {e}") from e
 
 @cli.command()
 @click.argument('domain')
+@click.option(
+    '--allow-private-network',
+    multiple=True,
+    metavar='CIDR',
+    help='Allow a private network range for this CLI scan (repeatable; e.g. 192.168.1.0/24)',
+)
+@click.option('--technologies/--no-technologies', default=None, help='Enable or skip technology detection.')
+@click.option('--cves/--no-cves', 'check_cves', default=None, help='Enable or skip NVD lookups.')
+@click.option('--exploits/--no-exploits', 'search_exploits', default=None, help='Enable or skip Exploit-DB searches.')
+@click.option('--nuclei/--no-nuclei', 'nuclei_enabled', default=None, help='Enable or skip Nuclei template runs.')
+@click.option('--sensitive-files/--no-sensitive-files', 'sensitive_files_enabled', default=None, help='Enable or skip sensitive-file checks.')
+@click.option('--default-credentials/--no-default-credentials', 'test_default_credentials', default=None, help='Enable or skip default-credential checks.')
+@click.option('--only-technologies', is_flag=True, help='Run only technology detection and skip enrichment checks.')
 @click.pass_context
-def scan_one(ctx, domain):
+def scan_one(ctx, domain, allow_private_network, technologies, check_cves,
+             search_exploits, nuclei_enabled, sensitive_files_enabled,
+             test_default_credentials, only_technologies):
     try:
         orchestrator = ScanOrchestrator(ctx.obj['config'])
+        scanner_config = orchestrator.config.setdefault('scanner', {})
+        _merge_allowed_private_networks(scanner_config, allow_private_network)
+        _configure_scan_stages(
+            scanner_config,
+            {
+                'technology_detection_enabled': technologies,
+                'check_cves': check_cves,
+                'search_exploits': search_exploits,
+                'nuclei_enabled': nuclei_enabled,
+                'sensitive_files_enabled': sensitive_files_enabled,
+                'test_default_credentials': test_default_credentials,
+            },
+            only_technologies=only_technologies,
+        )
         result = asyncio.run(orchestrator.scan_single(domain))
+        if result.get('error'):
+            raise click.ClickException(result['error'])
 
         click.echo("\n" + "="*50)
         click.echo(f"Scan results for: {domain}")
         click.echo("="*50)
 
-        if result.get('error'):
-            click.echo(f"Error: {result['error']}")
-        else:
-            click.echo(f"Status: {result.get('status_code', 'N/A')}")
-            if 'final_url' in result and result['final_url'] != domain:
-                click.echo(f"Redirected to: {result['final_url']}")
+        click.echo(f"Status: {result.get('status_code', 'N/A')}")
+        if 'final_url' in result and result['final_url'] != domain:
+            click.echo(f"Redirected to: {result['final_url']}")
 
-            technologies = result.get('technologies', {})
-            if technologies:
-                click.echo("\nTechnologies found:")
-                for tech_type, tech_list in technologies.items():
-                    if tech_list:
-                        if tech_type == 'database':
-                            click.echo(f"  {tech_type}: {', '.join(tech_list)}")
-                        elif tech_type == 'language':
-                            click.echo(f"  {tech_type}: {', '.join(tech_list)}")
+        technologies = result.get('technologies', {})
+        if technologies:
+            click.echo("\nTechnologies found:")
+            for tech_type, tech_list in technologies.items():
+                if tech_list:
+                    if tech_type == 'database':
+                        click.echo(f"  {tech_type}: {_format_result_items(tech_list)}")
+                    elif tech_type == 'language':
+                        click.echo(f"  {tech_type}: {_format_result_items(tech_list)}")
+                    else:
+                        click.echo(f"  {tech_type}: {_format_result_items(tech_list)}")
+
+        cameras = result.get('cameras', [])
+        if cameras:
+            click.echo(f"\nCameras: {_format_result_items(cameras)}")
+
+        routers = technologies.get('router', [])
+        if routers:
+            click.echo(f"\nRouters: {_format_result_items(routers)}")
+
+        databases = technologies.get('database', [])
+        if databases:
+            click.echo(f"\nDatabases: {_format_result_items(databases)}")
+
+        languages = technologies.get('language', [])
+        if languages:
+            click.echo(f"\nProgramming languages: {_format_result_items(languages)}")
+
+        plugins = technologies.get('plugins', [])
+        if plugins:
+            click.echo(f"\nPlugins: {_format_result_items(plugins)}")
+
+        themes = technologies.get('themes', [])
+        if themes:
+            click.echo(f"\nThemes: {_format_result_items(themes)}")
+
+        js_libs = technologies.get('javascript', [])
+        if js_libs:
+            click.echo(f"\nJavaScript libraries: {_format_result_items(js_libs)}")
+
+        bitrix_components = technologies.get('bitrix_components', [])
+        if bitrix_components:
+            click.echo(f"\nBitrix components: {_format_result_items(bitrix_components)}")
+
+        cves = result.get('cves', {})
+        if cves:
+            click.echo(f"\nCVEs found ({len(cves)} affected technologies):")
+            for tech_identifier, cve_list in cves.items():
+                if cve_list:
+                    click.echo(f"  {tech_identifier}: {len(cve_list)} CVE(s)")
+                    for cve in cve_list[:3]:
+                        cve_id = cve.get('id', 'N/A')
+                        severity = cve.get('cvss', {}).get('severity', 'N/A')
+                        score = cve.get('cvss', {}).get('score', 'N/A')
+                        if not cve.get('version_range_confirmed', False):
+                            click.echo(
+                                f"    - {cve_id} (NVD keyword match; exact affected "
+                                f"version not confirmed, "
+                                f"Severity: {severity}, Score: {score})"
+                            )
                         else:
-                            click.echo(f"  {tech_type}: {', '.join(tech_list)}")
+                            click.echo(
+                                f"    - {cve_id} (version match; Severity: {severity}, "
+                                f"Score: {score})"
+                            )
+                    if len(cve_list) > 3:
+                        click.echo(f"    ... and {len(cve_list) - 3} more")
 
-            cameras = result.get('cameras', [])
-            if cameras:
-                click.echo(f"\nCameras: {', '.join(cameras)}")
+        files = result.get('sensitive_files', [])
+        if files:
+            click.echo(f"\nSensitive files found ({len(files)}):")
+            for file_info in files[:5]:
+                click.echo(f"  • {file_info.get('url')}")
 
-            routers = technologies.get('router', [])
-            if routers:
-                click.echo(f"\nRouters: {', '.join(routers)}")
-
-            databases = technologies.get('database', [])
-            if databases:
-                click.echo(f"\nDatabases: {', '.join(databases)}")
-
-            languages = technologies.get('language', [])
-            if languages:
-                click.echo(f"\nProgramming languages: {', '.join(languages)}")
-
-            plugins = technologies.get('plugins', [])
-            if plugins:
-                click.echo(f"\nPlugins: {', '.join(plugins)}")
-
-            themes = technologies.get('themes', [])
-            if themes:
-                click.echo(f"\nThemes: {', '.join(themes)}")
-
-            js_libs = technologies.get('javascript', [])
-            if js_libs:
-                click.echo(f"\nJavaScript libraries: {', '.join(js_libs)}")
-
-            bitrix_components = technologies.get('bitrix_components', [])
-            if bitrix_components:
-                click.echo(f"\nBitrix components: {', '.join(bitrix_components)}")
-
-            
-            cves = result.get('cves', {})
-            if cves:
-                click.echo(f"\nCVEs found ({len(cves)} affected technologies):")
-                for tech_identifier, cve_list in cves.items():
-                    if cve_list:
-                        click.echo(f"  {tech_identifier}: {len(cve_list)} CVE(s)")
-                        for cve in cve_list[:3]:  
-                            cve_id = cve.get('id', 'N/A')
-                            severity = cve.get('cvss', {}).get('severity', 'N/A')
-                            score = cve.get('cvss', {}).get('score', 'N/A')
-                            if not cve.get('version_range_confirmed', False):
-                                click.echo(
-                                    f"    - {cve_id} (NVD keyword match; exact affected "
-                                    f"version not confirmed, "
-                                    f"Severity: {severity}, Score: {score})"
-                                )
-                            else:
-                                click.echo(
-                                    f"    - {cve_id} (version match; Severity: {severity}, "
-                                    f"Score: {score})"
-                                )
-                        if len(cve_list) > 3:
-                            click.echo(f"    ... and {len(cve_list) - 3} more")
-
-            files = result.get('sensitive_files', [])
-            if files:
-                click.echo(f"\nSensitive files found ({len(files)}):")
-                for file_info in files[:5]:
-                    click.echo(f"  • {file_info.get('url')}")
-
+    except click.ClickException:
+        raise
     except Exception as e:
-        click.echo(f"Error: {e}", err=True)
+        raise click.ClickException(f"Scan failed: {e}") from e
 
 @cli.command()
 @click.argument('db_path')
