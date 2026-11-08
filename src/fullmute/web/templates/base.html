@@ -48,12 +48,137 @@
 
     <style>
         [x-cloak] { display: none !important; }
-        ::-webkit-scrollbar { width: 8px; height: 8px; }
-        ::-webkit-scrollbar-track { background: #1e293b; }
-        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
-        .card-hover { transition: all 0.2s ease; }
-        .card-hover:hover { transform: translateY(-2px); box-shadow: 0 10px 40px rgba(0,0,0,0.3); }
+        :root {
+            color-scheme: dark;
+            --surface: rgba(30, 41, 59, 0.82);
+            --surface-border: rgba(148, 163, 184, 0.13);
+            --focus-ring: rgba(96, 165, 250, 0.28);
+        }
+        html { background: #080f1e; }
+        body {
+            background:
+                radial-gradient(ellipse at 12% -10%, rgba(37, 99, 235, 0.16), transparent 38rem),
+                radial-gradient(ellipse at 92% 18%, rgba(14, 165, 233, 0.08), transparent 34rem),
+                #0b1220;
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            letter-spacing: 0.005em;
+            -webkit-font-smoothing: antialiased;
+        }
+        ::selection { color: #eff6ff; background: rgba(37, 99, 235, 0.55); }
+        ::-webkit-scrollbar { width: 9px; height: 9px; }
+        ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.75); }
+        ::-webkit-scrollbar-thumb { background: #3b4b63; border: 2px solid #0f172a; border-radius: 999px; }
+        ::-webkit-scrollbar-thumb:hover { background: #5b6d87; }
+        :focus-visible { outline: 2px solid #60a5fa; outline-offset: 2px; }
+        input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+        select, textarea {
+            transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+        }
+        input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):focus,
+        select:focus, textarea:focus {
+            border-color: rgba(96, 165, 250, 0.75) !important;
+            box-shadow: 0 0 0 4px var(--focus-ring);
+            outline: none;
+        }
+        button, a { -webkit-tap-highlight-color: transparent; }
+        button:not(:disabled), a { transition: color 160ms ease, background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease; }
+        button:not(:disabled):hover { transform: translateY(-1px); }
+        button:not(:disabled):active { transform: translateY(0) scale(0.98); }
+        @keyframes card-arrive {
+            from { opacity: 0; transform: translateY(10px) scale(0.99); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes page-leave {
+            to { opacity: 0; transform: translateX(-10px); }
+        }
+        @keyframes page-enter {
+            from { opacity: 0; transform: translateX(10px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        .min-h-screen > .flex > aside {
+            background: rgba(15, 23, 42, 0.86);
+            border-color: var(--surface-border);
+            box-shadow: 12px 0 40px rgba(2, 6, 23, 0.12);
+            backdrop-filter: blur(18px);
+            view-transition-name: sidebar;
+        }
+        .min-h-screen > .flex > aside nav a {
+            border: 1px solid transparent;
+            color: #a7b3c5;
+        }
+        .min-h-screen > .flex > aside nav a i {
+            transition: transform 180ms ease, color 180ms ease;
+        }
+        .min-h-screen > .flex > aside nav a:hover i {
+            transform: scale(1.08);
+        }
+        .min-h-screen > .flex > aside nav a:hover {
+            color: #f8fafc;
+            border-color: rgba(148, 163, 184, 0.12);
+            background-color: rgba(51, 65, 85, 0.45);
+            transform: translateX(2px);
+        }
+        .min-h-screen > .flex > aside nav a.bg-primary-600\/20 {
+            color: #bfdbfe;
+            border-color: rgba(96, 165, 250, 0.22);
+            background: linear-gradient(110deg, rgba(37, 99, 235, 0.2), rgba(37, 99, 235, 0.06));
+            box-shadow: inset 3px 0 #60a5fa;
+        }
+        header.gradient-header {
+            position: sticky;
+            top: 0;
+            z-index: 20;
+            background:
+                linear-gradient(110deg, rgba(30, 64, 175, 0.88), rgba(15, 23, 42, 0.92) 72%),
+                #111c31;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+            backdrop-filter: blur(16px);
+            box-shadow: 0 12px 32px rgba(2, 6, 23, 0.18);
+        }
+        .min-h-screen > .flex > main {
+            view-transition-name: page-content;
+        }
+        @view-transition { navigation: auto; }
+        ::view-transition-old(page-content) {
+            animation: 180ms ease-in both page-leave;
+        }
+        ::view-transition-new(page-content) {
+            animation: 240ms ease-out both page-enter;
+        }
+        ::view-transition-group(sidebar) {
+            animation-duration: 240ms;
+        }
+        .bg-dark-card.border-dark-border {
+            background: linear-gradient(145deg, rgba(30, 41, 59, 0.94), rgba(20, 30, 47, 0.94));
+            border-color: var(--surface-border);
+            box-shadow: 0 10px 30px rgba(2, 6, 23, 0.12);
+        }
+        .card-hover {
+            transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+            animation: card-arrive 460ms cubic-bezier(0.2, 0.7, 0.25, 1) both;
+        }
+        .card-hover:nth-child(2) { animation-delay: 45ms; }
+        .card-hover:nth-child(3) { animation-delay: 90ms; }
+        .card-hover:nth-child(4) { animation-delay: 135ms; }
+        .card-hover:nth-child(5) { animation-delay: 180ms; }
+        .card-hover:nth-child(6) { animation-delay: 225ms; }
+        .card-hover:nth-child(n+7) { animation-delay: 270ms; }
+        .card-hover:hover {
+            transform: translateY(-3px);
+            border-color: rgba(96, 165, 250, 0.28);
+            box-shadow: 0 18px 42px rgba(2, 6, 23, 0.3);
+        }
+        table thead { color: #9fb0c6; letter-spacing: 0.075em; }
+        table tbody tr { transition: background-color 140ms ease; }
+        table tbody tr:hover { background-color: rgba(51, 65, 85, 0.2); }
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                scroll-behavior: auto !important;
+                transition-duration: 0.01ms !important;
+                animation-duration: 0.01ms !important;
+            }
+            ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
+        }
     </style>
 
     <!-- SECURITY: CSRF Token Meta Tag -->

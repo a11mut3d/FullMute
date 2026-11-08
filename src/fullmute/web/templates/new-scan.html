@@ -199,6 +199,25 @@
                                     <i class="fas fa-sliders-h text-primary-400 mr-2"></i>
                                     Scan Options
                                 </h3>
+
+                                <!-- CVE Lookup -->
+                                <div class="flex items-start mb-4">
+                                    <input
+                                        type="checkbox"
+                                        id="searchCves"
+                                        x-model="searchCves"
+                                        class="mt-1 rounded"
+                                    >
+                                    <label for="searchCves" class="ml-3 cursor-pointer">
+                                        <span class="block text-sm font-medium text-gray-300">
+                                            <i class="fas fa-shield-virus text-red-400 mr-2"></i>
+                                            Search for CVEs
+                                        </span>
+                                        <span class="block text-xs text-gray-400">
+                                            Look up vulnerabilities for detected technology versions and, when enabled, network services.
+                                        </span>
+                                    </label>
+                                </div>
                                 
                                 <!-- Test Network (Port Scanning) -->
                                 <div class="flex items-start mb-4">
@@ -321,6 +340,7 @@ function newScanApp() {
         schedule: 'weekly',
         testNetwork: false,
         testDefaultCredentials: false,
+        searchCves: true,
         searchExploits: false,
         runNuclei: false,
         loading: false,
@@ -501,6 +521,7 @@ function newScanApp() {
             formData.append('target_ids', JSON.stringify(this.selectedTargets));
             formData.append('test_network', this.testNetwork);
             formData.append('test_default_credentials', this.testDefaultCredentials);
+            formData.append('check_cves', this.searchCves);
             formData.append('search_exploits', this.searchExploits);
             formData.append('run_nuclei', this.runNuclei);
 
