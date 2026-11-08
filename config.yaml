@@ -55,6 +55,8 @@ scanner:
   search_exploits: true
   test_default_credentials: true
   login_path_probe_concurrency: 8
+  max_response_bytes: 5242880
+  sensitive_file_concurrency: 8
   timeout: 15
   tech_detection_timeout: 15
   tech_detection_max_html: 2000000

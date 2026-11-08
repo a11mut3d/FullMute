@@ -15,6 +15,7 @@
 * [Features](#features)
 * [Installation](#installation)
 * [Quick Start](#quick-start)
+* [Automated Tests](#automated-tests)
 * [CLI Usage](#cli-usage)
 * [Web Interface](#web-interface)
 * [Configuration](#configuration)
@@ -67,6 +68,20 @@ pip install -e .
 ```bash
 https://www.exploit-db.com/searchsploit
 ```
+
+---
+
+## Automated Tests
+
+The local test suite uses only fixtures and temporary SQLite databases; it does
+not scan external hosts or call external vulnerability services.
+
+```bash
+PYTHONPATH=src python -m unittest discover -s test -v
+```
+
+Run this from the repository root. If using a virtual environment, replace
+`python` with its interpreter path, for example `venv/bin/python`.
 
 ---
 
@@ -176,7 +191,16 @@ database. Use `fullmute --config /path/to/config.yaml scan targets.txt` to selec
 a specific configuration. The scanner checks the same admin/login paths with
 bounded concurrency; adjust `scanner.login_path_probe_concurrency` in the YAML
 configuration if needed (default: `8`). Per-domain timing is recorded in the
-scanner log to identify the slowest stages.
+scanner log to identify the slowest stages. HTTP response bodies are capped at
+5 MiB by default (`scanner.max_response_bytes`) to prevent oversized pages from
+causing unbounded memory use. Completed web scans release their in-memory
+results after persistence; cancelled or expired scans keep their queue slot
+until the worker exits, preventing overlapping orphaned scans.
+Sensitive-file checks run common exposure signatures first, then probe only
+the detected WordPress, Joomla, Bitrix, or Shopify paths from
+`cms_sensitive_files.json`. CMS probes are bounded by
+`scanner.sensitive_file_concurrency` (default: `8`), do not follow redirects,
+and report endpoint reachability without storing response contents.
 Versioned technologies are checked against NVD using an exact CPE query first.
 If NVD has no matching CPE or exact query returns no CVEs, FullMute retries with
 a product-and-version keyword query and verifies each result against NVD's
