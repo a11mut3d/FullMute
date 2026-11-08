@@ -60,13 +60,19 @@ class FullMuteScanner:
             max_redirects=self.config.get('max_redirects', 5),
             max_concurrent=max_concurrent,
             enable_session_cache=True,
+            max_response_bytes=self.config.get(
+                'max_response_bytes',
+                5 * 1024 * 1024,
+            ),
             allowed_private_networks=self.config.get(
                 'allowed_private_networks', []
             ),
         )
 
         self.verifier = SensitiveFileVerifier(
-            self.signatures.get('sensitive_files', {})
+            self.signatures.get('sensitive_files', {}),
+            cms_signatures=self.signatures.get('cms_sensitive_files', {}),
+            max_concurrent=self.config.get('sensitive_file_concurrency', 8),
         )
 
         self.stealth = Stealth(
@@ -308,6 +314,7 @@ class FullMuteScanner:
                     sensitive_files = await self.verifier.verify(
                         None,
                         results.get('final_url', url),
+                        detected_technologies=technologies,
                     )
                 except Exception as e:
                     logger.info(f"Sensitive file verifier error for {domain}: {e}")
@@ -713,6 +720,7 @@ class FullMuteScanner:
     async def scan(self, domains: List[str], max_concurrent: int = None):
         if max_concurrent is None:
             max_concurrent = self.config.get('max_concurrent', 10)
+        max_concurrent = max(1, int(max_concurrent))
 
         logger.info(f"Starting scan of {len(domains)} domains with {max_concurrent} concurrent requests")
 
@@ -754,31 +762,31 @@ class FullMuteScanner:
                         "status_code": 0
                     }
 
-        tasks = [scan_with_semaphore(domain) for domain in domains]
-
         results = []
-        for i in range(0, len(tasks), max_concurrent):
-            batch = tasks[i:i + max_concurrent]
+        for i in range(0, len(domains), max_concurrent):
+            batch = domains[i:i + max_concurrent]
             try:
                 batch_results = await asyncio.wait_for(
-                    asyncio.gather(*batch, return_exceptions=True),
+                    asyncio.gather(
+                        *(scan_with_semaphore(domain) for domain in batch),
+                        return_exceptions=True,
+                    ),
                     timeout=self.config.get('timeout', 15) * 3
                 )
             except asyncio.TimeoutError:
                 logger.warning(f"Timeout processing batch of domains")
-                batch_results = []
-                for _ in range(len(batch)):
-                    domain_idx = i + len(results)
-                    if domain_idx < len(domains):
-                        results.append({
-                            "domain": domains[domain_idx],
-                            "technologies": {},
-                            "cameras": [],
-                            "sensitive_files": [],
-                            "cves": {},
-                            "error": "Timeout during scan",
-                            "status_code": 0
-                        })
+                batch_results = [
+                    {
+                        "domain": domain,
+                        "technologies": {},
+                        "cameras": [],
+                        "sensitive_files": [],
+                        "cves": {},
+                        "error": "Timeout during scan",
+                        "status_code": 0,
+                    }
+                    for domain in batch
+                ]
 
             for result in batch_results:
                 if isinstance(result, Exception):
