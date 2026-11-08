@@ -79,7 +79,7 @@ def get_domain_findings(domain: str) -> Dict[str, Any]:
         return {'technologies': [], 'cves': [], 'sensitive_files': []}
 
 
-async def run_scan(scan_id: int, user_id: int, target_ids: List[int], test_default_credentials: bool = True, search_exploits: bool = False, run_nuclei: Optional[bool] = None, port_scan_enabled: bool = False, port_scan_with_cves: bool = False, port_scan_with_exploits: bool = False):
+async def run_scan(scan_id: int, user_id: int, target_ids: List[int], test_default_credentials: bool = True, search_exploits: bool = False, run_nuclei: Optional[bool] = None, port_scan_enabled: bool = False, port_scan_with_cves: bool = False, port_scan_with_exploits: bool = False, check_cves: bool = True):
 
     scanner = None
     port_scanner = None
@@ -105,8 +105,14 @@ async def run_scan(scan_id: int, user_id: int, target_ids: List[int], test_defau
             port_scan_with_cves = user_settings.get('port_scan_with_cves', False)
         if port_scan_with_exploits is False:
             port_scan_with_exploits = user_settings.get('port_scan_with_exploits', False)
+        port_scan_with_cves = bool(port_scan_with_cves) and check_cves
 
-        logger.info(f"Scan {scan_id}: Starting with user {user_id} settings (NVD: {'yes' if nvd_api_key else 'no'}, Proxy: {'on' if proxy_enabled else 'off'}, Test Creds: {test_default_credentials}, Port Scan: {port_scan_enabled})")
+        logger.info(
+            f"Scan {scan_id}: Starting with user {user_id} settings "
+            f"(NVD: {'yes' if nvd_api_key else 'no'}, Proxy: {'on' if proxy_enabled else 'off'}, "
+            f"Test Creds: {test_default_credentials}, Port Scan: {port_scan_enabled}, "
+            f"CVE lookup: {check_cves})"
+        )
 
         
         async with active_scans_lock:
@@ -135,6 +141,7 @@ async def run_scan(scan_id: int, user_id: int, target_ids: List[int], test_defau
         
         scan_targets = get_scan_targets(scan_id)
         domains = [t['domain'] for t in scan_targets]
+        del scan_targets
 
         if not domains:
             update_scan_status(scan_id, 'completed', progress=100)
@@ -144,6 +151,7 @@ async def run_scan(scan_id: int, user_id: int, target_ids: List[int], test_defau
             
             queue_manager = get_scan_queue_manager()
             queue_manager.complete_scan(scan_id, user_id, ScanStatus.COMPLETED)
+            cleanup_completed_scan(scan_id)
             return
 
         
@@ -175,6 +183,7 @@ async def run_scan(scan_id: int, user_id: int, target_ids: List[int], test_defau
             'nvd_api_key': nvd_api_key if nvd_api_key else None,
             'test_default_credentials': test_default_credentials,  
             'search_exploits': search_exploits,
+            'check_cves': check_cves,
             'max_scans_before_cleanup': 20  
         }
 
@@ -205,7 +214,10 @@ async def run_scan(scan_id: int, user_id: int, target_ids: List[int], test_defau
                     
                     scan_data = get_scan(scan_id)
                     if scan_data and scan_data.get('status') == 'cancelled':
-                        logger.info(f"Scan {scan_id} was cancelled, stopping...")
+                        logger.info(
+                            f"Scan {scan_id} is {scan_data['status']}; stopping before "
+                            f"the next target"
+                        )
                         return None
 
                     async with active_scans_lock:
@@ -406,12 +418,13 @@ async def run_scan(scan_id: int, user_id: int, target_ids: List[int], test_defau
                     return None
 
         
-        tasks = [scan_domain_wrapper(domain) for domain in domains]
-        
-        
-        for i in range(0, len(tasks), max_concurrent_scans * 2):
-            batch = tasks[i:i + max_concurrent_scans * 2]
-            batch_results = await asyncio.gather(*batch, return_exceptions=True)
+        batch_size = max_concurrent_scans * 2
+        for i in range(0, len(domains), batch_size):
+            batch = domains[i:i + batch_size]
+            batch_results = await asyncio.gather(
+                *(scan_domain_wrapper(domain) for domain in batch),
+                return_exceptions=True,
+            )
             
             for result in batch_results:
                 if isinstance(result, Exception):
@@ -430,9 +443,13 @@ async def run_scan(scan_id: int, user_id: int, target_ids: List[int], test_defau
         logger.info(f"Scan {scan_id}: Determining final status. Database status: {scan_data.get('status') if scan_data else 'None'}")
 
         async with active_scans_lock:
-            if scan_data and scan_data.get('status') == 'cancelled':
+            scan_status = scan_data.get('status') if scan_data else None
+            if scan_status == 'cancelled':
                 final_status = ScanStatus.CANCELLED
                 active_scans[scan_id]['status'] = 'cancelled'
+            elif scan_status == 'failed':
+                final_status = ScanStatus.FAILED
+                active_scans[scan_id]['status'] = 'failed'
             else:
                 final_status = ScanStatus.COMPLETED
                 active_scans[scan_id]['status'] = 'completed'
@@ -452,6 +469,7 @@ async def run_scan(scan_id: int, user_id: int, target_ids: List[int], test_defau
         
         queue_manager = get_scan_queue_manager()
         queue_manager.complete_scan(scan_id, user_id, final_status)
+        cleanup_completed_scan(scan_id)
 
         logger.info(f"Scan {scan_id} completed successfully in {time.time() - start_time:.1f}s")
 
@@ -465,6 +483,7 @@ async def run_scan(scan_id: int, user_id: int, target_ids: List[int], test_defau
         
         queue_manager = get_scan_queue_manager()
         queue_manager.complete_scan(scan_id, user_id, ScanStatus.FAILED)
+        cleanup_completed_scan(scan_id)
     finally:
         
         try:
@@ -479,7 +498,7 @@ async def run_scan(scan_id: int, user_id: int, target_ids: List[int], test_defau
             logger.debug(f"Error during cleanup: {e}")
 
 
-def run_scan_sync(scan_id: int, user_id: int, target_ids: List[int], test_default_credentials: bool = True, search_exploits: bool = False, run_nuclei: Optional[bool] = None, port_scan_enabled: bool = False, port_scan_with_cves: bool = False, port_scan_with_exploits: bool = False):
+def run_scan_sync(scan_id: int, user_id: int, target_ids: List[int], test_default_credentials: bool = True, search_exploits: bool = False, run_nuclei: Optional[bool] = None, port_scan_enabled: bool = False, port_scan_with_cves: bool = False, port_scan_with_exploits: bool = False, check_cves: bool = True):
     try:
         asyncio.run(run_scan(
             scan_id, 
@@ -490,12 +509,22 @@ def run_scan_sync(scan_id: int, user_id: int, target_ids: List[int], test_defaul
             run_nuclei,
             port_scan_enabled,
             port_scan_with_cves,
-            port_scan_with_exploits
+            port_scan_with_exploits,
+            check_cves
         ))
     except Exception as e:
         logger.error(f"Scan {scan_id} failed: {e}")
         if scan_id in active_scans:
             active_scans[scan_id]['status'] = 'failed'
+        try:
+            get_scan_queue_manager().complete_scan(
+                scan_id,
+                user_id,
+                ScanStatus.FAILED,
+            )
+        except Exception:
+            logger.exception("Could not release queue slot for scan %s", scan_id)
+        cleanup_completed_scan(scan_id)
 
 
 def get_scan_progress(scan_id: int) -> Dict[str, Any]:

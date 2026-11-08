@@ -28,7 +28,8 @@ class ScanQueueItem:
                  test_default_credentials: bool = True, search_exploits: bool = False,
                  run_nuclei: Optional[bool] = None,
                  port_scan_enabled: bool = False, port_scan_with_cves: bool = False,
-                 port_scan_with_exploits: bool = False, max_duration_hours: int = 24):
+                 port_scan_with_exploits: bool = False, max_duration_hours: int = 24,
+                 check_cves: bool = True):
         self.scan_id = scan_id
         self.user_id = user_id
         self.target_ids = target_ids
@@ -38,6 +39,7 @@ class ScanQueueItem:
         self.port_scan_enabled = port_scan_enabled
         self.port_scan_with_cves = port_scan_with_cves
         self.port_scan_with_exploits = port_scan_with_exploits
+        self.check_cves = check_cves
         self.status = ScanStatus.PENDING
         self.created_at = datetime.now()
         self.started_at: Optional[datetime] = None
@@ -72,7 +74,8 @@ class UserScanQueue:
 
     def add_scan(self, scan_id: int, target_ids: List[int], test_default_credentials: bool = True, 
                  search_exploits: bool = False, run_nuclei: Optional[bool] = None, port_scan_enabled: bool = False,
-                 port_scan_with_cves: bool = False, port_scan_with_exploits: bool = False) -> ScanQueueItem:
+                 port_scan_with_cves: bool = False, port_scan_with_exploits: bool = False,
+                 check_cves: bool = True) -> ScanQueueItem:
         with self.lock:
             item = ScanQueueItem(
                 scan_id, self.user_id, target_ids, 
@@ -81,7 +84,8 @@ class UserScanQueue:
                 run_nuclei,
                 port_scan_enabled,
                 port_scan_with_cves,
-                port_scan_with_exploits
+                port_scan_with_exploits,
+                check_cves=check_cves,
             )
             item.status = ScanStatus.QUEUED
             self.queue.append(item)
@@ -107,18 +111,21 @@ class UserScanQueue:
             for scan_id, item in list(self.running.items()):
                 if item.is_expired():
                     expired_scans.append(scan_id)
-                    logger.warning(f"Scan {scan_id} expired (duration: {item.get_duration():.1f}s), marking as failed")
+                    logger.warning(
+                        f"Scan {scan_id} expired (duration: {item.get_duration():.1f}s); "
+                        "stopping after its current target"
+                    )
                     item.status = ScanStatus.FAILED
-                    item.completed_at = datetime.now()
                     update_scan_status(scan_id, 'failed', progress=0)
-            
-            
-            for scan_id in expired_scans:
-                del self.running[scan_id]
+                    from fullmute.web.scanner import active_scans
+                    if scan_id in active_scans:
+                        active_scans[scan_id]['status'] = 'failed'
             
             if expired_scans:
-                logger.info(f"Cleaned up {len(expired_scans)} expired scans")
-                self._try_start_scans()
+                logger.info(
+                    f"Marked {len(expired_scans)} expired scans for shutdown; "
+                    "their queue slots remain occupied until worker exit"
+                )
             
             self._last_cleanup = now
 
@@ -133,7 +140,7 @@ class UserScanQueue:
 
             
             scan_data = get_scan(item.scan_id)
-            if scan_data and scan_data.get('status') == 'cancelled':
+            if scan_data and scan_data.get('status') in {'cancelled', 'failed'}:
                 item.status = ScanStatus.CANCELLED
                 item.completed_at = datetime.now()
                 logger.info(f"Scan {item.scan_id} was cancelled while in queue")
@@ -161,7 +168,8 @@ class UserScanQueue:
                     item.run_nuclei,
                     item.port_scan_enabled,
                     item.port_scan_with_cves,
-                    item.port_scan_with_exploits
+                    item.port_scan_with_exploits,
+                    item.check_cves,
                 ),
                 daemon=True,  
                 name=f"scan-{item.scan_id}-user-{item.user_id}"
@@ -200,17 +208,17 @@ class UserScanQueue:
             
             if scan_id in self.running:
                 update_scan_status(scan_id, 'cancelled')
-                logger.info(f"Marked running scan {scan_id} for cancellation")
+                logger.info(
+                    f"Marked running scan {scan_id} for cancellation; "
+                    "its queue slot remains occupied until the worker exits"
+                )
                 
-                item = self.running.pop(scan_id)
+                item = self.running[scan_id]
                 item.status = ScanStatus.CANCELLED
-                item.completed_at = datetime.now()
                 
                 from fullmute.web.scanner import active_scans
                 if scan_id in active_scans:
                     active_scans[scan_id]['status'] = 'cancelled'
-                
-                self._try_start_scans()
                 return True
 
             return False
@@ -295,7 +303,8 @@ class ScanQueueManager:
                  test_default_credentials: bool = True, search_exploits: bool = False,
                  run_nuclei: Optional[bool] = None,
                  port_scan_enabled: bool = False, port_scan_with_cves: bool = False,
-                 port_scan_with_exploits: bool = False) -> ScanQueueItem:
+                 port_scan_with_exploits: bool = False,
+                 check_cves: bool = True) -> ScanQueueItem:
         """Add a scan to user's queue"""
         user_queue = self.get_user_queue(user_id)
         return user_queue.add_scan(
@@ -306,7 +315,8 @@ class ScanQueueManager:
             run_nuclei,
             port_scan_enabled,
             port_scan_with_cves,
-            port_scan_with_exploits
+            port_scan_with_exploits,
+            check_cves
         )
 
     def complete_scan(self, scan_id: int, user_id: int, status: ScanStatus):
