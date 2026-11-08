@@ -253,7 +253,8 @@ class HttpClient:
 
     def __init__(self, max_retries=3, timeout=15, proxy_enabled=False, proxy_file=None,
                  bypass_cloudflare=True, max_redirects=5, max_concurrent=10,
-                 enable_session_cache=True, allowed_private_networks=None):
+                 enable_session_cache=True, allowed_private_networks=None,
+                 max_response_bytes=5 * 1024 * 1024):
         self._closed = False
         self._session: Optional[ClientSession] = None
         self.max_retries = max_retries
@@ -264,6 +265,7 @@ class HttpClient:
         self.bypass_cloudflare = bypass_cloudflare
         self.max_redirects = max_redirects
         self.enable_session_cache = enable_session_cache
+        self.max_response_bytes = max(1, int(max_response_bytes))
         try:
             allowed_networks = [
                 ipaddress.ip_network(network, strict=False)
@@ -324,6 +326,22 @@ class HttpClient:
         if self.proxies:
             return random.choice(self.proxies)
         return None
+
+    async def _read_response_text(self, response) -> str:
+        body = await response.content.read(self.max_response_bytes + 1)
+        if len(body) > self.max_response_bytes:
+            response.close()
+            body = body[:self.max_response_bytes]
+            logger.warning(
+                "HTTP response body exceeded the %s-byte limit; truncating it",
+                self.max_response_bytes,
+            )
+
+        encoding = response.charset or "utf-8"
+        try:
+            return body.decode(encoding, errors="backslashreplace")
+        except LookupError:
+            return body.decode("utf-8", errors="backslashreplace")
 
     async def _get_session(self) -> ClientSession:
         if self._session is None or self._session.closed:
@@ -470,7 +488,7 @@ class HttpClient:
                             continue  # новый запрос
 
                     # ----- Получен ответ (не HTTP-редирект) -----
-                    html = await response.text(errors='backslashreplace')
+                    html = await self._read_response_text(response)
                     headers_dict = dict(response.headers)
                     cookies_dict = {k: v.value for k, v in response.cookies.items()}
                     final_url = current_url
@@ -520,7 +538,7 @@ class HttpClient:
                                         allow_redirects=False,
                                         cookies={cookie_name: cookie_value}
                                     ) as resp2:
-                                        html2 = await resp2.text(errors='backslashreplace')
+                                        html2 = await self._read_response_text(resp2)
                                         headers_dict = dict(resp2.headers)
                                         cookies_dict = {k: v.value for k, v in resp2.cookies.items()}
                                         final_url = current_url
