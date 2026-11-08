@@ -14,6 +14,41 @@ from fullmute.web.config import config
 router = APIRouter()
 
 
+def _get_group_targets(group_id: int, current_user: dict):
+    if current_user['role'] == 'admin':
+        targets = get_targets(group_id=group_id)
+    else:
+        targets = get_targets(
+            group_id=group_id,
+            created_by=current_user['id'],
+        )
+
+    if targets:
+        return targets
+
+    if current_user['role'] != 'admin':
+        with get_db_connection() as conn:
+            group = conn.execute(
+                "SELECT id, created_by FROM target_groups WHERE id = ?",
+                (group_id,),
+            ).fetchone()
+        if not group:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Group not found",
+            )
+        if group['created_by'] != current_user['id']:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied. You can only access reports for your own targets.",
+            )
+
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail="No targets found in group",
+    )
+
+
 def get_scanner_db_path():
     db_path = Path(__file__).parent.parent.parent.parent.parent / config.scanner_database
     return str(db_path)
@@ -330,31 +365,10 @@ async def generate_group_report_json(
     logger = setup_logger()
     logger.info(f"Generating JSON report for group {group_id} by user {current_user['username']} (role: {current_user['role']})")
 
-    targets = get_targets(group_id=group_id)
+    targets = _get_group_targets(group_id, current_user)
     logger.info(f"Found {len(targets)} targets in group {group_id}")
     for t in targets:
         logger.info(f"  Target: {t}")
-
-    if current_user['role'] != 'admin' and not targets:
-        with get_db_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT id, created_by FROM target_groups WHERE id = ?", (group_id,))
-            group = cursor.fetchone()
-            if not group:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Group not found"
-                )
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Access denied. You can only access reports for your own targets."
-            )
-
-    if not targets:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="No targets found in group"
-        )
 
     report_data = {
         "generated_at": datetime.now().isoformat(),
@@ -404,34 +418,8 @@ async def download_group_report(
     try:
         logger.info(f"Generating {format.upper()} report for group {group_id} by user {current_user['username']} (role: {current_user['role']})")
 
-        targets = get_targets(group_id=group_id)
+        targets = _get_group_targets(group_id, current_user)
         logger.info(f"Found {len(targets)} targets in group {group_id}")
-        for t in targets:
-            logger.info(f"  Target: {t}")
-
-        if current_user['role'] != 'admin' and not targets:
-            with get_db_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("SELECT id, created_by FROM target_groups WHERE id = ?", (group_id,))
-                group = cursor.fetchone()
-                if not group:
-                    logger.warning(f"Group {group_id} not found")
-                    raise HTTPException(
-                        status_code=status.HTTP_404_NOT_FOUND,
-                        detail="Group not found"
-                    )
-                logger.warning(f"User {current_user['username']} tried to access group {group_id} they don't own")
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Access denied. You can only access reports for your own targets."
-                )
-
-        if not targets:
-            logger.warning(f"No targets in group {group_id}")
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="No targets found in group"
-            )
 
         report_data = {
             "generated_at": datetime.now().isoformat(),
@@ -512,13 +500,7 @@ async def get_group_summary(
     logger = setup_logger()
     logger.info(f"Getting summary for group {group_id}")
 
-    targets = get_targets(group_id=group_id)
-
-    if not targets:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="No targets found in group"
-        )
+    targets = _get_group_targets(group_id, current_user)
 
     summary = {
         "total_targets": len(targets),
@@ -545,7 +527,7 @@ async def get_group_summary(
             if domain_row:
                 summary['scanned'] += 1
 
-                if domain_row.get('has_camera'):
+                if domain_row['has_camera']:
                     summary['with_cameras'] += 1
 
                 # Get technologies count
@@ -586,13 +568,7 @@ async def get_group_domains(
     current_user: dict = Depends(get_current_user)
 ):
     """Get all domains in a group"""
-    targets = get_targets(group_id=group_id)
-
-    if not targets:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="No targets found in group"
-        )
+    targets = _get_group_targets(group_id, current_user)
 
     domains = []
     for target in targets:

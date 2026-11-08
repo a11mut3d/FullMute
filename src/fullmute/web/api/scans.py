@@ -179,6 +179,7 @@ async def start_scan(
     target_ids: str = Form(...),
     test_network: bool = Form(False),
     test_default_credentials: bool = Form(False),
+    check_cves: bool = Form(True),
     search_exploits: bool = Form(False),
     run_nuclei: Optional[bool] = Form(None),
     current_user: dict = Depends(get_current_user)
@@ -275,8 +276,9 @@ async def start_scan(
             search_exploits,
             run_nuclei=run_nuclei,
             port_scan_enabled=test_network,
-            port_scan_with_cves=test_network,  
-            port_scan_with_exploits=search_exploits  
+            port_scan_with_cves=test_network and check_cves,
+            port_scan_with_exploits=search_exploits,
+            check_cves=check_cves,
         )
 
         
