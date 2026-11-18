@@ -6,7 +6,6 @@
 
 ![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)
-![License](https://img.shields.io/badge/License-MIT-green.svg)
 
 ---
 
@@ -21,7 +20,6 @@
   * [Advanced Configuration](#advanced-configuration)
   * [Under the Hood & Scanning Logic](#under-the-hood--scanning-logic)
 * [Web Interface](#web-interface)
-* [License](#license)
 
 ---
 
@@ -203,7 +201,3 @@ Run `fullmute search --help` to see all arguments, options, and advanced example
 FullMute includes a modern, intuitive web dashboard built on FastAPI for managing targets, scheduling tasks, and visualizing vulnerabilities by severity.
 
 ---
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
