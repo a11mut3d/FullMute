@@ -65,18 +65,6 @@ pip install -e .
 
 ---
 
-## Automated Tests
-
-The local test suite uses only fixtures and temporary SQLite databases; it does not scan external hosts or call external vulnerability services.
-
-Run this from the repository root:
-```bash
-PYTHONPATH=src python -m unittest discover -s test -v
-```
-*Note: If using a virtual environment, replace `python` with your interpreter path (e.g., `venv/bin/python`).*
-
----
-
 ## Quick Start
 
 ### CLI Mode
